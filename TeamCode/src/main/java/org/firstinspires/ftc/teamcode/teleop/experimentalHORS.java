@@ -110,7 +110,7 @@ public class experimentalHORS extends LinearOpMode {
     // heavy smoothing to remove violent shaking
     private static final double POWER_SMOOTH_ALPHA = 0.96;
 
-    // derivative low-pass filter to avoid spike noise
+    // derivative low-pass filter to avoid spike noises
     private static final double DERIV_FILTER_ALPHA = 0.2;
 
     // PID state
