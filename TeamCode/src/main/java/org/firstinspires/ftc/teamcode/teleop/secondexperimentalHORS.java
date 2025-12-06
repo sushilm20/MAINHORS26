@@ -12,16 +12,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
-/**
- * TeleOp with IMU-stabilized turret.
- * Damped and smoothed heavily, with IMU feedforward based on angular velocity.
- *
- * - Motor max power limited to 0.5
- * - Encoder hard limits: -500..500
- * - Turret motor direction kept REVERSE
- */
-@TeleOp(name="wildexperimentalHORS", group="Linear OpMode")
-public class aexperimentalHORS extends LinearOpMode {
+//testing wild things
+@TeleOp(name="???HORS???", group="Linear OpMode")
+public class secondexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, turret, intakeMotor;
@@ -89,28 +82,26 @@ public class aexperimentalHORS extends LinearOpMode {
 
     // ticks-per-radian mapping
     private static final double BASE_TICKS_PER_RADIAN = TURRET_MAX_POS / Math.PI; // ~159.155
-    private static final double TICKS_PER_RADIAN_SCALE = 3.0; //ADJUST THIS VALUE IF U WANT MORE OR LESS ROTATION GNG
+    private static final double TICKS_PER_RADIAN_SCALE = 2.88;
     private static final double TICKS_PER_RADIAN = BASE_TICKS_PER_RADIAN * TICKS_PER_RADIAN_SCALE;
 
     // PID parameters tuned for damping and stability (reduced aggressiveness)
-    private static final double TURRET_KP = 0.033;    // smaller proportional lowk change to 0.3 if doing wobble
-    private static final double TURRET_KI = 0.0000;   // very small integral
-    private static final double TURRET_KD = 0.010;    // derivative for damping and smoother movement
-    private static final double TURRET_MAX_POWER = 0.65; // user requested cap to 0.5
+    private static final double TURRET_KP = 0.033;
+    private static final double TURRET_KI = 0.0000;
+    private static final double TURRET_KD = 0.010;
+    private static final double TURRET_MAX_POWER = 0.80;
 
     // feedforward gain (based on robot angular velocity in rad/s)
-    // tune this lightly. Typical omega up to ~pi rad/s => FF_GAIN * pi should be < TURRET_MAX_POWER.
-    private static final double FF_GAIN = 0.03; // start conservative
+    private static final double FF_GAIN = 0.03;
 
     // deadband and anti-windup
-    private static final int SMALL_DEADBAND_TICKS = 4;
+    private static final int SMALL_DEADBAND_TICKS = 3;
     private static final double INTEGRAL_CLAMP = 200.0;
 
     // heavy smoothing to remove violent shaking
-    // alpha close to 1 keeps previous power more (strong smoothing)
-    private static final double POWER_SMOOTH_ALPHA = 0.97;
+    private static final double POWER_SMOOTH_ALPHA = 0.96;
 
-    // derivative low-pass filter to avoid spike noise
+    // derivative low-pass filter to avoid spike noises
     private static final double DERIV_FILTER_ALPHA = 0.2;
 
     // PID state
@@ -122,6 +113,9 @@ public class aexperimentalHORS extends LinearOpMode {
 
     // manual override tracking
     private boolean manualTurretActiveLast = false;
+
+    // For gamepad2 touchpad reset
+    private boolean gamepad2TouchpadLast = false;
 
     @Override
     public void runOpMode() {
@@ -146,7 +140,7 @@ public class aexperimentalHORS extends LinearOpMode {
         shooter.setDirection(DcMotor.Direction.REVERSE);
 
         // keep turret reversed as requested
-        turret.setDirection(DcMotor.Direction.REVERSE);
+        turret.setDirection(DcMotor.Direction.FORWARD);
 
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
@@ -198,6 +192,8 @@ public class aexperimentalHORS extends LinearOpMode {
         lastAppliedTurretPower = 0.0;
         lastDerivative = 0.0;
 
+        gamepad2TouchpadLast = false;
+
         while (opModeIsActive()) {
             long nowMs = System.currentTimeMillis();
 
@@ -207,6 +203,36 @@ public class aexperimentalHORS extends LinearOpMode {
             } catch (Throwable t) {
                 touchpadNow = (gamepad1.left_stick_button && gamepad1.right_stick_button);
             }
+
+            // ------------------------------------
+            // NEW FEATURE: gamepad2 touchpad reset
+            // ------------------------------------
+            boolean gamepad2TouchpadNow = false;
+            try {
+                gamepad2TouchpadNow = gamepad2.touchpad;
+            } catch (Throwable t) {
+                // fallback: both sticks pressed for gamepad2 (legacy)
+                gamepad2TouchpadNow = (gamepad2.left_stick_button && gamepad2.right_stick_button);
+            }
+            if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
+                // Reset IMU Z heading reference (no actual IMU re-init, just software reference)
+                headingReferenceRad = 0.0;
+                lastHeadingRad = 0.0;
+
+                // Reset turret encoder
+                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+                turretEncoderReference = 0;
+                lastTurretError = 0;
+                turretIntegral = 0.0;
+                lastAppliedTurretPower = 0.0;
+                lastDerivative = 0.0;
+
+                telemetry.addData("Reset", "IMU heading reference and turret encoder set to zero!");
+                telemetry.update();
+            }
+            gamepad2TouchpadLast = gamepad2TouchpadNow;
 
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
@@ -224,9 +250,7 @@ public class aexperimentalHORS extends LinearOpMode {
             }
             touchpadPressedLast = touchpadNow;
 
-            // -------------------------
             // DRIVE (unchanged)
-            // -------------------------
             double axial   = gamepad1.left_stick_y;
             double lateral = -gamepad1.left_stick_x;
             double yaw     = -gamepad1.right_stick_x;
@@ -318,9 +342,7 @@ public class aexperimentalHORS extends LinearOpMode {
             atTargetLast = atTargetNow;
             if (rumbling && nowMs > rumbleEndTimeMs) rumbling = false;
 
-            // -----------------------------------------
             // TURRET: SMOOTH PID + IMU FEEDFORWARD
-            // -----------------------------------------
             int turretPos = turret.getCurrentPosition();
 
             boolean manualNow = false;
@@ -329,7 +351,7 @@ public class aexperimentalHORS extends LinearOpMode {
             // manual control: bumpers OR legacy stick
             if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
                 manualNow = true;
-                if (turretPos < TURRET_MAX_POS) manualPower = 0.5; // manual at 0.5 as requested
+                if (turretPos < TURRET_MAX_POS) manualPower = 0.5;
             } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
                 manualNow = true;
                 if (turretPos > TURRET_MIN_POS) manualPower = -0.5;
@@ -430,7 +452,6 @@ public class aexperimentalHORS extends LinearOpMode {
                 lastAppliedTurretPower = applied;
                 lastDerivative = derivativeFiltered;
 
-                // telemetry to help tune if needed
                 telemetry.addData("turret.desired", desiredTicks);
                 telemetry.addData("turret.error", errorTicks);
                 telemetry.addData("turret.pid", String.format("%.3f", pidOut));
@@ -522,11 +543,12 @@ public class aexperimentalHORS extends LinearOpMode {
 
     /**
      * Read IMU heading (Z axis) in radians in range (-pi, pi]
+     * Correction for Rev Hub: logo RIGHT, USB DOWN (axes mirrored from default).
      */
     private double getHeadingRadians() {
         if (imu == null) return 0.0;
         Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
-        return o.firstAngle;
+        return -o.firstAngle;
     }
 
     /**

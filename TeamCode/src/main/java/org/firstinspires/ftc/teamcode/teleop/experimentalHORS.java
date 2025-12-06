@@ -5,12 +5,14 @@ import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
+//testing that works
 /**
  * TeleOp with IMU-stabilized turret.
  * Damped and smoothed heavily, with IMU feedforward based on angular velocity.
@@ -22,7 +24,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * Added: Feature to reset IMU and turret encoder by pressing gamepad2's middle touchpad.
  * Correction: getHeadingRadians() returns -firstAngle for Rev Hub mounted logo RIGHT, USB DOWN.
  */
-@TeleOp(name="???HORS???", group="Linear OpMode")
+@TeleOp(name="Normal Experimental HORS", group="Linear OpMode")
 public class experimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -91,14 +93,14 @@ public class experimentalHORS extends LinearOpMode {
 
     // ticks-per-radian mapping
     private static final double BASE_TICKS_PER_RADIAN = TURRET_MAX_POS / Math.PI; // ~159.155
-    private static final double TICKS_PER_RADIAN_SCALE = 3.0;
+    private static final double TICKS_PER_RADIAN_SCALE = 2.88;
     private static final double TICKS_PER_RADIAN = BASE_TICKS_PER_RADIAN * TICKS_PER_RADIAN_SCALE;
 
     // PID parameters tuned for damping and stability (reduced aggressiveness)
     private static final double TURRET_KP = 0.033;
     private static final double TURRET_KI = 0.0000;
     private static final double TURRET_KD = 0.010;
-    private static final double TURRET_MAX_POWER = 0.65;
+    private static final double TURRET_MAX_POWER = 0.80;
 
     // feedforward gain (based on robot angular velocity in rad/s)
     private static final double FF_GAIN = 0.03;
@@ -149,7 +151,7 @@ public class experimentalHORS extends LinearOpMode {
         shooter.setDirection(DcMotor.Direction.REVERSE);
 
         // keep turret reversed as requested
-        turret.setDirection(DcMotor.Direction.REVERSE);
+        turret.setDirection(DcMotor.Direction.FORWARD);
 
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 

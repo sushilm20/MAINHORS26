@@ -7,7 +7,6 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
-import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
@@ -18,57 +17,44 @@ public class pedroauto extends OpMode {
 
     private TelemetryManager panelsTelemetry; // Panels Telemetry instance
     public Follower follower; // Pedro Pathing follower instance
-    private int pathState = -1; // Current autonomous path state (state machine)
+    private int pathState; // Current autonomous path state (state machine)
     private Paths paths; // Paths defined in the Paths class
 
-    // Timers used by the FSM (mirrors ExampleAuto structure)
-    private Timer pathTimer;
-    private Timer opmodeTimer;
+    // State machine helpers
+    private boolean pathFollowing;
+    private long pathStartTimeMs;
+    private static final long PATH_TIMEOUT_MS = 8000; // fallback timeout per path
 
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(72, 8, Math.toRadians(90)));
+        // keep same starting pose as in the example
+        follower.setStartingPose(new Pose(72, 72, Math.toRadians(90)));
 
         paths = new Paths(follower); // Build paths
 
-        pathTimer = new Timer();
-        opmodeTimer = new Timer();
+        pathState = 0;
+        pathFollowing = false;
+        pathStartTimeMs = 0;
 
         panelsTelemetry.debug("Status", "Initialized");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
-    public void init_loop() {
-        // no-op; kept for parity with ExampleAuto
-    }
-
-    @Override
-    public void start() {
-        // Called once when play is pressed. Reset timers and start FSM at state 0.
-        if (opmodeTimer != null) opmodeTimer.resetTimer();
-        setPathState(0);
-    }
-
-    @Override
     public void loop() {
         follower.update(); // Update Pedro Pathing
-        pathState = autonomousPathUpdate(); // Update autonomous state machine
+        autonomousPathUpdate(); // Update autonomous state machine (updates internal state)
 
         // Log values to Panels and Driver Station
         panelsTelemetry.debug("Path State", pathState);
+        panelsTelemetry.debug("Path Following", pathFollowing);
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
         panelsTelemetry.update(telemetry);
-    }
-
-    @Override
-    public void stop() {
-        // Terminal cleanup if necessary
     }
 
     public static class Paths {
@@ -83,214 +69,281 @@ public class pedroauto extends OpMode {
         public PathChain Path8;
         public PathChain Path9;
         public PathChain Path10;
+        public PathChain Path11;
 
         public Paths(Follower follower) {
+            // Points replaced with user-provided sequence while keeping original heading interpolations
+
+            // 1) 25,83 -> 39,98
             Path1 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(17.742, 128.527), new Pose(60.447, 85.203))
+                            new BezierLine(new Pose(25.000, 72.000), new Pose(39.000, 98.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(142.5),
-                            Math.toRadians(180)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(130))
                     .build();
 
+            // 2) 39,98 -> 35,72 (collect -> shoot)
             Path2 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(60.447, 85.203), new Pose(18.468, 84.104))
+                            new BezierLine(new Pose(39.000, 98.000), new Pose(35.000, 72.000))
                     )
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(180))
                     .build();
 
+            // 3) 35,72 -> 8,101 (shoot -> collect 2nd)
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.468, 84.104), new Pose(44.672, 99.078))
+                            new BezierLine(new Pose(35.000, 72.000), new Pose(8.000, 101.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(180),
-                            Math.toRadians(142.5)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
+            // 4) 8,101 -> 23,115 (collect 2nd -> collect 3 2nd time)
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.672, 99.078), new Pose(44.423, 59.896))
+                            new BezierLine(new Pose(8.000, 101.000), new Pose(23.000, 115.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(142.5),
-                            Math.toRadians(180)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
                     .build();
 
+            // 5) 23,115 -> 35,72 (collect -> shoot)
             Path5 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.423, 59.896), new Pose(18.468, 59.646))
+                            new BezierLine(new Pose(23.000, 115.000), new Pose(35.000, 72.000))
                     )
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(180))
                     .build();
 
+            // 6) 35,72 -> 9,115 (shoot -> collect 3rd)
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.468, 59.646), new Pose(44.922, 99.078))
+                            new BezierLine(new Pose(35.000, 72.000), new Pose(9.000, 115.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(180),
-                            Math.toRadians(142.5)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
+            // 7) 9,115 -> 4,131 (collect 3rd -> collected 3)
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.922, 99.078), new Pose(43.924, 35.438))
+                            new BezierLine(new Pose(9.000, 115.000), new Pose(4.000, 131.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(142.5),
-                            Math.toRadians(180)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
                     .build();
 
+            // 8) 4,131 -> 35,72 (back to shoot)
             Path8 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(43.924, 35.438), new Pose(18.718, 35.438))
+                            new BezierLine(new Pose(4.000, 131.000), new Pose(35.000, 72.000))
                     )
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(180))
                     .build();
 
+            // 9) 35,72 -> 29,88
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.718, 35.438), new Pose(44.922, 99.328))
+                            new BezierLine(new Pose(35.000, 72.000), new Pose(29.000, 88.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(180),
-                            Math.toRadians(142.5)
-                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
+            // 10) 29,88 -> 35,72 (return to shoot or reposition)
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.922, 99.328), new Pose(44.672, 134.017))
+                            new BezierLine(new Pose(29.000, 88.000), new Pose(35.000, 72.000))
                     )
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(142.5),
-                            Math.toRadians(90)
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
+                    .build();
+
+            // 11) Final: stay at shoot pose but rotate to final heading (uses original Path11 heading interpolation)
+            Path11 = follower
+                    .pathBuilder()
+                    .addPath(
+                            new BezierLine(new Pose(35.000, 72.000), new Pose(35.000, 72.000))
                     )
+                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(270))
                     .build();
         }
     }
 
     /**
-     * Finite State Machine following the ExampleAuto logic.
-     * - Starts Path1 in state 0.
-     * - Waits for follower.isBusy() to be false before advancing to the next path.
-     * - Uses follower.followPath(path, true) to hold at the end of a PathChain when appropriate (so you can run actions).
-     * - Final state is -1 (terminal).
+     * Simple sequential state machine to run the PathChains in the order defined above.
+     *
+     * Behavior:
+     * - When entering a state it starts following the corresponding PathChain.
+     * - It waits until the follower reports it is no longer following (path finished),
+     *   or a timeout occurs, then advances to the next state.
+     *
+     * Note: This code assumes the Follower API exposes:
+     *   follower.follow(PathChain) to begin following a path
+     *   follower.isFollowing() to query whether a path is actively being followed
+     *
+     * If your Follower implementation uses different method names, adjust the calls accordingly.
      */
     public int autonomousPathUpdate() {
+        long now = System.currentTimeMillis();
+
+        // Helper lambda-style behavior using methods (kept inline for clarity)
         switch (pathState) {
             case 0:
-                // Start the first path (no hold)
-                follower.followPath(paths.Path1);
-                setPathState(1);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path1);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    // if follower finished or timed out -> advance
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
+                }
                 break;
 
             case 1:
-                // Wait until path1 finishes, then go to Path2 and hold (so actions could run)
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path2, true);
-                    setPathState(2);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path2);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 2:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path3, true);
-                    setPathState(3);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path3);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 3:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path4, true);
-                    setPathState(4);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path4);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 4:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path5, true);
-                    setPathState(5);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path5);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 5:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path6, true);
-                    setPathState(6);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path6);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 6:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path7, true);
-                    setPathState(7);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path7);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 7:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path8, true);
-                    setPathState(8);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path8);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 8:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path9, true);
-                    setPathState(9);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path9);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 9:
-                if (!follower.isBusy()) {
-                    follower.followPath(paths.Path10, true);
-                    setPathState(10);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path10);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
             case 10:
-                if (!follower.isBusy()) {
-                    // Sequence complete; terminal state
-                    setPathState(-1);
+                if (!pathFollowing) {
+                    follower.followPath(paths.Path11);
+                    pathFollowing = true;
+                    pathStartTimeMs = now;
+                } else {
+                    if (!follower.getFollowingPathChain() || now - pathStartTimeMs > PATH_TIMEOUT_MS) {
+                        // Finished final path -> move to terminal state
+                        pathFollowing = false;
+                        pathState++;
+                    }
                 }
                 break;
 
-            case -1:
             default:
-                // Terminal/default: nothing to do
+                // Terminal state: do nothing (all paths completed)
                 break;
         }
 
         return pathState;
-    }
-
-    /** Change path state and reset the path timer (mirrors ExampleAuto behavior). **/
-    public void setPathState(int pState) {
-        pathState = pState;
-        if (pathTimer != null) {
-            pathTimer.resetTimer();
-        }
-        if (panelsTelemetry != null) {
-            panelsTelemetry.debug("Set Path State", pathState);
-        }
     }
 }
