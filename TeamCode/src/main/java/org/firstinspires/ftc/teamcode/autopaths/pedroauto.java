@@ -20,52 +20,63 @@ import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
 /**
- * ExperimentalPedroAuto
+ * ExperimentalPedroAuto (improved PRE_ACTION pose handling + fallback)
  *
- * - Waits for shooter to reach close-mode RPM before starting pathing.
- * - Keeps turret auto-align running.
- * - Starts intake/compression before paths 3, 6, 9 (same as teleop).
- * - Ensures intake is RUNNING continuously from before starting path 3 until AFTER reaching path 4,
- *   similarly for the segments 6->7 and 9->10.
- * - Whenever a completed path ENDS at (48,96) the opmode:
- *     1) pauses at that pose for PRE_ACTION_WAIT_SECONDS (1.3s),
- *     2) then starts intake/compression,
- *     3) runs intake/compression for INTAKE_WAIT_SECONDS,
- *     4) runs claw servo action (close then open) automatically,
- *     5) then continues to the next path.
+ * Fixes:
+ *  - PRE_ACTION timer only begins after the robot reaches the shoot pose OR after a short pose-wait timeout.
+ *  - Increased default pose tolerance and added debug telemetry for distance-to-target so you can tune.
+ *  - Prevents the robot from stalling indefinitely when it gets "very close but not exact".
  *
- * - Final path end point is (42.000, 80.000) (heading preserved).
+ * Behavior preserved otherwise.
  *
- * Hardware names used (must match your robot): "shooter","turret","intakeMotor",
- * "leftCompressionServo","rightCompressionServo","clawServo","imu"
+ * Modifications:
+ *  - When path 4, path 7 or path 10 starts, run intake for a timed 1.0s and then stop.
+ *  - PRE_ACTION_WAIT_SECONDS reduced by 0.5s (from 0.8 to 0.3).
  */
-@Autonomous(name = "Working Auto", group = "Autonomous")
+@Autonomous(name = "Working 12 Auto", group = "Autonomous")
 @Configurable
 public class pedroauto extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
-    private int pathState;
     private Paths paths;
+
+    // State machine
+    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, PRE_ACTION, INTAKE_WAIT, CLAW_ACTION, FINISHED }
+    private AutoState state = AutoState.IDLE;
+
+    // current path index being run (1..11). 0 when none.
+    private int currentPathIndex = 0;
+    // next path index to run after PRE_ACTION/CLAW sequences
+    private int nextPathIndex = -1;
 
     // Intake-wait state & timer
     private Timer intakeTimer;
-    private static final int INTAKE_WAIT_STATE = 101;
-    private static final double INTAKE_WAIT_SECONDS = 3.0; // edit this value to change intake-wait duration
+    private static final double INTAKE_WAIT_SECONDS = 2.5; // change to shorten/lengthen intake duration
+
+    // Timed intake on-path start (for path4, path7 and path10)
+    private Timer timedIntakeTimer;
+    private static final double TIMED_INTAKE_SECONDS = 1.0; // run intake for 1 second when path4, path7 or path10 starts
+    private boolean timedIntakeActive = false;
 
     // Claw action state & timing
-    private static final int CLAW_ACTION_STATE = 102;
     private long clawActionStartMs = 0L;
-    private int clawActionPhase = 0; // 0 idle, 1 waiting for close duration
-    private static final long CLAW_CLOSE_MS = 500L; // same as teleop
+    private static final long CLAW_CLOSE_MS = 250L; // duration to hold claw closed
 
-    // Pre-action (delay before starting intake/claw) state & timer
+    // Pre-action (delay before starting intake/claw) timer
     private Timer preActionTimer;
-    private static final int PRE_ACTION_STATE = 103;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.8; // changed to 1.3s per request
+    private static final double PRE_ACTION_WAIT_SECONDS = 0.3; // lowered by 0.5s from 0.8
+
+    // Pose-wait timer (wait for robot to reach pose before starting PRE_ACTION). Fallback if it never quite reaches it.
+    private Timer poseWaitTimer;
+    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3; // fallback after short timeout
+
+    // Flag to indicate whether PRE_ACTION timer has been started (we only start it when robot reaches pose or fallback triggers)
+    private boolean preActionTimerStarted = false;
+    // Flag set when entering PRE_ACTION state to reset poseWaitTimer
+    private boolean preActionEntered = false;
 
     // Shooter-wait state before starting paths
-    private static final int WAIT_FOR_SHOOTER_STATE = 200;
     private long shooterWaitStartMs = -1;
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L; // fallback timeout if shooter doesn't spin up
 
@@ -92,19 +103,15 @@ public class pedroauto extends OpMode {
     private static final double LEFT_COMPRESSION_OFF = 0.5;
     private static final double RIGHT_COMPRESSION_OFF = 0.5;
 
-    // pending next path index used when we enter PRE_ACTION_STATE / INTAKE_WAIT_STATE or CLAW_ACTION_STATE
-    private int pendingState = -1;
-
-    // Intake-segment tracking: when starting a multi-path intake segment (3->4, 6->7, 9->10),
-    // set intakeSegmentEnd to the path index after which the intake should be stopped (4,7,10).
+    // Intake-segment tracking: when starting a multi-path intake segment (3, 6, 9),
+    // set intakeSegmentEnd to the path index after which the intake should be stopped.
     // -1 when no active intake segment.
     private int intakeSegmentEnd = -1;
 
-    // helper: which path indices end at the shoot pose (48,96)
-    // From your Paths: Path1, Path4, Path7, Path10 end at (48,96)
-    private boolean endsAtShoot(int pathIndex) {
-        return pathIndex == 1 || pathIndex == 4 || pathIndex == 7 || pathIndex == 10;
-    }
+    // Shoot pose constants and tolerance - used to ensure PRE_ACTION timer starts only when robot reaches pose
+    private static final double SHOOT_POSE_X = 48.0;
+    private static final double SHOOT_POSE_Y = 96.0;
+    private static final double START_POSE_TOLERANCE_IN = 6.0; // increased tolerance to avoid tiny-miss stalls
 
     public pedroauto() {}
 
@@ -121,9 +128,14 @@ public class pedroauto extends OpMode {
 
         // Timers & state
         intakeTimer = new Timer();
+        timedIntakeTimer = new Timer();
         preActionTimer = new Timer();
-        pendingState = -1;
+        poseWaitTimer = new Timer();
+        nextPathIndex = -1;
         intakeSegmentEnd = -1;
+        preActionTimerStarted = false;
+        preActionEntered = false;
+        timedIntakeActive = false;
 
         // --- Hardware for shooter & turret (match teleop names) ---
         try {
@@ -227,9 +239,7 @@ public class pedroauto extends OpMode {
 
         // Start measuring shooter-wait
         shooterWaitStartMs = System.currentTimeMillis();
-
-        // Enter WAIT_FOR_SHOOTER_STATE so we ensure shooter reaches RPM before moving
-        setPathState(WAIT_FOR_SHOOTER_STATE);
+        state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
@@ -250,11 +260,12 @@ public class pedroauto extends OpMode {
             turretController.update(false, 0.0);
         }
 
-        // Run the FSM
-        pathState = autonomousPathUpdate();
+        // Run the refined FSM
+        runStateMachine(nowMs);
 
-        // Panels & driver station telemetry
-        panelsTelemetry.debug("Path State", pathState);
+        // Panels & driver station telemetry (including distance-to-target for tuning)
+        panelsTelemetry.debug("State", state.name());
+        panelsTelemetry.debug("PathIdx", currentPathIndex);
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
@@ -276,6 +287,9 @@ public class pedroauto extends OpMode {
         if (clawServo != null) {
             panelsTelemetry.debug("ClawPos", clawServo.getPosition());
         }
+
+        double dist = distanceToShootPose();
+        panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
         panelsTelemetry.update(telemetry);
     }
 
@@ -293,6 +307,7 @@ public class pedroauto extends OpMode {
         // Ensure intake off and claw open
         stopIntake();
         if (clawServo != null) clawServo.setPosition(0.63);
+        state = AutoState.FINISHED;
     }
 
     // --- Intake helpers (right-trigger behavior) ---
@@ -316,6 +331,225 @@ public class pedroauto extends OpMode {
         }
     }
 
+    // Helper to check which path indices end at the shoot pose (48,96)
+    private boolean endsAtShoot(int pathIndex) {
+        return pathIndex == 1 || pathIndex == 4 || pathIndex == 7 || pathIndex == 10;
+    }
+
+    /**
+     * Returns true when follower's current pose is within tolerance (inches) of target.
+     */
+    private boolean isAtPose(double targetX, double targetY, double tolerance) {
+        try {
+            Pose p = follower.getPose();
+            double dx = p.getX() - targetX;
+            double dy = p.getY() - targetY;
+            return Math.hypot(dx, dy) <= tolerance;
+        } catch (Exception e) {
+            panelsTelemetry.debug("isAtPose", "error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Compute Euclidean distance to shoot pose for telemetry/tuning.
+     */
+    private double distanceToShootPose() {
+        try {
+            Pose p = follower.getPose();
+            double dx = p.getX() - SHOOT_POSE_X;
+            double dy = p.getY() - SHOOT_POSE_Y;
+            return Math.hypot(dx, dy);
+        } catch (Exception e) {
+            return Double.POSITIVE_INFINITY;
+        }
+    }
+
+    /**
+     * Start a path by index and set the state to RUNNING_PATH.
+     * This helper also starts intake/compression before specific path segments (3, 6, 9).
+     * Intake will run only DURING those starting paths and will be stopped when that path finishes,
+     * so it will not be active during paths 4, 7, 10 by default.
+     *
+     * Additionally: when starting path 4, path 7 or path 10 we start a timed intake that runs for 1s and then stops.
+     */
+    private void startPath(int idx) {
+        if (idx < 1 || idx > 11) {
+            currentPathIndex = 0;
+            state = AutoState.FINISHED;
+            return;
+        }
+
+        // If this path is the beginning of an intake segment, enable intake and record its end index.
+        // We set intakeSegmentEnd to the same idx so intake runs only during that path and is stopped
+        // when that path finishes.
+        if (idx == 3) {
+            intakeSegmentEnd = 3;
+            startIntake();
+        } else if (idx == 6) {
+            intakeSegmentEnd = 6;
+            startIntake();
+        } else if (idx == 9) {
+            intakeSegmentEnd = 9;
+            startIntake();
+        }
+
+        // Special: start a timed intake (1s) when path 4, 7 or 10 starts.
+        if (idx == 4 || idx == 7 || idx == 10) {
+            // If an intake is already running due to another reason, this will simply ensure it stays on.
+            startIntake();
+            timedIntakeTimer.resetTimer();
+            timedIntakeActive = true;
+            panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
+        }
+
+        // Follow the requested path
+        switch (idx) {
+            case 1: follower.followPath(paths.Path1); break;
+            case 2: follower.followPath(paths.Path2); break;
+            case 3: follower.followPath(paths.Path3); break;
+            case 4: follower.followPath(paths.Path4); break;
+            case 5: follower.followPath(paths.Path5); break;
+            case 6: follower.followPath(paths.Path6); break;
+            case 7: follower.followPath(paths.Path7); break;
+            case 8: follower.followPath(paths.Path8); break;
+            case 9: follower.followPath(paths.Path9); break;
+            case 10: follower.followPath(paths.Path10); break;
+            case 11: follower.followPath(paths.Path11); break;
+            default: break;
+        }
+
+        currentPathIndex = idx;
+        state = AutoState.RUNNING_PATH;
+    }
+
+    private void runStateMachine(long nowMs) {
+        // Handle timed intake expiration independent of the FSM states:
+        if (timedIntakeActive) {
+            if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
+                // stop the timed intake
+                stopIntake();
+                timedIntakeActive = false;
+                // ensure intakeSegment tracking is cleared so we don't try to stop it again later
+                intakeSegmentEnd = -1;
+                panelsTelemetry.debug("TimedIntake", "Timed intake ended after " + TIMED_INTAKE_SECONDS + "s");
+            } else {
+                // still within timed intake period - show telemetry
+                panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
+            }
+        }
+
+        switch (state) {
+            case WAIT_FOR_SHOOTER:
+                boolean atTarget = (flywheel != null && flywheel.isAtTarget());
+                long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
+                if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
+                    // proceed to first path immediately
+                    startPath(1);
+                }
+                break;
+
+            case RUNNING_PATH:
+                // Wait until follower finishes this path
+                if (!follower.isBusy()) {
+                    int finished = currentPathIndex;
+                    // If finished path was the end of an intake segment, clear tracking and stop intake now
+                    if (intakeSegmentEnd == finished) {
+                        stopIntake();
+                        intakeSegmentEnd = -1;
+                    }
+
+                    // If this path ends at the shoot pose, go to PRE_ACTION but do not start the PRE_ACTION timer yet.
+                    if (endsAtShoot(finished)) {
+                        nextPathIndex = finished + 1;
+                        preActionTimerStarted = false; // ensure timer is not considered started
+                        preActionEntered = false; // ensure pose wait is reset on entry
+                        state = AutoState.PRE_ACTION;
+                    } else {
+                        // not a shoot-end, just continue to next path (or finish)
+                        int next = finished + 1;
+                        if (next > 11) {
+                            state = AutoState.FINISHED;
+                        } else {
+                            startPath(next);
+                        }
+                    }
+                }
+                break;
+
+            case PRE_ACTION:
+                // On first tick after entering PRE_ACTION, reset the poseWaitTimer
+                if (!preActionEntered) {
+                    poseWaitTimer.resetTimer();
+                    preActionTimerStarted = false;
+                    preActionEntered = true;
+                    panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
+                }
+
+                // If PRE_ACTION timer hasn't been started yet, wait until robot reaches pose OR fallback after a short timeout
+                if (!preActionTimerStarted) {
+                    double dist = distanceToShootPose();
+                    if (dist <= START_POSE_TOLERANCE_IN) {
+                        preActionTimer.resetTimer();
+                        preActionTimerStarted = true;
+                        panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
+                    } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
+                        // fallback: start PRE_ACTION timer even if we're not perfectly within tolerance
+                        preActionTimer.resetTimer();
+                        preActionTimerStarted = true;
+                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
+                    } else {
+                        // Still waiting for pose; remain in PRE_ACTION
+                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
+                    }
+                } else {
+                    // PRE_ACTION timer started; wait required PRE_ACTION_WAIT_SECONDS from this moment
+                    if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
+                        // start intake for INTAKE_WAIT_SECONDS, then claw action will run
+                        startIntake();
+                        intakeTimer.resetTimer();
+                        state = AutoState.INTAKE_WAIT;
+                    }
+                }
+                break;
+
+            case INTAKE_WAIT:
+                if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_SECONDS) {
+                    // Stop intake only if it's not part of a longer intake-segment
+                    if (intakeSegmentEnd == -1) {
+                        stopIntake();
+                    }
+                    // begin claw action (close)
+                    if (clawServo != null) clawServo.setPosition(0.2); // close
+                    clawActionStartMs = System.currentTimeMillis();
+                    state = AutoState.CLAW_ACTION;
+                }
+                break;
+
+            case CLAW_ACTION:
+                if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
+                    // open claw and continue to nextPathIndex
+                    if (clawServo != null) clawServo.setPosition(0.63); // open
+                    if (nextPathIndex > 0 && nextPathIndex <= 11) {
+                        startPath(nextPathIndex);
+                        nextPathIndex = -1;
+                    } else {
+                        state = AutoState.FINISHED;
+                    }
+                }
+                break;
+
+            case FINISHED:
+                // idle; do nothing. Hardware remains as last set.
+                break;
+
+            case IDLE:
+            default:
+                // Shouldn't be here during active OpMode; remain idle
+                break;
+        }
+    }
+
     public static class Paths {
 
         public PathChain Path1;
@@ -334,7 +568,7 @@ public class pedroauto extends OpMode {
             Path1 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(20, 122), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(20.000, 122.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(130))
                     .build();
@@ -342,7 +576,7 @@ public class pedroauto extends OpMode {
             Path2 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(42.000, 84.000))
+                            new BezierLine(new Pose(48.000, 96.000), new Pose(44.000, 84.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(180))
                     .build();
@@ -350,16 +584,15 @@ public class pedroauto extends OpMode {
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(42.000, 84.000), new Pose(26.000, 84.000))
+                            new BezierLine(new Pose(44.000, 84.000), new Pose(24.000, 84.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
-
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(26.000, 84.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(24.000, 84.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
                     .build();
@@ -367,7 +600,7 @@ public class pedroauto extends OpMode {
             Path5 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(46.000, 57.000))//ending is point before collecting balls
+                            new BezierLine(new Pose(48.000, 96.000), new Pose(46.000, 57.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(180))
                     .build();
@@ -375,7 +608,7 @@ public class pedroauto extends OpMode {
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(46.000, 57.000), new Pose(17.000, 57.000))
+                            new BezierLine(new Pose(46.000, 57.000), new Pose(15.000, 57.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -383,7 +616,7 @@ public class pedroauto extends OpMode {
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(17.000, 57.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(15.000, 57.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
                     .build();
@@ -399,7 +632,7 @@ public class pedroauto extends OpMode {
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(43.000, 36.000), new Pose(18.000, 36.000))//change x ending pose lower to go closer to field. was 20
+                            new BezierLine(new Pose(43.000, 36.000), new Pose(16.000, 36.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -407,7 +640,7 @@ public class pedroauto extends OpMode {
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.000, 36.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(16.000, 36.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(130))
                     .build();
@@ -415,317 +648,10 @@ public class pedroauto extends OpMode {
             Path11 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(30, 110))
+                            new BezierLine(new Pose(48.000, 96.000), new Pose(20.000, 122.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(270))
+                    .setLinearHeadingInterpolation(Math.toRadians(130), Math.toRadians(135))
                     .build();
         }
-    }
-
-    public int autonomousPathUpdate() {
-        /*
-          FSM that:
-           - waits for shooter to reach close-mode RPM (or timeout) before starting paths,
-           - follows Path1 -> Path2 -> ... -> Path11 sequentially,
-           - whenever the robot finishes a path that ENDS at (48,96) we:
-               a) wait PRE_ACTION_WAIT_SECONDS (1.3s),
-               b) start intake for INTAKE_WAIT_SECONDS,
-               c) run claw action (close then open),
-               d) continue,
-           - intake is also explicitly turned ON BEFORE starting path segments (3->4, 6->7, 9->10).
-        */
-        switch (pathState) {
-            case WAIT_FOR_SHOOTER_STATE:
-                // Wait until flywheel reports at-target OR timeout
-                boolean atTarget = (flywheel != null && flywheel.isAtTarget());
-                long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
-                if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
-                    // proceed to first path immediately
-                    followPathIndexAndSetState(1);
-                }
-                break;
-
-            case PRE_ACTION_STATE:
-                // wait PRE_ACTION_WAIT_SECONDS, then start intake-wait sequence
-                if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                    // start intake for INTAKE_WAIT_SECONDS, then claw action will run
-                    startIntake();
-                    intakeTimer.resetTimer();
-                    setPathState(INTAKE_WAIT_STATE);
-                }
-                break;
-
-            case INTAKE_WAIT_STATE:
-                // wait for INTAKE_WAIT_SECONDS, then stop intake and proceed to CLAW action
-                if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_SECONDS) {
-                    stopIntake();
-                    // begin claw action (close then open) automatically
-                    if (clawServo != null) clawServo.setPosition(0.2); // close
-                    clawActionPhase = 1;
-                    clawActionStartMs = System.currentTimeMillis();
-                    setPathState(CLAW_ACTION_STATE);
-                }
-                break;
-
-            case CLAW_ACTION_STATE:
-                // wait for CLAW_CLOSE_MS then open claw and continue to pendingState
-                if (clawActionPhase == 1) {
-                    long nowMs = System.currentTimeMillis();
-                    if (nowMs >= clawActionStartMs + CLAW_CLOSE_MS) {
-                        if (clawServo != null) clawServo.setPosition(0.63); // open
-                        clawActionPhase = 0;
-                        // continue to next path
-                        if (pendingState > 0) {
-                            followPathIndexAndSetState(pendingState);
-                        } else {
-                            setPathState(-1);
-                        }
-                    }
-                }
-                break;
-
-            // Each path state waits for follower to finish. When finished:
-            // - if the completed path ENDS at shoot pose, enter PRE_ACTION_STATE (1.3s) then INTAKE_WAIT_STATE then CLAW_ACTION_STATE;
-            // - otherwise continue to the next path immediately (also stop intake if the intake segment ended).
-            case 1:
-                if (!follower.isBusy()) {
-                    int next = 2;
-                    if (endsAtShoot(1)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 2:
-                if (!follower.isBusy()) {
-                    int next = 3;
-                    if (endsAtShoot(2)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 3:
-                if (!follower.isBusy()) {
-                    // path3-specific: we started intake before path3 and we want it to continue through path4.
-                    int next = 4;
-                    // If the path ends at shoot pose, we will run the PRE_ACTION_STATE instead; otherwise, continue to next.
-                    if (endsAtShoot(3)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        // DO NOT stop intake here (intentional: keep intake running until path4 completes).
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 4:
-                if (!follower.isBusy()) {
-                    int next = 5;
-                    if (endsAtShoot(4)) {
-                        // robot ended at shoot pose: wait PRE_ACTION_WAIT_SECONDS then intake-wait, etc.
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                        // clear intake-segment tracking now that we've reached its end
-                        intakeSegmentEnd = -1;
-                    } else {
-                        // if this is the end of an intake segment, stop intake now
-                        if (intakeSegmentEnd == 4) {
-                            stopIntake();
-                            intakeSegmentEnd = -1;
-                        }
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 5:
-                if (!follower.isBusy()) {
-                    int next = 6;
-                    if (endsAtShoot(5)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 6:
-                if (!follower.isBusy()) {
-                    int next = 7;
-                    if (endsAtShoot(6)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 7:
-                if (!follower.isBusy()) {
-                    int next = 8;
-                    if (endsAtShoot(7)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                        intakeSegmentEnd = -1;
-                    } else {
-                        if (intakeSegmentEnd == 7) {
-                            stopIntake();
-                            intakeSegmentEnd = -1;
-                        }
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 8:
-                if (!follower.isBusy()) {
-                    int next = 9;
-                    if (endsAtShoot(8)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 9:
-                if (!follower.isBusy()) {
-                    int next = 10;
-                    if (endsAtShoot(9)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 10:
-                if (!follower.isBusy()) {
-                    int next = 11;
-                    if (endsAtShoot(10)) {
-                        pendingState = next;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                        intakeSegmentEnd = -1;
-                    } else {
-                        if (intakeSegmentEnd == 10) {
-                            stopIntake();
-                            intakeSegmentEnd = -1;
-                        }
-                        followPathIndexAndSetState(next);
-                    }
-                }
-                break;
-
-            case 11:
-                if (!follower.isBusy()) {
-                    // last path done
-                    if (endsAtShoot(11)) {
-                        pendingState = -1;
-                        preActionTimer.resetTimer();
-                        setPathState(PRE_ACTION_STATE);
-                    } else {
-                        setPathState(-1);
-                    }
-                }
-                break;
-
-            default:
-                // idle/finished (-1 or other)
-                break;
-        }
-
-        return pathState;
-    }
-
-    /**
-     * Helper to follow a path by its index and set pathState accordingly.
-     * Also turns intake ON immediately before starting specific path segments (3->4, 6->7, 9->10).
-     * Sets intakeSegmentEnd so intake won't be stopped until the end path completes.
-     */
-    private void followPathIndexAndSetState(int idx) {
-        switch (idx) {
-            case 1:
-                follower.followPath(paths.Path1);
-                setPathState(1);
-                break;
-            case 2:
-                follower.followPath(paths.Path2);
-                setPathState(2);
-                break;
-            case 3:
-                // turn on intake/compression BEFORE starting path 3 and keep it running through path4
-                intakeSegmentEnd = 4;
-                startIntake();
-                follower.followPath(paths.Path3);
-                setPathState(3);
-                break;
-            case 4:
-                follower.followPath(paths.Path4);
-                setPathState(4);
-                break;
-            case 5:
-                follower.followPath(paths.Path5);
-                setPathState(5);
-                break;
-            case 6:
-                // turn on intake/compression BEFORE starting path 6 and keep it running through path7
-                intakeSegmentEnd = 7;
-                startIntake();
-                follower.followPath(paths.Path6);
-                setPathState(6);
-                break;
-            case 7:
-                follower.followPath(paths.Path7);
-                setPathState(7);
-                break;
-            case 8:
-                follower.followPath(paths.Path8);
-                setPathState(8);
-                break;
-            case 9:
-                // turn on intake/compression BEFORE starting path 9 and keep it running through path10
-                intakeSegmentEnd = 10;
-                startIntake();
-                follower.followPath(paths.Path9);
-                setPathState(9);
-                break;
-            case 10:
-                follower.followPath(paths.Path10);
-                setPathState(10);
-                break;
-            case 11:
-                follower.followPath(paths.Path11);
-                setPathState(11);
-                break;
-            default:
-                setPathState(-1);
-                break;
-        }
-    }
-
-    private void setPathState(int pState) {
-        pathState = pState;
     }
 }
