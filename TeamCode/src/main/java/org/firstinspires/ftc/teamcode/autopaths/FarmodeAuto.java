@@ -7,26 +7,40 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
+import com.pedropathing.util.Timer;
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
 /**
- * Implements:
- * - Start at (63,8) heading 90deg
- * - Path1 -> (52,14)
- *   - Run intake sequence once (placeholder for ExperimentalHors code)
- *   - After intake sequence completes, wait 2 seconds (intake stays ON)
- * - Path2 (while intake ON) -> (16,14)
- *   - Once arrived, keep intake ON for 1 second
- * - Path3 -> (52,14)
- *   - Shoot 3 (placeholder for ExperimentalHors shooting code), intake ON during shooting
- * - End at (52,14)
+ * FarmodeAuto — Autonomous sequence using the same hardware helpers & logic from ExperimentalPedroAuto.
  *
- * NOTE: Replace the placeholder methods (startIntake, stopIntake, runIntakeSequence,
- * shootThree) with the actual implementations from your ExperimentalHors class.
+ * Sequence:
+ *  - Start at (63,8) heading 90deg.
+ *  - Drive -> (52,14).
+ *  - Run intake sequence once (intake remains ON).
+ *  - After intake sequence completes, wait 2s (intake still ON).
+ *  - Drive -> (16,14) while intake remains ON.
+ *  - When arriving at (16,14), keep intake ON for 1s.
+ *  - Drive -> (52,14).
+ *  - Shoot 3 (intake ON during shooting). End.
+ *
+ * All hardware mapping and intake helpers are copied from ExperimentalPedroAuto.
+ * There are no placeholders — the intake start/stop implementations, flywheel and turret setup,
+ * timers and the use of pedropathing Timer are taken from ExperimentalPedroAuto.
+ *
+ * NOTE: ExperimentalPedroAuto does not include an explicit indexer motor / indexing routine.
+ * The shooting step here relies on the flywheel subsystem to be spun up and runs a timed "shoot"
+ * period (during which you should ensure your indexing mechanism runs if present).
  */
-@Autonomous(name = "Farmode Auto (sequence)", group = "Autonomous")
+@Autonomous(name = "Farmode Auto (Experimental-style)", group = "Autonomous")
 @Configurable
 public class FarmodeAuto extends OpMode {
 
@@ -34,222 +48,403 @@ public class FarmodeAuto extends OpMode {
   public Follower follower;
   private Paths paths;
 
-  private ElapsedTime runtime = new ElapsedTime();
-
   // State machine states
-  // 1 = drive to 52,14 (Path1)
-  // 2 = at 52,14: run intake sequence, then wait 2s; after that -> drive to 16,14 (Path2)
-  // 3 = driving to 16,14
-  // 4 = at 16,14: keep intake on for 1s then -> drive to 52,14 (Path3)
-  // 5 = driving to 52,14
-  // 6 = at 52,14: shoot 3, finish
-  private int state = 1;
+  private enum AutoState { INIT, TO_52, RUN_INTAKE_SEQ, WAIT_AFTER_INTK, TO_16, HOLD_AT_16, TO_52_AGAIN, SHOOT, FINISHED }
+  private AutoState state = AutoState.INIT;
 
-  // Intake / sequence timers / flags
+  // hardware (copied / mapped as in ExperimentalPedroAuto)
+  private DcMotor shooterMotor = null;
+  private DcMotor turretMotor = null;
+  private BNO055IMU imu = null;
+  private Flywheel flywheel = null;
+  private TurretController turretController = null;
+
+  // Intake + compression hardware (from teleop)
+  private DcMotor intakeMotor = null;
+  private Servo leftCompressionServo = null;
+  private Servo rightCompressionServo = null;
+
+  // Claw servo (not used by this sequence but mapped same as ExperimentalPedroAuto)
+  private Servo clawServo = null;
+
+  // Intake/compression "on" values (copied)
+  private static final double INTAKE_ON_POWER = 1.0;
+  private static final double LEFT_COMPRESSION_ON = 1.0;
+  private static final double RIGHT_COMPRESSION_ON = 0.0;
+  private static final double LEFT_COMPRESSION_OFF = 0.5;
+  private static final double RIGHT_COMPRESSION_OFF = 0.5;
+
+  // timers
+  private Timer intakeSequenceTimer;
+  private Timer waitTimer;
+  private Timer holdTimer;
+  private Timer shootTimer;
+
+  // durations (seconds) - intake sequence length & waits (adjust if you want exact timings)
+  private static final double INTAKE_SEQUENCE_SECONDS = 1.5; // run intake-sequence at first (user specified "once")
+  private static final double WAIT_AFTER_INTAKE_SECONDS = 2.0; // wait 2s after intake sequence
+  private static final double HOLD_AT_16_SECONDS = 1.0; // hold intake 1s at 16,14
+  private static final double SHOOT_SECONDS = 1.5; // run shooting period (timed) - adjust to match indexing mechanism
+
+  // helper to track path start/completion
+  private boolean pathStarted = false;
+
+  // flags
   private boolean intakeOn = false;
   private boolean intakeSequenceRunning = false;
-  private double intakeSequenceDuration = 1500.0; // ms, placeholder for actual sequence length
-  private long intakeSequenceStart = 0L;
-
-  private long waitStart = 0L;
-  private double waitDuration = 2000.0; // 2 seconds wait after intake sequence
-
-  private long at16HoldStart = 0L;
-  private double at16HoldDuration = 1000.0; // 1 second hold at 16,14
-
   private boolean shooting = false;
-  private boolean shotDone = false;
-  private double shootDuration = 1500.0; // ms placeholder
-  private long shootStart = 0L;
+
+  // Flywheel/turret constants (copied)
+  private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
+  private long shooterWaitStartMs = -1;
+  private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L;
+
+  public FarmodeAuto() {}
 
   @Override
   public void init() {
     panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-    follower = org.firstinspires.ftc.teamcode.pedroPathing.Constants.createFollower(hardwareMap);
-    follower.setStartingPose(new Pose(63.0, 8.0, Math.toRadians(90)));
-
+    // Create follower and build the 3 needed paths
+    follower = Constants.createFollower(hardwareMap);
     paths = new Paths(follower);
 
-    panelsTelemetry.debug("Status", "Initialized FarmodeAuto (sequence)");
+    // Set starting pose (63,8 heading 90deg)
+    follower.setStartingPose(new Pose(63.0, 8.0, Math.toRadians(90)));
+
+    // timers
+    intakeSequenceTimer = new Timer();
+    waitTimer = new Timer();
+    holdTimer = new Timer();
+    shootTimer = new Timer();
+
+    // --- Hardware mapping (copied from ExperimentalPedroAuto) ---
+    // Shooter & turret motors + IMU + subsystems
+    try {
+      shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
+      turretMotor = hardwareMap.get(DcMotor.class, "turret");
+
+      shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+      turretMotor.setDirection(DcMotor.Direction.FORWARD);
+
+      shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+      turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+      turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+      turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+    } catch (Exception e) {
+      panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
+    }
+
+    // IMU
+    try {
+      imu = hardwareMap.get(BNO055IMU.class, "imu");
+      BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
+      imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+      imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+      imu.initialize(imuParams);
+    } catch (Exception e) {
+      panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e.getMessage());
+    }
+
+    // Subsystems: Flywheel & TurretController (if available)
+    try {
+      if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
+      if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
+
+      if (turretController != null) {
+        turretController.captureReferences();
+        turretController.resetPidState();
+      }
+
+      // Do NOT enable shooter in init (same as ExperimentalPedroAuto)
+      if (flywheel != null) {
+        flywheel.setModeFar(false); // close mode target, but do not enable shooter here
+      }
+    } catch (Exception e) {
+      panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
+    }
+
+    // --- Intake & compression hardware (same names as teleop) ---
+    try {
+      intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+      leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
+      rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
+
+      intakeMotor.setDirection(DcMotor.Direction.REVERSE);
+      intakeMotor.setPower(0.0);
+      leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
+      rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
+    } catch (Exception e) {
+      panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
+    }
+
+    // Claw servo (mapped for completeness)
+    try {
+      clawServo = hardwareMap.get(Servo.class, "clawServo");
+      clawServo.setPosition(0.63); // ensure open
+    } catch (Exception e) {
+      panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
+    }
+
+    panelsTelemetry.debug("Status", "Initialized FarmodeAuto (Experimental-style). Shooter remains OFF until start()");
     panelsTelemetry.update(telemetry);
-    runtime.reset();
+  }
+
+  @Override
+  public void init_loop() {
+    // warm up flywheel/turret readings like ExperimentalPedroAuto
+    if (flywheel != null) {
+      flywheel.update(System.currentTimeMillis(), false);
+    }
+    if (turretController != null) {
+      turretController.update(false, 0.0);
+    }
+  }
+
+  @Override
+  public void start() {
+    // Enable flywheel now and set close-range target RPM (same behavior as ExperimentalPedroAuto.start())
+    if (flywheel != null) {
+      flywheel.setShooterOn(true);
+      flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
+    }
+    if (turretController != null) {
+      turretController.captureReferences();
+      turretController.resetPidState();
+    }
+
+    // We do not wait for shooter to reach target; start driving immediately per your requested flow.
+    state = AutoState.TO_52;
+    pathStarted = false;
   }
 
   @Override
   public void loop() {
+    // Update Pedro follower
     follower.update();
 
+    // Keep flywheel and turret updated while opmode runs (copied pattern)
+    long nowMs = System.currentTimeMillis();
+    if (flywheel != null) {
+      flywheel.handleLeftTrigger(false);
+      flywheel.update(nowMs, false);
+    }
+    if (turretController != null) {
+      turretController.update(false, 0.0);
+    }
+
+    // Run the small FSM implementing your sequence
     switch (state) {
-      case 1:
-        // Drive to (52,14)
-        if (!follower.isFollowingPath()) {
-          follower.follow(paths.Path1);
-          panelsTelemetry.debug("State", "1 - Starting Path1 -> (52,14)");
+      case TO_52:
+        // Start path from (63,8) -> (52,14)
+        if (!pathStarted) {
+          follower.followPath(paths.Path1);
+          pathStarted = true;
+          panelsTelemetry.debug("State", "TO_52: following Path1 -> (52,14)");
         }
-        if (follower.isPathFinished()) {
-          // arrived at shoot pose (52,14)
+        // arrival when follower is no longer busy
+        if (pathStarted && !follower.isBusy()) {
+          pathStarted = false;
           panelsTelemetry.debug("Arrived", "52,14 - starting intake sequence");
-          startIntake(); // intake ON during sequences and movements per user's request
-          startIntakeSequence();
-          state = 2;
+          // start intake (copy from ExperimentalPedroAuto)
+          startIntake();
+          // start intake-sequence timer
+          intakeSequenceTimer.resetTimer();
+          intakeSequenceRunning = true;
+          state = AutoState.RUN_INTAKE_SEQ;
         }
         break;
 
-      case 2:
-        // At 52,14: run intake sequence; when intake sequence completes -> wait 2s -> drive to 16,14
+      case RUN_INTAKE_SEQ:
+        // run intake sequence (timed). When done, start 2s wait (intake stays ON)
         if (intakeSequenceRunning) {
-          if (isIntakeSequenceDone()) {
+          if (intakeSequenceTimer.getElapsedTimeSeconds() >= INTAKE_SEQUENCE_SECONDS) {
             intakeSequenceRunning = false;
-            waitStart = System.currentTimeMillis();
-            panelsTelemetry.debug("Action", "Intake sequence complete. Starting 2s wait.");
+            waitTimer.resetTimer();
+            panelsTelemetry.debug("Action", "Intake sequence completed - starting 2s wait (intake stays ON)");
+            state = AutoState.WAIT_AFTER_INTK;
+          } else {
+            panelsTelemetry.debug("IntakeSeq", String.format("running %.2fs/%.2fs",
+                    intakeSequenceTimer.getElapsedTimeSeconds(), INTAKE_SEQUENCE_SECONDS));
           }
+        }
+        break;
+
+      case WAIT_AFTER_INTK:
+        // after 2s wait, drive to (16,14) while intake remains ON
+        if (waitTimer.getElapsedTimeSeconds() >= WAIT_AFTER_INTAKE_SECONDS) {
+          if (!pathStarted) {
+            follower.followPath(paths.Path2);
+            pathStarted = true;
+            panelsTelemetry.debug("State", "WAIT_AFTER_INTK -> following Path2 -> (16,14) with intake ON");
+          }
+          state = AutoState.TO_16;
         } else {
-          // waiting after sequence
-          long elapsed = System.currentTimeMillis() - waitStart;
-          panelsTelemetry.debug("Waiting", elapsed + "ms / " + (long) waitDuration + "ms");
-          if (elapsed >= (long) waitDuration) {
-            // begin driving to 16,14, intake remains ON
-            if (!follower.isFollowingPath()) {
-              follower.follow(paths.Path2);
-              panelsTelemetry.debug("State", "2 -> starting Path2 -> (16,14) with intake ON");
-            }
-            state = 3;
+          panelsTelemetry.debug("Waiting", String.format("%.2fs/%.2fs", waitTimer.getElapsedTimeSeconds(), WAIT_AFTER_INTAKE_SECONDS));
+        }
+        break;
+
+      case TO_16:
+        // driving to (16,14) while intake ON
+        if (pathStarted && !follower.isBusy()) {
+          pathStarted = false;
+          panelsTelemetry.debug("Arrived", "16,14 - holding intake ON for 1s");
+          holdTimer.resetTimer();
+          state = AutoState.HOLD_AT_16;
+        }
+        break;
+
+      case HOLD_AT_16:
+        // keep intake ON for 1s, then drive back to 52,14
+        if (holdTimer.getElapsedTimeSeconds() >= HOLD_AT_16_SECONDS) {
+          if (!pathStarted) {
+            follower.followPath(paths.Path3);
+            pathStarted = true;
+            panelsTelemetry.debug("State", "HOLD_AT_16 -> following Path3 -> (52,14)");
           }
+          state = AutoState.TO_52_AGAIN;
+        } else {
+          panelsTelemetry.debug("HoldAt16", String.format("%.2fs/%.2fs", holdTimer.getElapsedTimeSeconds(), HOLD_AT_16_SECONDS));
         }
         break;
 
-      case 3:
-        // Driving to (16,14) while intake stays on
-        if (follower.isPathFinished()) {
-          panelsTelemetry.debug("Arrived", "16,14 - hold intake for 1s");
-          at16HoldStart = System.currentTimeMillis();
-          state = 4;
-        }
-        break;
-
-      case 4:
-        // Keep intake on for 1 second at 16,14 then go to 52,14
-        long held = System.currentTimeMillis() - at16HoldStart;
-        panelsTelemetry.debug("HoldingAt16", held + "ms / " + (long) at16HoldDuration + "ms");
-        if (held >= (long) at16HoldDuration) {
-          // drive back to 52,14 (end)
-          if (!follower.isFollowingPath()) {
-            follower.follow(paths.Path3);
-            panelsTelemetry.debug("State", "4 -> starting Path3 -> (52,14)");
+      case TO_52_AGAIN:
+        if (pathStarted && !follower.isBusy()) {
+          pathStarted = false;
+          panelsTelemetry.debug("Arrived", "52,14 (final) - starting shooting (3)");
+          // ensure flywheel is ON (should already be on), keep intake ON during shooting
+          if (flywheel != null) {
+            flywheel.setShooterOn(true);
+            flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
           }
-          state = 5;
+          shootTimer.resetTimer();
+          shooting = true;
+          state = AutoState.SHOOT;
         }
         break;
 
-      case 5:
-        // Drive to final (52,14)
-        if (follower.isPathFinished()) {
-          panelsTelemetry.debug("Arrived", "52,14 - start shooting 3 (intake ON)");
-          startShootingThree();
-          state = 6;
+      case SHOOT:
+        // during shooting, keep updating subsystems (done at top of loop). Wait SHOOT_SECONDS then stop intake.
+        if (shootTimer.getElapsedTimeSeconds() >= SHOOT_SECONDS) {
+          shooting = false;
+          panelsTelemetry.debug("Action", "Shooting period complete - stopping intake");
+          stopIntake(); // stop intake after shooting period
+          // leave flywheel on or off as desired; ExperimentalPedroAuto turns flywheel off in stop()
+          state = AutoState.FINISHED;
+        } else {
+          panelsTelemetry.debug("Shooting", String.format("%.2fs/%.2fs", shootTimer.getElapsedTimeSeconds(), SHOOT_SECONDS));
         }
         break;
 
-      case 6:
-        // Shooting sequence
-        if (shooting) {
-          if (isShootingDone()) {
-            shooting = false;
-            shotDone = true;
-            panelsTelemetry.debug("Action", "Shooting complete. Stopping intake.");
-            stopIntake();
-          }
-        }
-        // finished: we can stay here
+      case FINISHED:
+        // do nothing further; maintain telemetry/hardware until OpMode stop()
         break;
 
+      case INIT:
       default:
         break;
     }
 
-    // Telemetry always
-    panelsTelemetry.debug("State", state);
-    panelsTelemetry.debug("PoseX", follower.getPose().getX());
-    panelsTelemetry.debug("PoseY", follower.getPose().getY());
-    panelsTelemetry.debug("Heading", follower.getPose().getHeading());
+    // Telemetry (copied style)
+    panelsTelemetry.debug("State", state.name());
+    try {
+      panelsTelemetry.debug("X", follower.getPose().getX());
+      panelsTelemetry.debug("Y", follower.getPose().getY());
+      panelsTelemetry.debug("Heading", follower.getPose().getHeading());
+    } catch (Exception ignored) {}
+    if (flywheel != null) {
+      panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
+      panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
+      panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
+      panelsTelemetry.debug("Fly AtTarget", flywheel.isAtTarget());
+    }
+    if (turretMotor != null && turretController != null) {
+      panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
+      panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
+      panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(true));
+    }
+    if (intakeMotor != null) {
+      panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
+      panelsTelemetry.debug("LeftCompPos", leftCompressionServo != null ? leftCompressionServo.getPosition() : -1);
+      panelsTelemetry.debug("RightCompPos", rightCompressionServo != null ? rightCompressionServo.getPosition() : -1);
+    }
+    if (clawServo != null) {
+      panelsTelemetry.debug("ClawPos", clawServo.getPosition());
+    }
     panelsTelemetry.debug("IntakeOn", intakeOn);
     panelsTelemetry.debug("IntakeSeqRunning", intakeSequenceRunning);
     panelsTelemetry.debug("Shooting", shooting);
     panelsTelemetry.update(telemetry);
   }
 
-  // === Path definitions ===
-  public static class Paths {
-    public PathChain Path1; // 63,8 -> 52,14
-    public PathChain Path2; // 52,14 -> 16,14
-    public PathChain Path3; // 16,14 -> 52,14 (end)
-
-    public Paths(Follower follower) {
-      Path1 = follower
-        .pathBuilder()
-        .addPath(new BezierLine(new Pose(63.000, 8.000), new Pose(52.000, 14.000)))
-        .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(109))
-        .build();
-
-      Path2 = follower
-        .pathBuilder()
-        .addPath(new BezierLine(new Pose(52.000, 14.000), new Pose(16.000, 14.000)))
-        .setLinearHeadingInterpolation(Math.toRadians(109), Math.toRadians(180))
-        .build();
-
-      Path3 = follower
-        .pathBuilder()
-        .addPath(new BezierLine(new Pose(16.000, 14.000), new Pose(52.000, 14.000)))
-        .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(109))
-        .build();
+  @Override
+  public void stop() {
+    // turn off flywheel and turret safely (copied)
+    if (flywheel != null) {
+      flywheel.setShooterOn(false);
+      flywheel.update(System.currentTimeMillis(), false);
     }
+    if (turretController != null) {
+      turretController.update(false, 0.0);
+    }
+
+    // Ensure intake off and claw open
+    stopIntake();
+    if (clawServo != null) clawServo.setPosition(0.63);
+    state = AutoState.FINISHED;
+
+    panelsTelemetry.debug("Status", "Stopped");
+    panelsTelemetry.update(telemetry);
   }
 
-  // ===== Placeholders for robot-specific actions =====
-  // Replace these with the actual code from ExperimentalHors class.
+  // --- Intake helpers (copied from ExperimentalPedroAuto) ---
   private void startIntake() {
-    if (!intakeOn) {
+    try {
+      if (intakeMotor != null) intakeMotor.setPower(INTAKE_ON_POWER);
+      if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_ON);
+      if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_ON);
       intakeOn = true;
-      // TODO: call ExperimentalHors.setIntakePower(true) or similar
-      panelsTelemetry.debug("Hardware", "startIntake() called (placeholder)");
+    } catch (Exception e) {
+      panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
     }
   }
 
   private void stopIntake() {
-    if (intakeOn) {
+    try {
+      if (intakeMotor != null) intakeMotor.setPower(0.0);
+      if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
+      if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
       intakeOn = false;
-      // TODO: call ExperimentalHors.setIntakePower(false) or similar
-      panelsTelemetry.debug("Hardware", "stopIntake() called (placeholder)");
+    } catch (Exception e) {
+      panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
     }
   }
 
-  private void startIntakeSequence() {
-    intakeSequenceRunning = true;
-    intakeSequenceStart = System.currentTimeMillis();
-    // TODO: copy/paste ExperimentalHors intake sequence here (timers, motor commands, servos)
-    panelsTelemetry.debug("Hardware", "startIntakeSequence() started (placeholder)");
-  }
+  // === Paths (3 paths only) ===
+  public static class Paths {
+    public PathChain Path1; // 63,8 -> 52,14
+    public PathChain Path2; // 52,14 -> 16,14
+    public PathChain Path3; // 16,14 -> 52,14
 
-  private boolean isIntakeSequenceDone() {
-    // Placeholder condition: run for intakeSequenceDuration ms. Replace with actual completion logic.
-    if (!intakeSequenceRunning) return true;
-    long elapsed = System.currentTimeMillis() - intakeSequenceStart;
-    return elapsed >= (long) intakeSequenceDuration;
-  }
+    public Paths(Follower follower) {
+      Path1 = follower
+              .pathBuilder()
+              .addPath(new BezierLine(new Pose(63.000, 8.000), new Pose(52.000, 14.000)))
+              .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(109))
+              .build();
 
-  private void startShootingThree() {
-    if (!shooting && !shotDone) {
-      shooting = true;
-      shootStart = System.currentTimeMillis();
-      // TODO: call ExperimentalHors.shootThreeRings() or sequence to spin shooter, index 3 rings, etc.
-      panelsTelemetry.debug("Hardware", "startShootingThree() started (placeholder)");
+      Path2 = follower
+              .pathBuilder()
+              .addPath(new BezierLine(new Pose(52.000, 14.000), new Pose(16.000, 14.000)))
+              .setLinearHeadingInterpolation(Math.toRadians(109), Math.toRadians(180))
+              .build();
+
+      Path3 = follower
+              .pathBuilder()
+              .addPath(new BezierLine(new Pose(16.000, 14.000), new Pose(52.000, 14.000)))
+              .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(109))
+              .build();
     }
-  }
-
-  private boolean isShootingDone() {
-    // Placeholder: shooting takes shootDuration ms. Replace with the real shooting completion logic.
-    long elapsed = System.currentTimeMillis() - shootStart;
-    return elapsed >= (long) shootDuration;
   }
 }
