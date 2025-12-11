@@ -18,7 +18,7 @@ public class Constants {
             .mass(11.8)
             .forwardZeroPowerAcceleration(-36.47575519127562)
             .lateralZeroPowerAcceleration(-55.47828826172785)
-            .translationalPIDFCoefficients(new PIDFCoefficients(0.08,0,0.0067,0.03))
+            .translationalPIDFCoefficients(new PIDFCoefficients(0.09,0,0.0067,0.03))
             .headingPIDFCoefficients(new PIDFCoefficients(0.8,0,0.03,0.028));//change today
 
 
@@ -39,7 +39,7 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity( 76.68937863327488)
+            .xVelocity(76.68937863327488)
             .yVelocity(55.81917974517101);
 
     // ✅ Pinpoint localizer constants

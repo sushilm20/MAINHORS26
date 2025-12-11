@@ -66,7 +66,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  *  - SHOOTER_WAIT_TIMEOUT_MS = 4000
  *  - AUTO_SHOOTER_RPM = 90.0
  */
-@Autonomous(name = "Experimental Pedro Pathing Auto", group = "Autonomous")
+@Autonomous(name = "No turn Experiment Auto", group = "Autonomous")
 @Configurable
 public class ExperimentalPedroAuto extends OpMode {
 

@@ -40,7 +40,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  * The shooting step here relies on the flywheel subsystem to be spun up and runs a timed "shoot"
  * period (during which you should ensure your indexing mechanism runs if present).
  */
-@Autonomous(name = "Farmode Auto (Experimental-style)", group = "Autonomous")
+@Autonomous(name = "Farmode Auto (FIX) ", group = "Autonomous")
 @Configurable
 public class FarmodeAuto extends OpMode {
 
