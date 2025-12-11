@@ -660,10 +660,15 @@ public class ExperimentalPedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
+            // Modified Path7: split into two segments and like no breaking cuz speed
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(15.000, 57.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(15.000, 57.000), new Pose(30.000, 57.000))
+                    )
+                    .setNoDeceleration()
+                    .addPath(
+                            new BezierLine(new Pose(30.000, 57.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
