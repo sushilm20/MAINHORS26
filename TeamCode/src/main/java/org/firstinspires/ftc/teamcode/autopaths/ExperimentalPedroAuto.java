@@ -617,7 +617,7 @@ public class ExperimentalPedroAuto extends OpMode {
                             new BezierLine(new Pose(20.000, 122.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
-                    .setVelocityConstraint(60)//remove if slow
+                    .setBrakingStrength(2)//idk make sure tho
                     .build();
 
             Path2 = follower
