@@ -614,10 +614,11 @@ public class ExperimentalPedroAuto extends OpMode {
             Path1 = follower
                     .pathBuilder()
                     .addPath(
+
                             new BezierLine(new Pose(20.000, 122.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
-                    .setBrakingStrength(2)//idk make sure tho
+                    .setBrakingStrength(4)//idk make sure tho
                     .build();
 
             Path2 = follower
@@ -631,7 +632,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.000, 84.000), new Pose(24.000, 84.000))
+                            new BezierLine(new Pose(44.000, 84.000), new Pose(26.000, 84.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -639,7 +640,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(24.000, 84.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(26.000, 84.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -655,7 +656,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(46.000, 57.000), new Pose(17.000, 57.000))
+                            new BezierLine(new Pose(46.000, 57.000), new Pose(23.000, 57.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -664,12 +665,12 @@ public class ExperimentalPedroAuto extends OpMode {
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(17.000, 57.000), new Pose(26.000, 62.000))
+                            new BezierLine(new Pose(23.000, 57.000), new Pose(30.000, 62.000))
                     )
                     .setNoDeceleration()
                     .setLinearHeadingInterpolation(Math.toRadians(180),Math.toRadians(180))
                     .addPath(
-                            new BezierLine(new Pose(26.000, 62.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(30.000, 62.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -677,7 +678,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path8 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(43.000, 36.000))
+                            new BezierLine(new Pose(48.000, 96.000), new Pose(45.000, 36.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -685,7 +686,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(43.000, 36.000), new Pose(16.000, 36.000))
+                            new BezierLine(new Pose(45.000, 36.000), new Pose(23.000, 36.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -693,7 +694,7 @@ public class ExperimentalPedroAuto extends OpMode {
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(16.000, 36.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(23.000, 36.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -701,9 +702,9 @@ public class ExperimentalPedroAuto extends OpMode {
             Path11 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(20.000, 122.000))
+                            new BezierLine(new Pose(48.000, 96.000), new Pose(40.000, 85.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(135))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
         }
     }
