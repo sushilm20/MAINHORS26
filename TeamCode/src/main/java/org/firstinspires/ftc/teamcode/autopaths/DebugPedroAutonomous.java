@@ -48,6 +48,8 @@ public class DebugPedroAutonomous extends OpMode {
                 .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(90))
                 .build();
 
+//        follower.drivetrain.runDrive();
+
         panelsTelemetry.debug("Status", "Debug initialized");
         panelsTelemetry.update(telemetry);
     }

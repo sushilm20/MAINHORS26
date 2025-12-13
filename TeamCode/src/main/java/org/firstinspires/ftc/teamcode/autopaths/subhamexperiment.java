@@ -68,7 +68,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  */
 @Autonomous(name = "No turn Experiment Auto", group = "Autonomous")
 @Configurable
-public class ExperimentalPedroAuto extends OpMode {
+public class subhamexperiment extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -149,8 +149,6 @@ public class ExperimentalPedroAuto extends OpMode {
     // Turret movement control flag (false = allow automatic movement; true = manual mode with 0 power)
     // We will set this to false so turret tracking is enabled.
     private final boolean turretForceManualNoMove = false;
-
-    public ExperimentalPedroAuto() {}
 
     @Override
     public void init() {

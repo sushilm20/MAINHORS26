@@ -1,2 +1,14 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven {
+            url "https://www.matthewo.tech/maven/"
+        }
+    }
+}
+
 include ':FtcRobotController'
 include ':TeamCode'
+
+// https://www.matthewo.tech/maven/
