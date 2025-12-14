@@ -49,18 +49,18 @@ public class TurretController {
 
 
     // PID & control gains (from your tuned values)
-    private static final double TURRET_KP = 0.2;//0.15
-    private static final double TURRET_KI = 0.0005;
-    private static final double TURRET_KD = 0.16;//0.10
+    private static final double TURRET_KP = 1.5;//0.20
+    private static final double TURRET_KI = 0.09;
+    private static final double TURRET_KD = 0.3;//0.16
     private static final double TURRET_MAX_POWER = 1.0;
 
     // Feedforward and smoothing/filtering
-    private static final double FF_GAIN = 0.025;
-    private static final double POWER_SMOOTH_ALPHA = 0.97;
-    private static final double DERIV_FILTER_ALPHA = 0.70;
+    private static final double FF_GAIN = 0.030;//0.28
+    private static final double POWER_SMOOTH_ALPHA = 0.96;//0.96
+    private static final double DERIV_FILTER_ALPHA = 0.40;//0.7
 
     // Deadband & anti-windup
-    private static final int SMALL_DEADBAND_TICKS = 3;
+    private static final int SMALL_DEADBAND_TICKS = 4;//3
     private static final double INTEGRAL_CLAMP = 200.0;
 
     // Internal state
