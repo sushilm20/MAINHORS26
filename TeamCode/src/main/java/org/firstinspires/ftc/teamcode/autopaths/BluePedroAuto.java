@@ -66,7 +66,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  *  - SHOOTER_WAIT_TIMEOUT_MS = 4000
  *  - AUTO_SHOOTER_RPM = 90.0
  */
-@Autonomous(name = "BLUE 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "A BLUE 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
 public class BluePedroAuto extends OpMode {
 

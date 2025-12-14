@@ -29,9 +29,9 @@ import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
  * Keep verifying hardware names: "shooter", "intakeMotor", "leftCompressionServo",
  * "rightCompressionServo", "clawServo".
  */
-@Autonomous(name = "FARMODE BLUE 🔷", group = "Autonomous")
+@Autonomous(name = "FARMODE RED 🔴", group = "Autonomous")
 @Configurable
-public class FarmModeBlueAuto extends OpMode {
+public class FarmModeRedAuto extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -119,7 +119,7 @@ public class FarmModeBlueAuto extends OpMode {
     private long shooterWaitStartMs = -1;
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L;
 
-    public FarmModeBlueAuto() {}
+    public FarmModeRedAuto() {}
 
     @Override
     public void init() {
