@@ -40,7 +40,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  * The shooting step here relies on the flywheel subsystem to be spun up and runs a timed "shoot"
  * period (during which you should ensure your indexing mechanism runs if present).
  */
-@Autonomous(name = "Farmode Auto (FIX) ", group = "Autonomous")
+@Autonomous(name = "Farmode Auto (FIX) ", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
 public class FarmodeAuto extends OpMode {
 
@@ -81,10 +81,10 @@ public class FarmodeAuto extends OpMode {
   private Timer shootTimer;
 
   // durations (seconds) - intake sequence length & waits (adjust if you want exact timings)
-  private static final double INTAKE_SEQUENCE_SECONDS = 1.5; // run intake-sequence at first (user specified "once")
-  private static final double WAIT_AFTER_INTAKE_SECONDS = 2.0; // wait 2s after intake sequence
+  private static final double INTAKE_SEQUENCE_SECONDS = 2.0; // run intake-sequence at first (user specified "once")
+  private static final double WAIT_AFTER_INTAKE_SECONDS = 5.0; // wait 2s after intake sequence
   private static final double HOLD_AT_16_SECONDS = 1.0; // hold intake 1s at 16,14
-  private static final double SHOOT_SECONDS = 1.5; // run shooting period (timed) - adjust to match indexing mechanism
+  private static final double SHOOT_SECONDS = 3.0; // run shooting period (timed) - adjust to match indexing mechanism
 
   // helper to track path start/completion
   private boolean pathStarted = false;
@@ -95,7 +95,7 @@ public class FarmodeAuto extends OpMode {
   private boolean shooting = false;
 
   // Flywheel/turret constants (copied)
-  private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
+  private static final double AUTO_SHOOTER_RPM = 140.0; // close-mode target
   private long shooterWaitStartMs = -1;
   private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L;
 
@@ -436,13 +436,13 @@ public class FarmodeAuto extends OpMode {
 
       Path2 = follower
               .pathBuilder()
-              .addPath(new BezierLine(new Pose(52.000, 14.000), new Pose(16.000, 14.000)))
+              .addPath(new BezierLine(new Pose(52.000, 14.000), new Pose(20.000, 14.000)))
               .setLinearHeadingInterpolation(Math.toRadians(109), Math.toRadians(180))
               .build();
 
       Path3 = follower
               .pathBuilder()
-              .addPath(new BezierLine(new Pose(16.000, 14.000), new Pose(52.000, 14.000)))
+              .addPath(new BezierLine(new Pose(20.000, 14.000), new Pose(52.000, 14.000)))
               .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(109))
               .build();
     }

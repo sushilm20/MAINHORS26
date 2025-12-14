@@ -20,55 +20,14 @@ import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
 /**
- * ExperimentalPedroAuto — Autonomous with Pedro pathing and explicit pre-action + intake/claw sequencing.
- *
- * Program:
- *  - Creates a Pedro pathing follower and runs a sequence of 11 predefined bezier paths.
- *  - Uses a simple FSM (AutoState) to progress: WAIT_FOR_SHOOTER -> RUNNING_PATH -> PRE_ACTION ->
- *    INTAKE_RUN -> CLAW_ACTION -> (next path or FINISHED).
- *
- * PRE_ACTION behavior:
- *  - Entered when a path finishes at the "shoot pose" (x=48, y=96). Paths 1, 4, 7 and 10 end at that pose.
- *  - On entry, the OpMode waits for the robot to reach the shoot pose within a tolerance (START_POSE_TOLERANCE_IN = 6.0 inches).
- *  - If the robot reaches the pose the PRE_ACTION timer is started. If the robot does not reach it within
- *    PRE_ACTION_MAX_POSE_WAIT_SECONDS (0.3s) the PRE_ACTION timer is started anyway (fallback).
- *  - After PRE_ACTION_WAIT_SECONDS (0.3s) elapses from timer start, the robot starts the intake and
- *    transitions to INTAKE_RUN.
- *
- * INTAKE_RUN behavior:
- *  - Runs the intake/compression for INTAKE_RUN_SECONDS (default 2.5s).
- *  - After the run-duration expires the intake is stopped (unless it's part of an ongoing intake-segment),
- *    the claw is closed for CLAW_CLOSE_MS (250ms) then opened, and the FSM continues to the next path.
- *
- * Intake segments and timed intakes:
- *  - Starting certain paths begins continuous intake for that path:
- *      - Path 3 starts intake for the duration of Path 3 (stops when Path 3 finishes).
- *      - Path 6 starts intake for the duration of Path 6.
- *      - Path 9 starts intake for the duration of Path 9.
- *    (This is tracked with intakeSegmentEnd.)
- *  - Paths 4, 7 and 10 start a short, timed intake when they begin — the intake runs for TIMED_INTAKE_SECONDS (1.0s)
- *    and is then stopped automatically. This is independent of the normal INTAKE_RUN sequence.
- *
- * Shooter & Turret:
- *  - Shooter (Flywheel) subsystem is instantiated during init() but NOT spun up until start().
- *  - On start(), the flywheel is enabled and given a close-range target RPM (AUTO_SHOOTER_RPM = 90.0).
- *  - OpMode enters WAIT_FOR_SHOOTER and waits until flywheel reports on-target or a timeout elapses
- *    (SHOOTER_WAIT_TIMEOUT_MS = 4000ms) before beginning Path1.
- *  - TurretController is active and allowed to track (automatic mode) so turret tracking/motion is enabled.
- *
- * Timing constants used by the program (defaults shown):
- *  - PRE_ACTION_WAIT_SECONDS = 0.3   (wait after reaching pose / fallback)
- *  - PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3 (pose-wait fallback)
- *  - START_POSE_TOLERANCE_IN = 6.0 (in units of inches)
- *  - INTAKE_RUN_SECONDS = 2.5
- *  - TIMED_INTAKE_SECONDS = 1.0
- *  - CLAW_CLOSE_MS = 250
- *  - SHOOTER_WAIT_TIMEOUT_MS = 4000
- *  - AUTO_SHOOTER_RPM = 90.0
+ * RedPedroAuto — Red-side autonomous that mirrors ExperimentalPedroAuto but uses the
+ * red-side path points provided by the user. All logic (FSM, timers, intake/claw/shooter sequencing)
+ * is identical to the original ExperimentalPedroAuto; only starting pose, shoot pose and path points
+ * / heading interpolations are changed to the red coordinates.
  */
-@Autonomous(name = "No turn Experiment Auto", group = "Autonomous")
+@Autonomous(name = "RED 12 Ball 🔴", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
-public class ExperimentalPedroAuto extends OpMode {
+public class RedPedroAuto extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -142,7 +101,8 @@ public class ExperimentalPedroAuto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     // Shoot pose constants and tolerance - used to ensure PRE_ACTION timer starts only when robot reaches pose
-    private static final double SHOOT_POSE_X = 48.0;
+    // For red-side paths the shoot pose is at (96, 96)
+    private static final double SHOOT_POSE_X = 96.0;
     private static final double SHOOT_POSE_Y = 96.0;
     private static final double START_POSE_TOLERANCE_IN = 6.0; // increased tolerance to avoid tiny-miss stalls
 
@@ -150,7 +110,7 @@ public class ExperimentalPedroAuto extends OpMode {
     // We will set this to false so turret tracking is enabled.
     private final boolean turretForceManualNoMove = false;
 
-    public ExperimentalPedroAuto() {}
+    public RedPedroAuto() {}
 
     @Override
     public void init() {
@@ -160,8 +120,8 @@ public class ExperimentalPedroAuto extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
-        // Set starting pose to the start point of Path1 (and heading to match interpolation start)
-        follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
+        // Set starting pose to the red starting point provided
+        follower.setStartingPose(new Pose(124, 124, Math.toRadians(45)));
 
         // Timers & state
         intakeTimer = new Timer();
@@ -377,7 +337,7 @@ public class ExperimentalPedroAuto extends OpMode {
         }
     }
 
-    // Helper to check which path indices end at the shoot pose (48,96)
+    // Helper to check which path indices end at the shoot pose (now 96,96)
     private boolean endsAtShoot(int pathIndex) {
         return pathIndex == 1 || pathIndex == 4 || pathIndex == 7 || pathIndex == 10;
     }
@@ -614,99 +574,94 @@ public class ExperimentalPedroAuto extends OpMode {
             Path1 = follower
                     .pathBuilder()
                     .addPath(
-
-                            new BezierLine(new Pose(20.000, 122.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(124.000, 124.000), new Pose(96.000, 96.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
-                    .setBrakingStart(0.9)
-                    .setBrakingStrength(0.6)//idk make sure tho
-
+                    .setConstantHeadingInterpolation(Math.toRadians(45))
                     .build();
 
             Path2 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(44.000, 84.000))
+                            new BezierLine(new Pose(96.000, 96.000), new Pose(100.000, 84.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(45), Math.toRadians(0))
                     .build();
 
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.000, 84.000), new Pose(22.000, 84.000))
+                            new BezierLine(new Pose(100.000, 84.000), new Pose(118.000, 84.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(22.000, 84.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(118.000, 84.000), new Pose(96.000, 96.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path5 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(46.000, 59.000))
+                            new BezierLine(new Pose(96.000, 96.000), new Pose(98.000, 57.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(46.000, 59.000), new Pose(17.000, 59.000))
+                            new BezierLine(new Pose(98.000, 57.000), new Pose(121.000, 57.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
-            // Modified Path7: split into two segments and like no breaking cuz speed
+            // Path7 split into two segments (mirrors provided red code)
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(17.000, 59.000), new Pose(30.000, 62.000))
+                            new BezierLine(new Pose(121.000, 57.000), new Pose(108, 72))
                     )
-                    .setNoDeceleration()
-                    .setLinearHeadingInterpolation(Math.toRadians(180),Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .addPath(
-                            new BezierLine(new Pose(30.000, 62.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(108, 72), new Pose(96.000, 96.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path8 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(45.000, 36.000))
+                            new BezierLine(new Pose(96.000, 96.000), new Pose(99.000, 36.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(45.000, 36.000), new Pose(17.000, 36.000))
+                            new BezierLine(new Pose(99.000, 36.000), new Pose(121.000, 36.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(17.000, 36.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(121.000, 36.000), new Pose(96.000, 96.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
             Path11 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(40.000, 85.000))
+                            new BezierLine(new Pose(96.000, 96.000), new Pose(104.000, 85.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
         }
     }

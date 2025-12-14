@@ -33,7 +33,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  *  - When path 4, path 7 or path 10 starts, run intake for a timed 1.0s and then stop.
  *  - PRE_ACTION_WAIT_SECONDS reduced by 0.5s (from 0.8 to 0.3).
  */
-@Autonomous(name = "Blue Side 12 Ball", group = "Autonomous")
+@Autonomous(name = "zOLD Blue Side 12 Ball turning", group = "Autonomous")
 @Configurable
 public class pedroauto extends OpMode {
 
