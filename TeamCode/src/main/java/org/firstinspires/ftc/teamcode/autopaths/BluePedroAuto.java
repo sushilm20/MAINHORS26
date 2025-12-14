@@ -704,7 +704,7 @@ public class BluePedroAuto extends OpMode {
                     .addPath(
                             new BezierLine(new Pose(48.000, 96.000), new Pose(40.000, 85.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(135))
                     .build();
         }
     }

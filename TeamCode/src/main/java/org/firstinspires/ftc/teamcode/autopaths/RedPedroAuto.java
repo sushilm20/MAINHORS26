@@ -661,7 +661,7 @@ public class RedPedroAuto extends OpMode {
                     .addPath(
                             new BezierLine(new Pose(96.000, 96.000), new Pose(104.000, 85.000))
                     )
-                    .setConstantHeadingInterpolation(Math.toRadians(0))
+                    .setConstantHeadingInterpolation(Math.toRadians(45))
                     .build();
         }
     }
