@@ -8,6 +8,8 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -119,6 +121,10 @@ public class FarmModeBlueAuto extends OpMode {
     private long shooterWaitStartMs = -1;
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L;
 
+    private BNO055IMU pinpointImu = null;
+    private BNO055IMU hubImu = null;
+    private BNO055IMU imu = null;
+
     public FarmModeBlueAuto() {}
 
     @Override
@@ -146,7 +152,6 @@ public class FarmModeBlueAuto extends OpMode {
         inShootPoseSequence = false;
         waitingForRPMStable = false;
 
-        // hardware mapping
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
             if (shooterMotor != null) {
@@ -185,6 +190,35 @@ public class FarmModeBlueAuto extends OpMode {
             panelsTelemetry.debug("Init", "claw mapping failed: " + e.getMessage());
         }
 
+        try {
+            try {
+                pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' found");
+            } catch (Exception e) {
+                pinpointImu = null;
+            }
+
+            try {
+                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
+                panelsTelemetry.debug("Init", "Expansion Hub IMU 'imu' found");
+            } catch (Exception e) {
+                hubImu = null;
+            }
+
+            imu = (pinpointImu != null) ? pinpointImu : hubImu;
+
+            if (imu != null) {
+                BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
+                imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+                imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+                imu.initialize(imuParams);
+            } else {
+                panelsTelemetry.debug("Init", "IMU not found or failed to init");
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Init", "IMU init error: " + e.getMessage());
+        }
+
         panelsTelemetry.debug("Status", "Initialized (shooter OFF until start)");
         panelsTelemetry.update(telemetry);
     }
@@ -218,7 +252,6 @@ public class FarmModeBlueAuto extends OpMode {
 
         runStateMachine(nowMs);
 
-        // telemetry
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         try {
@@ -256,7 +289,6 @@ public class FarmModeBlueAuto extends OpMode {
         state = AutoState.FINISHED;
     }
 
-    // intake helpers
     private void startIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(INTAKE_ON_POWER);
@@ -277,15 +309,11 @@ public class FarmModeBlueAuto extends OpMode {
         }
     }
 
-    // Helper: check which path ends at shoot pose
     private boolean endsAtShoot(int pathIndex) {
-        // per provided Paths: Path1, Path3, Path6 end at 52,14
         return pathIndex == 1 || pathIndex == 3 || pathIndex == 6;
     }
 
-    // Helper: check which path starts at shoot pose (we want PRE_ACTION also when next path starts at shoot)
     private boolean startsAtShoot(int pathIndex) {
-        // per provided Paths: Path2, Path4, Path7 start at 52,14
         return pathIndex == 2 || pathIndex == 4 || pathIndex == 7;
     }
 
@@ -319,13 +347,11 @@ public class FarmModeBlueAuto extends OpMode {
             return;
         }
 
-        // Continuous intake for specified indices (updated per your requests)
         if (idx == 1 || idx == 3 || idx == 5 || idx == 6) {
             intakeSegmentEnd = idx;
             startIntake();
         }
 
-        // Timed intake example for path4 (kept as convenience)
         if (idx == 4) {
             startIntake();
             timedIntakeTimer.resetTimer();
@@ -349,7 +375,6 @@ public class FarmModeBlueAuto extends OpMode {
     }
 
     private void runStateMachine(long nowMs) {
-        // handle timed intake expiration (independent)
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
                 stopIntake();
@@ -375,17 +400,14 @@ public class FarmModeBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
-                    // stop intake for continuous-intake segments
                     if (intakeSegmentEnd == finished) {
                         stopIntake();
                         intakeSegmentEnd = -1;
                     }
 
-                    // NEW: If path 3 just finished, enter WAIT_NO_MOVEMENT state
                     if (finished == 3) {
                         nextPathIndex = finished + 1;
                         waitTimer.resetTimer();
-                        // set flywheel to 90 RPM during the wait (if available)
                         if (flywheel != null) {
                             flywheel.setTargetRPM(90.0);
                         }
@@ -398,7 +420,6 @@ public class FarmModeBlueAuto extends OpMode {
                     if (next > 7) {
                         state = AutoState.FINISHED;
                     } else {
-                        // If finished path ended at shoot OR the next path starts at shoot, enter PRE_ACTION
                         if (endsAtShoot(finished) || startsAtShoot(next)) {
                             nextPathIndex = next;
                             preActionTimerStarted = false;
@@ -434,20 +455,16 @@ public class FarmModeBlueAuto extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // START shoot-pose intake sequence and go to INTAKE_RUN in shoot mode
                         startIntake();
                         intakeTimer.resetTimer();
-                        // Mark that this INTAKE_RUN originates from a shoot-pose PRE_ACTION
                         inShootPoseSequence = true;
                         waitingForRPMStable = false;
-                        // initialize shootStableTimer depending on current RPM
                         if (flywheel != null && Math.abs(flywheel.getCurrentRPM() - AUTO_SHOOTER_RPM) <= (RPM_TOLERANCE * AUTO_SHOOTER_RPM)) {
                             shootStableTimer.resetTimer();
                         } else {
-                            // not stable yet; we'll wait for it to become stable and start the stable timer then
                             shootStableTimer.resetTimer();
                             waitingForRPMStable = true;
-                            stopIntake(); // stop until RPM returns
+                            stopIntake();
                         }
                         state = AutoState.INTAKE_RUN;
                     }
@@ -456,16 +473,12 @@ public class FarmModeBlueAuto extends OpMode {
 
             case INTAKE_RUN:
                 if (inShootPoseSequence) {
-                    // New logic that depends on flywheel RPM stability
                     if (flywheel == null) {
-                        // fallback: no flywheel available, behave like legacy INTAKE_RUN_SECONDS
                         if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                            // perform claw sequence
                             if (intakeSegmentEnd == -1) stopIntake();
                             if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                             if (clawServo != null) clawServo.setPosition(0.2);
                             clawActionStartMs = System.currentTimeMillis();
-                            // reset flags
                             inShootPoseSequence = false;
                             waitingForRPMStable = false;
                             state = AutoState.CLAW_ACTION;
@@ -475,34 +488,26 @@ public class FarmModeBlueAuto extends OpMode {
                         boolean rpmStable = Math.abs(currentRPM - AUTO_SHOOTER_RPM) <= (RPM_TOLERANCE * AUTO_SHOOTER_RPM);
 
                         if (!rpmStable) {
-                            // RPM changed away from target: stop intake and wait for it to return
                             if (!waitingForRPMStable) {
                                 panelsTelemetry.debug("ShootSeq", "RPM deviated (now=" + String.format("%.1f", currentRPM) + "), stopping intake and waiting");
                             }
                             waitingForRPMStable = true;
                             stopIntake();
-                            // do not progress to claw until RPM returns and stable timer completes
                         } else {
-                            // RPM is stable
                             if (waitingForRPMStable) {
-                                // we just regained stable RPM; restart intake and reset stable timer
                                 panelsTelemetry.debug("ShootSeq", "RPM returned to target (now=" + String.format("%.1f", currentRPM) + "), restarting stable timer");
                                 startIntake();
                                 shootStableTimer.resetTimer();
                                 waitingForRPMStable = false;
                             } else {
-                                // if intake isn't running, ensure it's running
                                 if (intakeMotor != null && intakeMotor.getPower() == 0.0) {
                                     startIntake();
                                 }
-                                // If stable timer has run long enough, perform claw action
                                 if (shootStableTimer.getElapsedTimeSeconds() >= REQUIRED_STABLE_SECONDS) {
-                                    // perform claw action
                                     if (intakeSegmentEnd == -1) stopIntake();
                                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                                     if (clawServo != null) clawServo.setPosition(0.2); // close
                                     clawActionStartMs = System.currentTimeMillis();
-                                    // reset shoot-pose flags
                                     inShootPoseSequence = false;
                                     waitingForRPMStable = false;
                                     state = AutoState.CLAW_ACTION;
@@ -513,7 +518,6 @@ public class FarmModeBlueAuto extends OpMode {
                         }
                     }
                 } else {
-                    // Non-shoot INTAKE_RUN: legacy timed behavior
                     if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                         if (intakeSegmentEnd == -1) stopIntake();
                         if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
@@ -526,7 +530,6 @@ public class FarmModeBlueAuto extends OpMode {
 
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    // open claw and continue
                     if (clawServo != null) clawServo.setPosition(0.63);
                     if (nextPathIndex > 0 && nextPathIndex <= 7) {
                         startPath(nextPathIndex);
@@ -538,14 +541,11 @@ public class FarmModeBlueAuto extends OpMode {
                 break;
 
             case WAIT_NO_MOVEMENT:
-                // During this state robot should not start new movement. Flywheel is kept at 90 RPM.
                 panelsTelemetry.debug("WAIT_NO_MOVEMENT", String.format("elapsed=%.2fs/%.2fs", waitTimer.getElapsedTimeSeconds(), WAIT_TIME_NO_MOVEMENT));
                 if (waitTimer.getElapsedTimeSeconds() >= WAIT_TIME_NO_MOVEMENT) {
-                    // resume to next path
                     int toStart = nextPathIndex;
                     nextPathIndex = -1;
                     if (toStart > 0 && toStart <= 7) {
-                        // restore autoshooter target to normal auto RPM for subsequent operations
                         if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
                         startPath(toStart);
                     } else {
@@ -555,7 +555,6 @@ public class FarmModeBlueAuto extends OpMode {
                 break;
 
             case FINISHED:
-                // idle
                 break;
 
             case IDLE:
@@ -564,7 +563,6 @@ public class FarmModeBlueAuto extends OpMode {
         }
     }
 
-    // Paths per your latest coordinates (7 paths)
     public static class Paths {
 
         public PathChain Path1;

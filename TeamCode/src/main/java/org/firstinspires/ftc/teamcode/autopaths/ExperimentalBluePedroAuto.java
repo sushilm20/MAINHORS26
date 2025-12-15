@@ -22,49 +22,15 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 /**
  * ExperimentalPedroAuto — Autonomous with Pedro pathing and explicit pre-action + intake/claw sequencing.
  *
- * Program:
- *  - Creates a Pedro pathing follower and runs a sequence of 11 predefined bezier paths.
- *  - Uses a simple FSM (AutoState) to progress: WAIT_FOR_SHOOTER -> RUNNING_PATH -> PRE_ACTION ->
- *    INTAKE_RUN -> CLAW_ACTION -> (next path or FINISHED).
+ * Modified to prefer the GoBILDA PinPoint IMU (device name "pinpoint") for heading.
+ * If a "pinpoint" BNO055IMU is present on the hardware map it will be used.
+ * Otherwise the original expansion-hub IMU ("imu") is used as a fallback.
  *
- * PRE_ACTION behavior:
- *  - Entered when a path finishes at the "shoot pose" (x=48, y=96). Paths 1, 4, 7 and 10 end at that pose.
- *  - On entry, the OpMode waits for the robot to reach the shoot pose within a tolerance (START_POSE_TOLERANCE_IN = 6.0 inches).
- *  - If the robot reaches the pose the PRE_ACTION timer is started. If the robot does not reach it within
- *    PRE_ACTION_MAX_POSE_WAIT_SECONDS (0.3s) the PRE_ACTION timer is started anyway (fallback).
- *  - After PRE_ACTION_WAIT_SECONDS (0.3s) elapses from timer start, the robot starts the intake and
- *    transitions to INTAKE_RUN.
+ * To use the PinPoint IMU on your robot:
+ *  - Configure the sensor in the Robot Configuration with the name "pinpoint" (or modify the string below).
+ *  - The code will automatically prefer it and initialize it in the same way as the original code did.
  *
- * INTAKE_RUN behavior:
- *  - Runs the intake/compression for INTAKE_RUN_SECONDS (default 2.5s).
- *  - After the run-duration expires the intake is stopped (unless it's part of an ongoing intake-segment),
- *    the claw is closed for CLAW_CLOSE_MS (250ms) then opened, and the FSM continues to the next path.
- *
- * Intake segments and timed intakes:
- *  - Starting certain paths begins continuous intake for that path:
- *      - Path 3 starts intake for the duration of Path 3 (stops when Path 3 finishes).
- *      - Path 6 starts intake for the duration of Path 6.
- *      - Path 9 starts intake for the duration of Path 9.
- *    (This is tracked with intakeSegmentEnd.)
- *  - Paths 4, 7 and 10 start a short, timed intake when they begin — the intake runs for TIMED_INTAKE_SECONDS (1.0s)
- *    and is then stopped automatically. This is independent of the normal INTAKE_RUN sequence.
- *
- * Shooter & Turret:
- *  - Shooter (Flywheel) subsystem is instantiated during init() but NOT spun up until start().
- *  - On start(), the flywheel is enabled and given a close-range target RPM (AUTO_SHOOTER_RPM = 90.0).
- *  - OpMode enters WAIT_FOR_SHOOTER and waits until flywheel reports on-target or a timeout elapses
- *    (SHOOTER_WAIT_TIMEOUT_MS = 4000ms) before beginning Path1.
- *  - TurretController is active and allowed to track (automatic mode) so turret tracking/motion is enabled.
- *
- * Timing constants used by the program (defaults shown):
- *  - PRE_ACTION_WAIT_SECONDS = 0.3   (wait after reaching pose / fallback)
- *  - PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3 (pose-wait fallback)
- *  - START_POSE_TOLERANCE_IN = 6.0 (in units of inches)
- *  - INTAKE_RUN_SECONDS = 2.5
- *  - TIMED_INTAKE_SECONDS = 1.0
- *  - CLAW_CLOSE_MS = 250
- *  - SHOOTER_WAIT_TIMEOUT_MS = 4000
- *  - AUTO_SHOOTER_RPM = 90.0
+ * Everything else remains unchanged from the original implementation.
  */
 @Autonomous(name = "Gate 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
@@ -116,7 +82,14 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // Shooter / Turret hardware & controllers
     private DcMotor shooterMotor;
     private DcMotor turretMotor;
-    private BNO055IMU imu;
+
+    // IMU variables:
+    // - We will attempt to map a GoBILDA PinPoint IMU with the hardware name "pinpoint".
+    // - If that is present we'll use it for heading (preferred). Otherwise fall back to the expansion-hub IMU named "imu".
+    private BNO055IMU pinpointImu = null;
+    private BNO055IMU hubImu = null;
+    private BNO055IMU imu = null; // the imu actually used by the program
+
     private Flywheel flywheel;
     private TurretController turretController;
     private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
@@ -208,13 +181,38 @@ public class ExperimentalBluePedroAuto extends OpMode {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
 
-        // IMU init (same parameters as teleop)
+        // IMU init (prefer GoBILDA PinPoint IMU named "pinpoint" if available)
         try {
-            imu = hardwareMap.get(BNO055IMU.class, "imu");
-            BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
-            imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-            imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-            imu.initialize(imuParams);
+            // Try to map the GoBILDA PinPoint IMU (configure your robot to expose the PinPoint under this name)
+            try {
+                pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+                panelsTelemetry.debug("Init", "Found PinPoint IMU as 'pinpoint'");
+            } catch (Exception e) {
+                pinpointImu = null;
+                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
+            }
+
+            // Map the original expansion-hub IMU as a fallback (named "imu" in your config)
+            try {
+                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
+                panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
+            } catch (Exception e) {
+                hubImu = null;
+                panelsTelemetry.debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
+            }
+
+            // Choose which IMU to use: prefer pinpoint, otherwise fallback to hub imu.
+            imu = (pinpointImu != null) ? pinpointImu : hubImu;
+
+            if (imu != null) {
+                BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
+                imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+                imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+                imu.initialize(imuParams);
+                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" : "Expansion Hub") + ")");
+            } else {
+                panelsTelemetry.debug("Init", "No IMU found (neither 'pinpoint' nor 'imu'). Turret will not have heading data.");
+            }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e.getMessage());
         }
@@ -222,7 +220,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
         // Instantiate subsystems using the provided classes (pass OpMode telemetry for telemetry output)
         try {
             if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
-            if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
+            if (turretMotor != null) {
+                // Pass the chosen imu (may be null) into the turret controller
+                turretController = new TurretController(turretMotor, imu, telemetry);
+            }
 
             // Prepare turret controller just like teleop
             if (turretController != null) {
@@ -368,6 +369,16 @@ public class ExperimentalBluePedroAuto extends OpMode {
         if (gateCloseTimerStarted) {
             panelsTelemetry.debug("GateCloseTimer", String.format("%.2f", gateCloseTimer.getElapsedTimeSeconds()));
         }
+
+        // Which IMU are we using? show for debugging/tuning
+        if (imu == pinpointImu && pinpointImu != null) {
+            panelsTelemetry.debug("IMU Source", "PinPoint ('pinpoint')");
+        } else if (imu == hubImu && hubImu != null) {
+            panelsTelemetry.debug("IMU Source", "Expansion Hub ('imu')");
+        } else {
+            panelsTelemetry.debug("IMU Source", "None");
+        }
+
         panelsTelemetry.update(telemetry);
     }
 
