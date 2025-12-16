@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
+
 /*
   secondexperimentalHORS.java
   ---------------------------
@@ -8,6 +9,10 @@ package org.firstinspires.ftc.teamcode.teleop;
   - Calls short-duration rumbles repeatedly each loop while condition holds, so vibration
     continues until the flywheel exits the tolerance window.
   - No change to flywheel logic besides checking isAtTarget().
+  - Added gate servo toggle on dpad_up for both gamepads (default open=0.1, closed=0.5).
+  - Turret IMU selection: prefer "pinpoint" IMU (if present) for turret control, otherwise fall back
+    to the existing "imu" (expansion hub). The chosen IMU is passed to the TurretController and
+    reported on telemetry.
 */
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
@@ -30,6 +35,13 @@ public class secondexperimentalHORS extends LinearOpMode {
     private DcMotor shooter, turret, intakeMotor;
     private Servo clawServo, leftCompressionServo, rightCompressionServo;
     private Servo leftHoodServo, rightHoodServo;
+
+    // Gate servo
+    private Servo gateServo;
+    private boolean dpadUpLast = false;
+    private boolean gateClosed = false;
+    private static final double GATE_OPEN = 0.67;//lmao
+    private static final double GATE_CLOSED = 0.5;
 
     // Subsystems
     private TurretController turretController;
@@ -63,8 +75,10 @@ public class secondexperimentalHORS extends LinearOpMode {
     // For gamepad2 touchpad reset
     private boolean gamepad2TouchpadLast = false;
 
-    // IMU
-    private BNO055IMU imu;
+    // IMUs
+    private BNO055IMU imu;            // existing expansion-hub IMU (named "imu" in config)
+    private BNO055IMU pinpointImu;    // optional pinpoint IMU (named "pinpoint" in config)
+    private BNO055IMU turretImu;      // the IMU actually used by the turret (pinpoint if present otherwise imu)
 
     @Override
     public void runOpMode() {
@@ -82,6 +96,8 @@ public class secondexperimentalHORS extends LinearOpMode {
         rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
+        // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
+        gateServo = hardwareMap.get(Servo.class, "gateServo");
 
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -102,14 +118,41 @@ public class secondexperimentalHORS extends LinearOpMode {
 //        backRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // IMU init
-        imu = hardwareMap.get(BNO055IMU.class, "imu");
+        // Try to map both the standard "imu" and an optional "pinpoint" IMU.
+        // If "pinpoint" exists we'll use it for turret control; otherwise fall back to "imu".
+        try {
+            imu = hardwareMap.get(BNO055IMU.class, "imu");
+        } catch (Exception e) {
+            imu = null;
+        }
+
+        try {
+            pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+        } catch (Exception e) {
+            // no pinpoint IMU mapped; leave null
+            pinpointImu = null;
+        }
+
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
         imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-        imu.initialize(imuParams);
+
+        if (imu != null) {
+            try {
+                imu.initialize(imuParams);
+            } catch (Exception ignored) {}
+        }
+        if (pinpointImu != null) {
+            try {
+                pinpointImu.initialize(imuParams);
+            } catch (Exception ignored) {}
+        }
+
+        // Choose turret IMU: prefer pinpoint if available
+        turretImu = (pinpointImu != null) ? pinpointImu : imu;
 
         // Create subsystem controllers
-        turretController = new TurretController(turret, imu, telemetry);
+        turretController = new TurretController(turret, turretImu, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new Flywheel(shooter, telemetry);
 
@@ -120,8 +163,14 @@ public class secondexperimentalHORS extends LinearOpMode {
         leftHoodServo.setPosition(leftHoodPosition);
         rightHoodPosition = RIGHT_HOOD_CLOSE;
         rightHoodServo.setPosition(rightHoodPosition);
+        // Gate defaults to open (0.1)
+        gateClosed = false;
+        gateServo.setPosition(GATE_OPEN);
 
+        String imuUsed = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
+                (turretImu == imu && imu != null) ? "imu (expansion hub)" : "none";
         telemetry.addData("Status", "Initialized (mode = CLOSE)");
+        telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
 
         // ensure subsystems are ready
@@ -202,6 +251,16 @@ public class secondexperimentalHORS extends LinearOpMode {
                 flywheel.adjustTargetRPM(10.0);
             }
             dpadRightLast = dpadRightNow;
+
+            // ------------------------------
+            // Gate servo toggle on DPAD_UP for both controllers
+            // ------------------------------
+            boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
+            if (dpadUpNow && !dpadUpLast) {
+                gateClosed = !gateClosed;
+                gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
+            }
+            dpadUpLast = dpadUpNow;
 
             // ------------------------------
             // Flywheel update (measurement + PID + motor write)
@@ -298,11 +357,20 @@ public class secondexperimentalHORS extends LinearOpMode {
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
+            telemetry.addData("Gate", gateClosed ? "CLOSED" : "OPEN");
+            telemetry.addData("Gate Pos", gateServo.getPosition());
+
+            String imuUsedNow = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
+                    (turretImu == imu && imu != null) ? "imu (exp hub)" : "none";
+            telemetry.addData("Turret IMU Used", imuUsedNow);
+
             telemetry.update();
         }
     }
 
     private void headingReferenceReset() {
         // turretController.captureReferences() handles the turret mapping if needed.
+        // If you need to reset the turret IMU reference specifically, call captureReferences/resetPidState
+        // on the turretController which already uses turretImu.
     }
 }
