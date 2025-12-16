@@ -590,7 +590,7 @@ public class RedPedroAuto extends OpMode {
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(100.000, 84.000), new Pose(118.000, 84.000))
+                            new BezierLine(new Pose(100.000, 84.000), new Pose(129.000, 84.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
@@ -598,7 +598,7 @@ public class RedPedroAuto extends OpMode {
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(118.000, 84.000), new Pose(96.000, 96.000))
+                            new BezierLine(new Pose(129.000, 84.000), new Pose(96.000, 96.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
@@ -606,7 +606,7 @@ public class RedPedroAuto extends OpMode {
             Path5 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(96.000, 96.000), new Pose(98.000, 57.000))
+                            new BezierLine(new Pose(96.000, 96.000), new Pose(99.000, 60.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
@@ -614,7 +614,7 @@ public class RedPedroAuto extends OpMode {
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(98.000, 57.000), new Pose(121.000, 57.000))
+                            new BezierLine(new Pose(99.000, 60.000), new Pose(133.000, 60.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
@@ -623,7 +623,7 @@ public class RedPedroAuto extends OpMode {
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(121.000, 57.000), new Pose(108, 72))
+                            new BezierLine(new Pose(133.000, 60.000), new Pose(108, 72))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .addPath(
@@ -643,7 +643,7 @@ public class RedPedroAuto extends OpMode {
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(99.000, 36.000), new Pose(121.000, 36.000))
+                            new BezierLine(new Pose(99.000, 36.000), new Pose(131.000, 36.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
@@ -651,7 +651,7 @@ public class RedPedroAuto extends OpMode {
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(121.000, 36.000), new Pose(96.000, 96.000))
+                            new BezierLine(new Pose(131.000, 36.000), new Pose(96.000, 96.000))
                     )
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
