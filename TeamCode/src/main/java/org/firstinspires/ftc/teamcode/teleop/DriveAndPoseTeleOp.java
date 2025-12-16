@@ -47,7 +47,7 @@ public class DriveAndPoseTeleOp extends OpMode {
             follower.setTeleOpDrive(axial, lateral, yaw, true);  // Robot-centric driving enabled
         }
 
-        // Telemetry: display robot pose
+        // Telemetry: display robot pose, accurate to the tenths place
         telemetry.addData("Pose", currentPose != null
                 ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
                 : "N/A");
