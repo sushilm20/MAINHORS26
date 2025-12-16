@@ -17,11 +17,11 @@ import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
-import org.firstinspires.ftc.teamcode.subsystems.TurretAutoAim;
+import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 @TeleOp(name="Turret and DynamicHORS", group="Linear OpMode")
-public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
+public class forthexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, turret, intakeMotor;
@@ -37,7 +37,7 @@ public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
     private DriveController driveController;
     private Flywheel flywheel;
     private FlywheelVersatile flywheelVersatile;
-    private TurretAutoAim turretAutoAim;
+    private TurretGoalAimer turretGoalAimer;
 
     private Follower follower;
     private Pose currentPose = new Pose();
@@ -94,7 +94,7 @@ public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // IMU init (for completeness—turret aiming here does not depend on IMU)
+        // IMU init
         try { imu = hardwareMap.get(BNO055IMU.class, "imu"); } catch (Exception e) { imu = null; }
         try { pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint"); } catch (Exception e) { pinpointImu = null; }
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
@@ -125,7 +125,8 @@ public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
         );
         flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 90.0, 150.0);
 
-        turretAutoAim = new TurretAutoAim(turret, BLUE_GOAL);
+        // Use pose-based turret aiming
+        turretGoalAimer = new TurretGoalAimer(turret, turretImu, telemetry);
 
         clawServo.setPosition(0.63);
         leftCompressionServo.setPosition(0.5);
@@ -136,7 +137,7 @@ public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
         gateClosed = false;
         gateServo.setPosition(GATE_OPEN);
 
-        telemetry.addData("Status", "Initialized (auto RPM + auto turret)");
+        telemetry.addData("Status", "Initialized (auto RPM + pose turret aim)");
         telemetry.update();
 
         waitForStart();
@@ -210,8 +211,13 @@ public class forthexperimentalHORS experimentalHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Auto-aim turret toward blue goal
-            turretAutoAim.update(currentPose);
+            // Pose-based turret aiming at BLUE_GOAL
+            turretGoalAimer.update(
+                    /*manualNow=*/false,
+                    /*manualPower=*/0.0,
+                    currentPose,
+                    BLUE_GOAL
+            );
 
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {
