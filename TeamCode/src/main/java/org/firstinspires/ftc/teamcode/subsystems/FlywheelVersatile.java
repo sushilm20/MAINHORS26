@@ -1,0 +1,129 @@
+package org.firstinspires.ftc.teamcode.subsystems;
+
+import com.pedropathing.geometry.Pose;
+import java.util.List;
+
+/**
+ * Computes target RPM from robot pose relative to a goal, using a linear
+ * regression over calibration points (distance -> RPM) plus driver trim.
+ * Delegates actual motor control to the existing Flywheel class.
+ */
+public class FlywheelVersatile {
+
+    public static class CalibrationPoint {
+        public final Pose pose;
+        public final double rpm;
+        public CalibrationPoint(Pose pose, double rpm) {
+            this.pose = pose;
+            this.rpm = rpm;
+        }
+    }
+
+    private final Flywheel flywheel;
+    private final Pose goalPose;
+    private final List<CalibrationPoint> calibration;
+    private final double minRpm;
+    private final double maxRpm;
+
+    private double slope = 0.0;
+    private double intercept = 0.0;
+    private double trimRpm = 0.0;
+    private double lastBaseRpm = 0.0;
+    private double lastDistance = 0.0;
+
+    public FlywheelVersatile(Flywheel flywheel,
+                             Pose goalPose,
+                             List<CalibrationPoint> calibration,
+                             double minRpm,
+                             double maxRpm) {
+        this.flywheel = flywheel;
+        this.goalPose = goalPose;
+        this.calibration = calibration;
+        this.minRpm = minRpm;
+        this.maxRpm = maxRpm;
+        this.lastBaseRpm = clamp((minRpm + maxRpm) / 2.0);
+        computeRegression();
+    }
+
+    private void computeRegression() {
+        int n = calibration.size();
+        if (n < 2) {
+            slope = 0.0;
+            intercept = lastBaseRpm;
+            return;
+        }
+
+        double[] dists = new double[n];
+        double meanX = 0.0;
+        double meanY = 0.0;
+        for (int i = 0; i < n; i++) {
+            double dist = distanceToGoal(calibration.get(i).pose);
+            dists[i] = dist;
+            meanX += dist;
+            meanY += calibration.get(i).rpm;
+        }
+        meanX /= n;
+        meanY /= n;
+
+        double cov = 0.0;
+        double var = 0.0;
+        for (int i = 0; i < n; i++) {
+            double dx = dists[i] - meanX;
+            cov += dx * (calibration.get(i).rpm - meanY);
+            var += dx * dx;
+        }
+
+        if (Math.abs(var) < 1e-6) {
+            slope = 0.0;
+            intercept = clamp(meanY);
+        } else {
+            slope = cov / var;
+            intercept = meanY - slope * meanX;
+        }
+    }
+
+    private double clamp(double value) {
+        return Math.max(minRpm, Math.min(maxRpm, value));
+    }
+
+    private double distanceToGoal(Pose pose) {
+        double dx = pose.getX() - goalPose.getX();
+        double dy = pose.getY() - goalPose.getY();
+        return Math.hypot(dx, dy);
+    }
+
+    public double getDistanceToGoal(Pose pose) {
+        return distanceToGoal(pose);
+    }
+
+    public double computeBaseRpm(Pose robotPose) {
+        if (robotPose == null) {
+            return lastBaseRpm; // fallback to last known/base
+        }
+        lastDistance = distanceToGoal(robotPose);
+        double raw = slope * lastDistance + intercept;
+        lastBaseRpm = clamp(raw);
+        return lastBaseRpm;
+    }
+
+    public double getFinalTargetRPM(Pose robotPose) {
+        double base = computeBaseRpm(robotPose);
+        return clamp(base + trimRpm);
+    }
+
+    public void adjustTrim(double delta) {
+        trimRpm += delta;
+    }
+
+    public double getTrimRpm() {
+        return trimRpm;
+    }
+
+    public double getLastBaseRpm() {
+        return lastBaseRpm;
+    }
+
+    public double getLastDistance() {
+        return lastDistance;
+    }
+}
