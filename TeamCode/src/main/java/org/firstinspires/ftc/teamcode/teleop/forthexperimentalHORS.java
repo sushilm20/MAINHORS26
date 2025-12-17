@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPo
 import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-@TeleOp(name="Turret and DynamicHORS", group="Linear OpMode")
+@TeleOp(name="Turret and Dynamic HORS", group="Linear OpMode")
 public class forthexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -117,7 +117,7 @@ public class forthexperimentalHORS extends LinearOpMode {
         }
 
         List<CalibrationPoint> calibrationPoints = Arrays.asList(
-                new CalibrationPoint(new Pose(48, 96, 0), 90.0),
+                new CalibrationPoint(new Pose(48, 96, 135), 90.0),
                 new CalibrationPoint(new Pose(60, 125, 0), 95.0),
                 new CalibrationPoint(new Pose(60, 82, 0), 100.0),
                 new CalibrationPoint(new Pose(72, 72, 0), 110.0),

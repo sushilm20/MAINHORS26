@@ -32,7 +32,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants; // ensure this exists in your project
 
-@TeleOp(name="DynamicHORS", group="Linear OpMode")
+@TeleOp(name="Adaptive RPM HORS - No Turret", group="Linear OpMode")
 public class thirdexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;

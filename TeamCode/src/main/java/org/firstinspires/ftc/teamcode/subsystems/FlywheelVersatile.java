@@ -4,9 +4,11 @@ import com.pedropathing.geometry.Pose;
 import java.util.List;
 
 /**
- * Computes target RPM from robot pose relative to a goal, using a linear
- * regression over calibration points (distance -> RPM) plus driver trim.
- * Delegates actual motor control to the existing Flywheel class.
+ * Computes target RPM from robot pose relative to a goal, using linear regression
+ * over calibration points (distance -> RPM) plus driver trim.
+ *
+ * Adds a flat radius around the goal: inside this radius RPM is held at minRpm.
+ * Outside, RPM increases with distance based on calibration.
  */
 public class FlywheelVersatile {
 
@@ -25,23 +27,43 @@ public class FlywheelVersatile {
     private final double minRpm;
     private final double maxRpm;
 
+    // Flat radius (in field units). If distance <= flatRadius, RPM = minRpm.
+    private double flatRadius = 0.0;
+
     private double slope = 0.0;
     private double intercept = 0.0;
     private double trimRpm = 0.0;
     private double lastBaseRpm = 0.0;
     private double lastDistance = 0.0;
 
+    // Existing constructor (keeps backward compatibility, flatRadius=0)
     public FlywheelVersatile(Flywheel flywheel,
                              Pose goalPose,
                              List<CalibrationPoint> calibration,
                              double minRpm,
                              double maxRpm) {
+        this(flywheel, goalPose, calibration, minRpm, maxRpm, 0.0);
+    }
+
+    // New constructor with configurable flat radius
+    public FlywheelVersatile(Flywheel flywheel,
+                             Pose goalPose,
+                             List<CalibrationPoint> calibration,
+                             double minRpm,
+                             double maxRpm,
+                             double flatRadius) {
         this.flywheel = flywheel;
         this.goalPose = goalPose;
         this.calibration = calibration;
         this.minRpm = minRpm;
         this.maxRpm = maxRpm;
+        this.flatRadius = Math.max(0.0, flatRadius);
         this.lastBaseRpm = clamp((minRpm + maxRpm) / 2.0);
+        computeRegression();
+    }
+
+    public void setFlatRadius(double flatRadius) {
+        this.flatRadius = Math.max(0.0, flatRadius);
         computeRegression();
     }
 
@@ -49,17 +71,18 @@ public class FlywheelVersatile {
         int n = calibration.size();
         if (n < 2) {
             slope = 0.0;
-            intercept = lastBaseRpm;
+            intercept = clamp(minRpm);
             return;
         }
 
-        double[] dists = new double[n];
+        double[] adj = new double[n]; // adjusted distances (distance - flatRadius, floored at 0)
         double meanX = 0.0;
         double meanY = 0.0;
         for (int i = 0; i < n; i++) {
             double dist = distanceToGoal(calibration.get(i).pose);
-            dists[i] = dist;
-            meanX += dist;
+            double d = Math.max(0.0, dist - flatRadius);
+            adj[i] = d;
+            meanX += d;
             meanY += calibration.get(i).rpm;
         }
         meanX /= n;
@@ -68,7 +91,7 @@ public class FlywheelVersatile {
         double cov = 0.0;
         double var = 0.0;
         for (int i = 0; i < n; i++) {
-            double dx = dists[i] - meanX;
+            double dx = adj[i] - meanX;
             cov += dx * (calibration.get(i).rpm - meanY);
             var += dx * dx;
         }
@@ -101,7 +124,15 @@ public class FlywheelVersatile {
             return lastBaseRpm; // fallback to last known/base
         }
         lastDistance = distanceToGoal(robotPose);
-        double raw = slope * lastDistance + intercept;
+
+        // Flat radius behavior: hold minRpm when inside radius
+        if (lastDistance <= flatRadius) {
+            lastBaseRpm = minRpm;
+            return lastBaseRpm;
+        }
+
+        double adjDist = Math.max(0.0, lastDistance - flatRadius);
+        double raw = slope * adjDist + intercept;
         lastBaseRpm = clamp(raw);
         return lastBaseRpm;
     }
