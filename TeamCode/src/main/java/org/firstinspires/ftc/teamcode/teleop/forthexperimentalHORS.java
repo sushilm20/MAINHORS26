@@ -167,9 +167,9 @@ public class forthexperimentalHORS extends LinearOpMode {
             }
             gamepad2TouchpadLast = gamepad2TouchpadNow;
 
-            double axial   = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw     = -gamepad1.right_stick_x;
+            double axial   = -gamepad1.left_stick_y;
+            double lateral = gamepad1.left_stick_x;
+            double yaw     = gamepad1.right_stick_x;
             double driveSpeed = 1.0;
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
