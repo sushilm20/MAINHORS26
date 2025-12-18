@@ -65,6 +65,8 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private Flywheel flywheel;
     private TurretController turretController;
     private static final double AUTO_SHOOTER_RPM = 90.0;
+    private static final double PATH1_SHOOTER_RPM = 88.0; // Path1-only shooter RPM
+    private static final double PATH1_VELOCITY_CONSTRAINT = 15.0; // in/s, slower approach on Path1
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -237,7 +239,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     public void start() {
         if (flywheel != null) {
             flywheel.setShooterOn(true);
-            flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
+            flywheel.setTargetRPM(PATH1_SHOOTER_RPM); // Path1 starts at 88 RPM
         }
         if (turretController != null) {
             turretController.captureReferences();
@@ -245,7 +247,8 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
 
         shooterWaitStartMs = System.currentTimeMillis();
-        state = AutoState.WAIT_FOR_SHOOTER;
+        // Move immediately on Path1 with reduced velocity instead of waiting for spin-up
+        startPath(1);
     }
 
     @Override
@@ -390,6 +393,15 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
         }
 
+        // Per-path shooter RPM
+        if (flywheel != null) {
+            if (idx == 1) {
+                flywheel.setTargetRPM(PATH1_SHOOTER_RPM);
+            } else {
+                flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
+            }
+        }
+
         switch (idx) {
             case 1: follower.followPath(paths.Path1); break;
             case 2: follower.followPath(paths.Path2); break;
@@ -423,6 +435,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
         switch (state) {
             case WAIT_FOR_SHOOTER:
+                // left for compatibility; start() moves immediately now
                 boolean atTarget = (flywheel != null && flywheel.isAtTarget());
                 long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
                 if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
@@ -577,6 +590,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
                     .build();
+
 
             Path2 = follower
                     .pathBuilder()
