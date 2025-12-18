@@ -42,7 +42,6 @@ public class thirdexperimentalHORS extends LinearOpMode {
 
     // Gate servo
     private Servo gateServo;
-    private boolean dpadUpLast = false;
     private boolean gateClosed = false;
     private static final double GATE_OPEN = 0.67;//lmao
     private static final double GATE_CLOSED = 0.5;
@@ -172,8 +171,8 @@ public class thirdexperimentalHORS extends LinearOpMode {
         List<CalibrationPoint> calibrationPoints = Arrays.asList(
                 new CalibrationPoint(new Pose(48, 96, 0), 90.0),
                 new CalibrationPoint(new Pose(60, 125, 0), 95.0),
-                new CalibrationPoint(new Pose(60, 82, 0), 100.0),
-                new CalibrationPoint(new Pose(72, 72, 0), 110.0),
+                new CalibrationPoint(new Pose(60, 82, 0), 95.0),
+                new CalibrationPoint(new Pose(72, 72, 0), 105.0),
                 new CalibrationPoint(new Pose(52, 14, 0), 140.0)
         );
         flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 90.0, 150.0);
@@ -236,9 +235,9 @@ public class thirdexperimentalHORS extends LinearOpMode {
             // ------------------------------
             // DRIVE: delegate to DriveController (same as before)
             // ------------------------------
-            double axial   = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw     = -gamepad1.right_stick_x;
+            double axial   = -gamepad1.left_stick_y;
+            double lateral = gamepad1.left_stick_x;
+            double yaw     = gamepad1.right_stick_x;
             double driveSpeed = 1.0;
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
@@ -263,20 +262,20 @@ public class thirdexperimentalHORS extends LinearOpMode {
             }
             dpadRightLast = dpadRightNow;
 
+            boolean yNow = gamepad1.y || gamepad2.y;
+
             // ------------------------------
-            // Gate servo toggle on DPAD_UP for both controllers
+            // Gate servo toggle on Y for both controllers
             // ------------------------------
-            boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
-            if (dpadUpNow && !dpadUpLast) {
+            if (yNow && !yPressedLast) {
                 gateClosed = !gateClosed;
                 gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
             }
-            dpadUpLast = dpadUpNow;
+            yPressedLast = yNow;
 
             // ------------------------------
             // Flywheel target from pose-based model + trim
             // ------------------------------
-            boolean yNow = gamepad1.y || gamepad2.y;
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
 
             double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
@@ -309,14 +308,14 @@ public class thirdexperimentalHORS extends LinearOpMode {
             // ------------------------------
             // INTAKE + COMPRESSION
             // ------------------------------
-            boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
+            boolean leftTriggerNow = (gamepad1.left_trigger > 0.1) || (gamepad2.left_trigger > 0.1);
             if (leftTriggerNow) {
                 intakeMotor.setPower(-1.0);
                 leftCompressionServo.setPosition(0.0);
                 rightCompressionServo.setPosition(1.0);
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(1.0);
+                    intakeMotor.setPower(0.5);
                     leftCompressionServo.setPosition(1.0);
                     rightCompressionServo.setPosition(0.0);
                 } else {
@@ -370,16 +369,16 @@ public class thirdexperimentalHORS extends LinearOpMode {
                     : "N/A");
             telemetry.addData("Dist->Goal", currentPose != null ?
                     String.format("%.1f", flywheelVersatile.getLastDistance()) : "N/A");
-            telemetry.addData("Base RPM (model)", String.format("%.1f", flywheelVersatile.getLastBaseRpm()));
-            telemetry.addData("Trim RPM", String.format("%.1f", flywheelVersatile.getTrimRpm()));
+//            telemetry.addData("Base RPM (model)", String.format("%.1f", flywheelVersatile.getLastBaseRpm()));
+//            telemetry.addData("Trim RPM", String.format("%.1f", flywheelVersatile.getTrimRpm()));
             telemetry.addData("Target RPM", String.format("%.1f", targetRpm));
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
-            telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
-            telemetry.addData("Gate", gateClosed ? "CLOSED" : "OPEN");
-            telemetry.addData("Gate Pos", gateServo.getPosition());
-            telemetry.addData("Turret Enc", turret.getCurrentPosition());
-            telemetry.addData("Turret Power (applied)", turretController.getLastAppliedPower());
-            telemetry.addData("Turret IMU Used", imuUsedNow);
+//            telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
+//            telemetry.addData("Gate", gateClosed ? "CLOSED" : "OPEN");
+//            telemetry.addData("Gate Pos", gateServo.getPosition());
+//            telemetry.addData("Turret Enc", turret.getCurrentPosition());
+//            telemetry.addData("Turret Power (applied)", turretController.getLastAppliedPower());
+//            telemetry.addData("Turret IMU Used", imuUsedNow);
 
             telemetry.update();
         }
