@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretController;
  * is identical to the original ExperimentalPedroAuto; only starting pose, shoot pose and path points
  * / heading interpolations are changed to the red coordinates.
  */
-@Autonomous(name = "A RED 12 Ball 🔴", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "A RED 12 Ball 🔴", group = "Autonomous",preselectTeleOp = "Adaptive HORS")
 @Configurable
 public class RedPedroAuto extends OpMode {
 

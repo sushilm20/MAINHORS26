@@ -305,7 +305,7 @@ public class secondexperimentalHORS extends LinearOpMode {
                 rightCompressionServo.setPosition(1.0);
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(1.0);
+                    intakeMotor.setPower(0.6);
                     leftCompressionServo.setPosition(1.0);
                     rightCompressionServo.setPosition(0.0);
                 } else {

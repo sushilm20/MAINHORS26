@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
-@Autonomous(name = "Gate 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "Gate 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "Adaptive HORS")
 @Configurable
 public class ExperimentalBluePedroAuto extends OpMode {
 
@@ -74,7 +74,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private static final double INTAKE_ON_POWER = 1.0;
     private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.6;     // pre-spin before gate opens
+    private static final double CLOSED_INTAKE_POWER = 0.4;     // pre-spin before gate opens
     private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence

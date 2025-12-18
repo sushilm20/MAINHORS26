@@ -32,12 +32,12 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants; // ensure this exists in your project
 
-@TeleOp(name="Adaptive RPM HORS - No Turret", group="Linear OpMode")
+@TeleOp(name="Adaptive HORS", group="Linear OpMode")
 public class thirdexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, turret, intakeMotor;
-    private Servo clawServo, leftCompressionServo, rightCompressionServo;
+    private Servo clawServo;
     private Servo leftHoodServo, rightHoodServo;
 
     // Gate servo
@@ -97,8 +97,6 @@ public class thirdexperimentalHORS extends LinearOpMode {
         turret = hardwareMap.get(DcMotor.class, "turret");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
         clawServo = hardwareMap.get(Servo.class, "clawServo");
-        leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
-        rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
@@ -161,7 +159,7 @@ public class thirdexperimentalHORS extends LinearOpMode {
         // PedroPathing follower for localization (driving still handled by DriveController)
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));  // Default starting pose (adjust as needed)
+            follower.setStartingPose(new Pose(40.000, 85.000, Math.toRadians(135)));  // Default starting pose (adjust as needed)
             follower.update();
         } catch (Exception e) {
             follower = null; // fail gracefully
@@ -169,18 +167,18 @@ public class thirdexperimentalHORS extends LinearOpMode {
 
         // FlywheelVersatile setup with calibration samples and RPM bounds
         List<CalibrationPoint> calibrationPoints = Arrays.asList(
-                new CalibrationPoint(new Pose(48, 96, 0), 90.0),
-                new CalibrationPoint(new Pose(60, 125, 0), 95.0),
-                new CalibrationPoint(new Pose(60, 82, 0), 95.0),
-                new CalibrationPoint(new Pose(72, 72, 0), 105.0),
-                new CalibrationPoint(new Pose(52, 14, 0), 140.0)
+                new CalibrationPoint(new Pose(48, 96, 135), 90.0),
+                new CalibrationPoint(new Pose(60, 125, 135), 93.0),
+                new CalibrationPoint(new Pose(60, 82, 135), 98.0),
+                new CalibrationPoint(new Pose(72, 72, 135), 103.0),
+                new CalibrationPoint(new Pose(72, 120, 167), 95.0),
+                new CalibrationPoint(new Pose(95, 120, 135), 110.0),
+                new CalibrationPoint(new Pose(52, 14, 135), 140.0)
         );
         flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 90.0, 150.0);
 
         // initial positions
         clawServo.setPosition(0.63);
-        leftCompressionServo.setPosition(0.5);
-        rightCompressionServo.setPosition(0.5);
         leftHoodServo.setPosition(leftHoodPosition);
         rightHoodPosition = 0.12;
         rightHoodServo.setPosition(rightHoodPosition);
@@ -306,23 +304,15 @@ public class thirdexperimentalHORS extends LinearOpMode {
             turretController.update(manualNow, manualPower);
 
             // ------------------------------
-            // INTAKE + COMPRESSION
+            // INTAKE (compression servos removed)
             // ------------------------------
             boolean leftTriggerNow = (gamepad1.left_trigger > 0.1) || (gamepad2.left_trigger > 0.1);
             if (leftTriggerNow) {
                 intakeMotor.setPower(-1.0);
-                leftCompressionServo.setPosition(0.0);
-                rightCompressionServo.setPosition(1.0);
+            } else if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
+                intakeMotor.setPower(0.5);
             } else {
-                if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(0.5);
-                    leftCompressionServo.setPosition(1.0);
-                    rightCompressionServo.setPosition(0.0);
-                } else {
-                    intakeMotor.setPower(0.0);
-                    leftCompressionServo.setPosition(0.5);
-                    rightCompressionServo.setPosition(0.5);
-                }
+                intakeMotor.setPower(0.0);
             }
 
             // CLAW toggle
