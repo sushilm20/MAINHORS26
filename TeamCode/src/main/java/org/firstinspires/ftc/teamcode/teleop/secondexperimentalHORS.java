@@ -4,15 +4,13 @@ package org.firstinspires.ftc.teamcode.teleop;
 /*
   secondexperimentalHORS.java
   ---------------------------
-  Modified rumble logic:
-  - Uses flywheel.isAtTarget() to vibrate continuously while the flywheel is within tolerance.
-  - Calls short-duration rumbles repeatedly each loop while condition holds, so vibration
-    continues until the flywheel exits the tolerance window.
-  - No change to flywheel logic besides checking isAtTarget().
-  - Added gate servo toggle on dpad_up for both gamepads (default open=0.1, closed=0.5).
-  - Turret IMU selection: prefer "pinpoint" IMU (if present) for turret control, otherwise fall back
-    to the existing "imu" (expansion hub). The chosen IMU is passed to the TurretController and
-    reported on telemetry.
+  - Gate servo now toggles on Y (gamepad1 or gamepad2), matching experimental HORS behavior.
+  - REV Digital LED Indicator (active-low) on hardware map names "led1" (red line) and "led2" (green line):
+      * Gate OPEN  -> LEDs show GREEN
+      * Gate CLOSED -> LEDs show RED
+  - Rumble logic: continuous short rumbles while flywheel.isAtTarget().
+  - Turret IMU preference: use "pinpoint" if present; otherwise "imu" (expansion hub).
+  - No adaptive shooting changes; keeps current shooting settings.
 */
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
@@ -21,7 +19,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
-
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 
 // subsystem imports (adjust package paths if yours differ)
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
@@ -38,10 +36,13 @@ public class secondexperimentalHORS extends LinearOpMode {
 
     // Gate servo
     private Servo gateServo;
-    private boolean dpadUpLast = false;
     private boolean gateClosed = false;
-    private static final double GATE_OPEN = 0.67;//lmao
+    private static final double GATE_OPEN = 0.67; // lmao
     private static final double GATE_CLOSED = 0.5;
+
+    // REV Digital LED Indicator (active-low) using hardware map names led1 (red) and led2 (green)
+    private DigitalChannel ledLineRed;   // led1
+    private DigitalChannel ledLineGreen; // led2
 
     // Subsystems
     private TurretController turretController;
@@ -99,6 +100,20 @@ public class secondexperimentalHORS extends LinearOpMode {
         // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
+        // REV Digital LED Indicator (single module, two DIO lines) using led1/led2
+        try {
+            ledLineRed = hardwareMap.get(DigitalChannel.class, "led1");   // assign red to led1
+            ledLineGreen = hardwareMap.get(DigitalChannel.class, "led2"); // assign green to led2
+            ledLineRed.setMode(DigitalChannel.Mode.OUTPUT);
+            ledLineGreen.setMode(DigitalChannel.Mode.OUTPUT);
+            // Active-low: true = off, false = on
+            ledLineRed.setState(true);
+            ledLineGreen.setState(true);
+        } catch (Exception e) {
+            ledLineRed = null;
+            ledLineGreen = null;
+        }
+
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -118,8 +133,6 @@ public class secondexperimentalHORS extends LinearOpMode {
 //        backRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // IMU init
-        // Try to map both the standard "imu" and an optional "pinpoint" IMU.
-        // If "pinpoint" exists we'll use it for turret control; otherwise fall back to "imu".
         try {
             imu = hardwareMap.get(BNO055IMU.class, "imu");
         } catch (Exception e) {
@@ -129,7 +142,6 @@ public class secondexperimentalHORS extends LinearOpMode {
         try {
             pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
         } catch (Exception e) {
-            // no pinpoint IMU mapped; leave null
             pinpointImu = null;
         }
 
@@ -163,9 +175,10 @@ public class secondexperimentalHORS extends LinearOpMode {
         leftHoodServo.setPosition(leftHoodPosition);
         rightHoodPosition = RIGHT_HOOD_CLOSE;
         rightHoodServo.setPosition(rightHoodPosition);
-        // Gate defaults to open (0.1)
+        // Gate defaults to open
         gateClosed = false;
         gateServo.setPosition(GATE_OPEN);
+        updateGateLed(); // reflect initial gate state
 
         String imuUsed = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
                 (turretImu == imu && imu != null) ? "imu (expansion hub)" : "none";
@@ -195,13 +208,11 @@ public class secondexperimentalHORS extends LinearOpMode {
                 gamepad2TouchpadNow = (gamepad2.left_stick_button && gamepad2.right_stick_button);
             }
             if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
-                // Reset IMU Z heading reference (no actual IMU re-init, just software reference)
                 turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                 turretController.captureReferences();
                 turretController.resetPidState();
 
-                // Reset drive immediately (stop)
                 driveController.stop();
 
                 telemetry.addData("Reset", "IMU heading reference and turret encoder set to zero!");
@@ -223,7 +234,7 @@ public class secondexperimentalHORS extends LinearOpMode {
             touchpadPressedLast = touchpadNow;
 
             // ------------------------------
-            // DRIVE: delegate to DriveController (exact same mixing/normalization as original)
+            // DRIVE: delegate to DriveController
             // ------------------------------
             double axial   = gamepad1.left_stick_y;
             double lateral = -gamepad1.left_stick_x;
@@ -232,7 +243,7 @@ public class secondexperimentalHORS extends LinearOpMode {
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
             // ------------------------------
-            // DPAD shooter adjustments (delegate target changes to Flywheel)
+            // DPAD shooter adjustments
             // ------------------------------
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) {
@@ -242,47 +253,44 @@ public class secondexperimentalHORS extends LinearOpMode {
 
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
             if (dpadLeftNow && !dpadLeftLast) {
-                flywheel.adjustTargetRPM(-10.0);
+                flywheel.adjustTargetRPM(-5.0);
             }
             dpadLeftLast = dpadLeftNow;
 
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
             if (dpadRightNow && !dpadRightLast) {
-                flywheel.adjustTargetRPM(10.0);
+                flywheel.adjustTargetRPM(5.0);
             }
             dpadRightLast = dpadRightNow;
 
             // ------------------------------
-            // Gate servo toggle on DPAD_UP for both controllers
+            // Gate servo toggle on Y for both controllers + LED color
             // ------------------------------
-            boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
-            if (dpadUpNow && !dpadUpLast) {
+            boolean yNow = gamepad1.y || gamepad2.y;
+            if (yNow && !yPressedLast) {
                 gateClosed = !gateClosed;
                 gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
+                updateGateLed();
             }
-            dpadUpLast = dpadUpNow;
+            yPressedLast = yNow;
 
             // ------------------------------
             // Flywheel update (measurement + PID + motor write)
             // ------------------------------
-            boolean yNow = gamepad1.y || gamepad2.y;
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, yNow);
 
             // ------------------------------
             // CONTINUOUS RUMBLE while flywheel within tolerance
             // ------------------------------
-            // Strategy: call a short-duration rumble every loop while isAtTarget() is true.
-            // This keeps the controller vibrating continuously while the condition holds.
             if (flywheel.isAtTarget()) {
-                // small duration (ms) — adjust if you want stronger/longer continuous rumble
                 final int RUMBLE_MS = 200;
                 try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
             // ------------------------------
-            // TURRET: manual detection and let turretController handle everything
+            // TURRET: manual detection and control
             // ------------------------------
             boolean manualNow = false;
             double manualPower = 0.0;
@@ -305,7 +313,7 @@ public class secondexperimentalHORS extends LinearOpMode {
                 rightCompressionServo.setPosition(1.0);
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(0.6);
+                    intakeMotor.setPower(0.8);
                     leftCompressionServo.setPosition(1.0);
                     rightCompressionServo.setPosition(0.0);
                 } else {
@@ -370,7 +378,23 @@ public class secondexperimentalHORS extends LinearOpMode {
 
     private void headingReferenceReset() {
         // turretController.captureReferences() handles the turret mapping if needed.
-        // If you need to reset the turret IMU reference specifically, call captureReferences/resetPidState
-        // on the turretController which already uses turretImu.
+    }
+
+    // Active-low LED helper: gate open -> green, gate closed -> red
+    private void updateGateLed() {
+        if (ledLineRed == null || ledLineGreen == null) return;
+        // off = true, on = false (active-low)
+        ledLineRed.setState(true);
+        ledLineGreen.setState(true);
+        if (gateClosed) {
+            // gate closed -> RED ON, GREEN OFF
+            ledLineRed.setState(false);
+            ledLineGreen.setState(true);
+        } else {
+            // gate open -> GREEN ON, RED OFF
+            ledLineRed.setState(true);
+            ledLineGreen.setState(false);
+        }
+        // For amber (if ever needed): ledLineRed.setState(false); ledLineGreen.setState(false);
     }
 }

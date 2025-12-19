@@ -37,7 +37,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private static final double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
 
     private Timer timedIntakeTimer;
-    private static final double TIMED_INTAKE_SECONDS = 1.0;
+    private static final double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
@@ -64,7 +64,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private Flywheel flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 90.0;
+    private static final double AUTO_SHOOTER_RPM = 90.5;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -74,7 +74,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private static final double INTAKE_ON_POWER = 1.0;
     private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.4;     // pre-spin before gate opens
+    private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
     private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
