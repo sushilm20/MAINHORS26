@@ -36,7 +36,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private Timer intakeTimer;
     private static final double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
 
-    private Timer timedIntakeTimer;
+    private Timer timedIntakeTimer;//test
     private static final double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
