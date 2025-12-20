@@ -19,54 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
-/**
- * ExperimentalPedroAuto — Autonomous with Pedro pathing and explicit pre-action + intake/claw sequencing.
- *
- * Program:
- *  - Creates a Pedro pathing follower and runs a sequence of 11 predefined bezier paths.
- *  - Uses a simple FSM (AutoState) to progress: WAIT_FOR_SHOOTER -> RUNNING_PATH -> PRE_ACTION ->
- *    INTAKE_RUN -> CLAW_ACTION -> (next path or FINISHED).
- *
- * PRE_ACTION behavior:
- *  - Entered when a path finishes at the "shoot pose" (x=48, y=96). Paths 1, 4, 7 and 10 end at that pose.
- *  - On entry, the OpMode waits for the robot to reach the shoot pose within a tolerance (START_POSE_TOLERANCE_IN = 6.0 inches).
- *  - If the robot reaches the pose the PRE_ACTION timer is started. If the robot does not reach it within
- *    PRE_ACTION_MAX_POSE_WAIT_SECONDS (0.3s) the PRE_ACTION timer is started anyway (fallback).
- *  - After PRE_ACTION_WAIT_SECONDS (0.3s) elapses from timer start, the robot starts the intake and
- *    transitions to INTAKE_RUN.
- *
- * INTAKE_RUN behavior:
- *  - Runs the intake/compression for INTAKE_RUN_SECONDS (default 2.5s).
- *  - After the run-duration expires the intake is stopped (unless it's part of an ongoing intake-segment),
- *    the claw is closed for CLAW_CLOSE_MS (250ms) then opened, and the FSM continues to the next path.
- *
- * Intake segments and timed intakes:
- *  - Starting certain paths begins continuous intake for that path:
- *      - Path 3 starts intake for the duration of Path 3 (stops when Path 3 finishes).
- *      - Path 6 starts intake for the duration of Path 6.
- *      - Path 9 starts intake for the duration of Path 9.
- *    (This is tracked with intakeSegmentEnd.)
- *  - Paths 4, 7 and 10 start a short, timed intake when they begin — the intake runs for TIMED_INTAKE_SECONDS (1.0s)
- *    and is then stopped automatically. This is independent of the normal INTAKE_RUN sequence.
- *
- * Shooter & Turret:
- *  - Shooter (Flywheel) subsystem is instantiated during init() but NOT spun up until start().
- *  - On start(), the flywheel is enabled and given a close-range target RPM (AUTO_SHOOTER_RPM = 90.0).
- *  - OpMode enters WAIT_FOR_SHOOTER and waits until flywheel reports on-target or a timeout elapses
- *    (SHOOTER_WAIT_TIMEOUT_MS = 4000ms) before beginning Path1.
- *  - TurretController is active and allowed to track (automatic mode) so turret tracking/motion is enabled.
- *
- * Timing constants used by the program (defaults shown):
- *  - PRE_ACTION_WAIT_SECONDS = 0.3   (wait after reaching pose / fallback)
- *  - PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3 (pose-wait fallback)
- *  - START_POSE_TOLERANCE_IN = 6.0 (in units of inches)
- *  - INTAKE_RUN_SECONDS = 2.5
- *  - TIMED_INTAKE_SECONDS = 1.0
- *  - CLAW_CLOSE_MS = 250
- *  - SHOOTER_WAIT_TIMEOUT_MS = 4000
- *  - AUTO_SHOOTER_RPM = 90.0
- */
-@Autonomous(name = "A BLUE 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "zBlue 12 ball", group = "Autonomous",preselectTeleOp = "Adaptive HORS")
 @Configurable
 public class BluePedroAuto extends OpMode {
 
@@ -74,81 +27,77 @@ public class BluePedroAuto extends OpMode {
     public Follower follower;
     private Paths paths;
 
-    // State machine
-    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED }
+    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED }
     private AutoState state = AutoState.IDLE;
 
-    // current path index being run (1..11). 0 when none.
     private int currentPathIndex = 0;
-    // next path index to run after PRE_ACTION/CLAW sequences
     private int nextPathIndex = -1;
 
-    // Intake-run state & timer
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 2.5; // change to shorten/lengthen intake duration
+    private static final double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
 
-    // Timed intake on-path start (for path4, path7 and path10)
-    private Timer timedIntakeTimer;
-    private static final double TIMED_INTAKE_SECONDS = 1.0; // run intake for 1 second when path4, path7 or path10 starts
+    private Timer timedIntakeTimer;//test
+    private static final double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
-    // Claw action state & timing
     private long clawActionStartMs = 0L;
-    private static final long CLAW_CLOSE_MS = 250L; // duration to hold claw closed
+    private static final long CLAW_CLOSE_MS = 250L;
 
-    // Pre-action (delay before starting intake/claw) timer
     private Timer preActionTimer;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.3; // lowered by 0.5s from 0.8
+    private static final double PRE_ACTION_WAIT_SECONDS = 0.25;
 
-    // Pose-wait timer (wait for robot to reach pose before starting PRE_ACTION). Fallback if it never quite reaches it.
     private Timer poseWaitTimer;
-    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3; // fallback after short timeout
+    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
 
-    // Flag to indicate whether PRE_ACTION timer has been started (we only start it when robot reaches pose or fallback triggers)
     private boolean preActionTimerStarted = false;
-    // Flag set when entering PRE_ACTION state to reset poseWaitTimer
     private boolean preActionEntered = false;
 
-    // Shooter-wait state before starting paths
     private long shooterWaitStartMs = -1;
-    private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L; // fallback timeout if shooter doesn't spin up
+    private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
-    // Shooter / Turret hardware & controllers
     private DcMotor shooterMotor;
     private DcMotor turretMotor;
-    private BNO055IMU imu;
+
+    private BNO055IMU pinpointImu = null;
+    private BNO055IMU hubImu = null;
+    private BNO055IMU imu = null;
+
     private Flywheel flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
+    private static final double AUTO_SHOOTER_RPM = 90.5;
 
-    // Intake + compression hardware (from teleop)
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
     private Servo rightCompressionServo;
 
-    // Claw servo
     private Servo clawServo;
 
-    // Intake/compression "on" values (match teleop right-trigger behavior)
     private static final double INTAKE_ON_POWER = 1.0;
-    private static final double LEFT_COMPRESSION_ON = 1.0;
-    private static final double RIGHT_COMPRESSION_ON = 0.0;
+    private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
+    private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
+    private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
+
+    // Compression servos no longer used in the intake sequence
     private static final double LEFT_COMPRESSION_OFF = 0.5;
     private static final double RIGHT_COMPRESSION_OFF = 0.5;
 
-    // Intake-segment tracking: when starting a multi-path intake segment (3, 6, 9),
-    // set intakeSegmentEnd to the path index after which the intake should be stopped.
-    // -1 when no active intake segment.
     private int intakeSegmentEnd = -1;
 
-    // Shoot pose constants and tolerance - used to ensure PRE_ACTION timer starts only when robot reaches pose
     private static final double SHOOT_POSE_X = 48.0;
     private static final double SHOOT_POSE_Y = 96.0;
-    private static final double START_POSE_TOLERANCE_IN = 6.0; // increased tolerance to avoid tiny-miss stalls
+    private static final double START_POSE_TOLERANCE_IN = 6.0;
 
-    // Turret movement control flag (false = allow automatic movement; true = manual mode with 0 power)
-    // We will set this to false so turret tracking is enabled.
     private final boolean turretForceManualNoMove = false;
+
+    private Servo gateServo;
+    private boolean dpadUpLast = false;
+    private boolean gateClosed = false;
+    private static final double GATE_OPEN = 0.67;
+    private static final double GATE_CLOSED = 0.5;
+
+    // Gate control thresholds (open slightly earlier than pose tolerance, close as soon as out of range)
+    private static final double GATE_OPEN_TOLERANCE_IN = START_POSE_TOLERANCE_IN + 3.0; // widened gate-open window
+    private static final double GATE_CLOSE_TOLERANCE_IN = GATE_OPEN_TOLERANCE_IN + 1.0; // small hysteresis for close
 
     public BluePedroAuto() {}
 
@@ -156,14 +105,11 @@ public class BluePedroAuto extends OpMode {
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // Create follower and build paths
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
-        // Set starting pose to the start point of Path1 (and heading to match interpolation start)
         follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
 
-        // Timers & state
         intakeTimer = new Timer();
         timedIntakeTimer = new Timer();
         preActionTimer = new Timer();
@@ -174,12 +120,10 @@ public class BluePedroAuto extends OpMode {
         preActionEntered = false;
         timedIntakeActive = false;
 
-        // --- Hardware for shooter & turret (match teleop names) ---
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
-            // Directions and modes (same as teleop)
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
             turretMotor.setDirection(DcMotor.Direction.FORWARD);
 
@@ -187,69 +131,92 @@ public class BluePedroAuto extends OpMode {
 
             turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            // ensure brake mode so turret holds position when power = 0
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
 
-        // IMU init (same parameters as teleop)
         try {
-            imu = hardwareMap.get(BNO055IMU.class, "imu");
-            BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
-            imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-            imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-            imu.initialize(imuParams);
+            try {
+                pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+                panelsTelemetry.debug("Init", "Found PinPoint IMU as 'pinpoint'");
+            } catch (Exception e) {
+                pinpointImu = null;
+                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
+            }
+
+            try {
+                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
+                panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
+            } catch (Exception e) {
+                hubImu = null;
+                panelsTelemetry.debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
+            }
+
+            imu = (pinpointImu != null) ? pinpointImu : hubImu;
+
+            if (imu != null) {
+                BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
+                imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+                imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+                imu.initialize(imuParams);
+                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" : "Expansion Hub") + ")");
+            } else {
+                panelsTelemetry.debug("Init", "No IMU found (neither 'pinpoint' nor 'imu'). Turret will not have heading data.");
+            }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e.getMessage());
         }
 
-        // Instantiate subsystems using the provided classes (pass OpMode telemetry for telemetry output)
         try {
             if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
-            if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
+            if (turretMotor != null) {
+                turretController = new TurretController(turretMotor, imu, telemetry);
+            }
 
-            // Prepare turret controller just like teleop
             if (turretController != null) {
                 turretController.captureReferences();
                 turretController.resetPidState();
             }
 
-            // NOTE: Do NOT turn the shooter on during init().
-            // Keep flywheel subsystem created so readings are available, but don't enable spinning
-            // until the autonomous actually starts (start()).
             if (flywheel != null) {
-                flywheel.setShooterOn(false); // set Close mode target mode if needed, but do not enable shooter
-                // intentionally do NOT call flywheel.setShooterOn(true) or setTargetRPM here
+                flywheel.setShooterOn(false);
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
         }
 
-        // --- Intake & compression hardware (same names as teleop) ---
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
             leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
             rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
 
-            // Direction per request
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
-            // Set defaults (same as teleop off state)
             intakeMotor.setPower(0.0);
-            leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
-            rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
+            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
+            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
         }
 
-        // --- Claw servo ---
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
-            // ensure default open position as teleop uses 0.63 for open
-            clawServo.setPosition(0.63);
+            if (clawServo != null) {
+                clawServo.setPosition(0.63);
+            }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
+        }
+
+        try {
+            gateServo = hardwareMap.get(Servo.class, "gateServo");
+            if (gateServo != null) {
+                gateServo.setPosition(GATE_CLOSED);
+                gateClosed = true;
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Init", "Gate servo mapping failed: " + e.getMessage());
         }
 
         panelsTelemetry.debug("Status", "Initialized (shooter remains OFF until start())");
@@ -258,12 +225,9 @@ public class BluePedroAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        // Warm up flywheel readings while waiting for start
         if (flywheel != null) {
 //            flywheel.update(System.currentTimeMillis(), false);
         }
-        // Keep turret controller state refreshed during init loop as well.
-        // Allow turret controller to run in automatic mode so tracking is active.
         if (turretController != null) {
             turretController.update(false, 0.0);
         }
@@ -271,9 +235,8 @@ public class BluePedroAuto extends OpMode {
 
     @Override
     public void start() {
-        // Start spinner and turret references at the beginning of autonomous
         if (flywheel != null) {
-            flywheel.setShooterOn(true);            // now enable shooter
+            flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
         }
         if (turretController != null) {
@@ -281,33 +244,29 @@ public class BluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        // Start measuring shooter-wait
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
     public void loop() {
-        // Keep Pedro Pathing updated
         follower.update();
 
         long nowMs = System.currentTimeMillis();
 
-        // Update flywheel (closed-loop) each loop so it runs for the whole OpMode
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
         }
 
-        // Turret: enable tracking/automatic updates (allow turret to move/track)
         if (turretController != null) {
             turretController.update(false, 0.0);
         }
 
-        // Run the refined FSM
         runStateMachine(nowMs);
 
-        // Panels & driver station telemetry (including distance-to-target for tuning)
+        updateGate();
+
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         panelsTelemetry.debug("X", follower.getPose().getX());
@@ -335,33 +294,48 @@ public class BluePedroAuto extends OpMode {
 
         double dist = distanceToShootPose();
         panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
+        panelsTelemetry.debug("GateClosed", String.valueOf(gateClosed));
+
+        if (imu == pinpointImu && pinpointImu != null) {
+            panelsTelemetry.debug("IMU Source", "PinPoint ('pinpoint')");
+        } else if (imu == hubImu && hubImu != null) {
+            panelsTelemetry.debug("IMU Source", "Expansion Hub ('imu')");
+        } else {
+            panelsTelemetry.debug("IMU Source", "None");
+        }
+
         panelsTelemetry.update(telemetry);
     }
 
     @Override
     public void stop() {
-        // Stop shooter and turret safely
         if (flywheel != null) {
             flywheel.setShooterOn(false);
             flywheel.update(System.currentTimeMillis(), false);
         }
         if (turretController != null) {
-            // leave turret controller in automatic mode but set 0 power as a safe stop command
             turretController.update(false, 0.0);
         }
 
-        // Ensure intake off and claw open
         stopIntake();
         if (clawServo != null) clawServo.setPosition(0.63);
+
+        if (gateServo != null) {
+            gateServo.setPosition(GATE_CLOSED);
+            gateClosed = true;
+        }
+
         state = AutoState.FINISHED;
     }
 
-    // --- Intake helpers (right-trigger behavior) ---
     private void startIntake() {
+        startIntake(INTAKE_ON_POWER);
+    }
+
+    private void startIntake(double power) {
         try {
-            if (intakeMotor != null) intakeMotor.setPower(INTAKE_ON_POWER);
-            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_ON);
-            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_ON);
+            if (intakeMotor != null) intakeMotor.setPower(power);
+            // compression servos intentionally not moved during intake sequence
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
         }
@@ -370,36 +344,16 @@ public class BluePedroAuto extends OpMode {
     private void stopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(0.0);
-            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
-            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
+            // leave compression servos untouched
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
         }
     }
 
-    // Helper to check which path indices end at the shoot pose (48,96)
     private boolean endsAtShoot(int pathIndex) {
         return pathIndex == 1 || pathIndex == 4 || pathIndex == 7 || pathIndex == 10;
     }
 
-    /**
-     * Returns true when follower's current pose is within tolerance (inches) of target.
-     */
-    private boolean isAtPose(double targetX, double targetY, double tolerance) {
-        try {
-            Pose p = follower.getPose();
-            double dx = p.getX() - targetX;
-            double dy = p.getY() - targetY;
-            return Math.hypot(dx, dy) <= tolerance;
-        } catch (Exception e) {
-            panelsTelemetry.debug("isAtPose", "error: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Compute Euclidean distance to shoot pose for telemetry/tuning.
-     */
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
@@ -411,14 +365,6 @@ public class BluePedroAuto extends OpMode {
         }
     }
 
-    /**
-     * Start a path by index and set the state to RUNNING_PATH.
-     * This helper also starts intake/compression before specific path segments (3, 6, 9).
-     * Intake will run only DURING those starting paths and will be stopped when that path finishes,
-     * so it will not be active during paths 4, 7, 10 by default.
-     *
-     * Additionally: when starting path 4, path 7 or path 10 we start a timed intake that runs for 1s and then stops.
-     */
     private void startPath(int idx) {
         if (idx < 1 || idx > 11) {
             currentPathIndex = 0;
@@ -426,9 +372,6 @@ public class BluePedroAuto extends OpMode {
             return;
         }
 
-        // If this path is the beginning of an intake segment, enable intake and record its end index.
-        // We set intakeSegmentEnd to the same idx so intake runs only during that path and is stopped
-        // when that path finishes.
         if (idx == 3) {
             intakeSegmentEnd = 3;
             startIntake();
@@ -440,16 +383,13 @@ public class BluePedroAuto extends OpMode {
             startIntake();
         }
 
-        // Special: start a timed intake (1s) when path 4, 7 or 10 starts.
         if (idx == 4 || idx == 7 || idx == 10) {
-            // If an intake is already running due to another reason, this will simply ensure it stays on.
             startIntake();
             timedIntakeTimer.resetTimer();
             timedIntakeActive = true;
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
         }
 
-        // Follow the requested path
         switch (idx) {
             case 1: follower.followPath(paths.Path1); break;
             case 2: follower.followPath(paths.Path2); break;
@@ -470,17 +410,13 @@ public class BluePedroAuto extends OpMode {
     }
 
     private void runStateMachine(long nowMs) {
-        // Handle timed intake expiration independent of the FSM states:
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                // stop the timed intake
                 stopIntake();
                 timedIntakeActive = false;
-                // ensure intakeSegment tracking is cleared so we don't try to stop it again later
                 intakeSegmentEnd = -1;
                 panelsTelemetry.debug("TimedIntake", "Timed intake ended after " + TIMED_INTAKE_SECONDS + "s");
             } else {
-                // still within timed intake period - show telemetry
                 panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
             }
         }
@@ -490,29 +426,24 @@ public class BluePedroAuto extends OpMode {
                 boolean atTarget = (flywheel != null && flywheel.isAtTarget());
                 long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
                 if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
-                    // proceed to first path immediately
                     startPath(1);
                 }
                 break;
 
             case RUNNING_PATH:
-                // Wait until follower finishes this path
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
-                    // If finished path was the end of an intake segment, clear tracking and stop intake now
                     if (intakeSegmentEnd == finished) {
                         stopIntake();
                         intakeSegmentEnd = -1;
                     }
 
-                    // If this path ends at the shoot pose, go to PRE_ACTION but do not start the PRE_ACTION timer yet.
                     if (endsAtShoot(finished)) {
                         nextPathIndex = finished + 1;
-                        preActionTimerStarted = false; // ensure timer is not considered started
-                        preActionEntered = false; // ensure pose wait is reset on entry
-                        state = AutoState.PRE_ACTION;
+                        preActionTimerStarted = false;
+                        preActionEntered = false;
+                        state = AutoState.CLOSED_INTAKE_SEQUENCE;
                     } else {
-                        // not a shoot-end, just continue to next path (or finish)
                         int next = finished + 1;
                         if (next > 11) {
                             state = AutoState.FINISHED;
@@ -523,8 +454,19 @@ public class BluePedroAuto extends OpMode {
                 }
                 break;
 
+            case CLOSED_INTAKE_SEQUENCE:
+                // Pre-spin intake (gate stays closed until gate tolerance hit)
+                double distPre = distanceToShootPose();
+                if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) {
+                    startIntake(CLOSED_INTAKE_POWER);
+                }
+                // Transition to PRE_ACTION once within main pose tolerance
+                if (distPre <= START_POSE_TOLERANCE_IN) {
+                    state = AutoState.PRE_ACTION;
+                }
+                break;
+
             case PRE_ACTION:
-                // On first tick after entering PRE_ACTION, reset the poseWaitTimer
                 if (!preActionEntered) {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
@@ -532,7 +474,6 @@ public class BluePedroAuto extends OpMode {
                     panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
                 }
 
-                // If PRE_ACTION timer hasn't been started yet, wait until robot reaches pose OR fallback after a short timeout
                 if (!preActionTimerStarted) {
                     double dist = distanceToShootPose();
                     if (dist <= START_POSE_TOLERANCE_IN) {
@@ -540,19 +481,16 @@ public class BluePedroAuto extends OpMode {
                         preActionTimerStarted = true;
                         panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
                     } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
-                        // fallback: start PRE_ACTION timer even if we're not perfectly within tolerance
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
                         panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
                     } else {
-                        // Still waiting for pose; remain in PRE_ACTION
                         panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
                     }
                 } else {
-                    // PRE_ACTION timer started; wait required PRE_ACTION_WAIT_SECONDS from this moment
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // start intake for INTAKE_RUN_SECONDS, then claw action will run
-                        startIntake();
+                        // Reduced intake power only when starting intake at the shoot pose
+                        startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
                     }
@@ -561,11 +499,9 @@ public class BluePedroAuto extends OpMode {
 
             case INTAKE_RUN:
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    // Stop intake only if it's not part of a longer intake-segment
                     if (intakeSegmentEnd == -1) {
                         stopIntake();
                     }
-                    // begin claw action (close)
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(0.2); // close
                     clawActionStartMs = System.currentTimeMillis();
@@ -575,7 +511,6 @@ public class BluePedroAuto extends OpMode {
 
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    // open claw and continue to nextPathIndex
                     if (clawServo != null) clawServo.setPosition(0.63); // open
                     if (nextPathIndex > 0 && nextPathIndex <= 11) {
                         startPath(nextPathIndex);
@@ -587,13 +522,35 @@ public class BluePedroAuto extends OpMode {
                 break;
 
             case FINISHED:
-                // idle; do nothing. Hardware remains as last set.
                 break;
 
             case IDLE:
             default:
-                // Shouldn't be here during active OpMode; remain idle
                 break;
+        }
+    }
+
+    /**
+     * Gate behavior:
+     * - Open quickly when within GATE_OPEN_TOLERANCE_IN of the shoot pose.
+     * - Close immediately once outside GATE_CLOSE_TOLERANCE_IN.
+     * This keeps the gate closed whenever we're not effectively at the shoot state.
+     */
+    private void updateGate() {
+        try {
+            double dist = distanceToShootPose();
+
+            if (dist <= GATE_OPEN_TOLERANCE_IN && gateServo != null && gateClosed) {
+                gateServo.setPosition(GATE_OPEN);
+                gateClosed = false;
+                panelsTelemetry.debug("Gate", "Opened (dist=" + String.format("%.2f", dist) + ")");
+            } else if (dist >= GATE_CLOSE_TOLERANCE_IN && gateServo != null && !gateClosed) {
+                gateServo.setPosition(GATE_CLOSED);
+                gateClosed = true;
+                panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ")");
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Gate", "updateGate error: " + e.getMessage());
         }
     }
 
@@ -661,7 +618,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
-            // Modified Path7: split into two segments and like no breaking cuz speed
             Path7 = follower
                     .pathBuilder()
                     .addPath(
@@ -686,7 +642,7 @@ public class BluePedroAuto extends OpMode {
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(45.000, 33.000), new Pose(18.000, 33.000))
+                            new BezierLine(new Pose(45.000, 33.000), new Pose(15.000, 33.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
@@ -694,7 +650,7 @@ public class BluePedroAuto extends OpMode {
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.000, 33.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(15.000, 33.000), new Pose(48.000, 96.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
