@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
-@Autonomous(name = "zBlue 12 ball", group = "Autonomous",preselectTeleOp = "Adaptive HORS")
+@Autonomous(name = "zBlue 12 ball", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
 public class BluePedroAuto extends OpMode {
 

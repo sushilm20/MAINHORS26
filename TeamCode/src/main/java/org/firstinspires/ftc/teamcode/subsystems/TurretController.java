@@ -49,7 +49,7 @@ public class TurretController {
 
 
     // PID & control gains (from your tuned values)
-    private static final double TURRET_KP = 1.3;//0.20
+    private static final double TURRET_KP = 1.0;//0.20
     private static final double TURRET_KI = 0.09;
     private static final double TURRET_KD = 0.3;//0.16
     private static final double TURRET_MAX_POWER = 1.0;
