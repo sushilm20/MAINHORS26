@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class FlywheelVersatile {
 
-    public static class CalibrationPoint {
+    public static class CalibrationPoint {//extras
         public final Pose pose;
         public final double rpm;
         public CalibrationPoint(Pose pose, double rpm) {
