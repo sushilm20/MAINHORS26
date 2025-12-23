@@ -1,52 +1,51 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
+
+
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 
-import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.Pose;
-
-import java.util.Arrays;
-import java.util.List;
-
+// subsystem imports (adjust package paths if yours differ)
+import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
-import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
-import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
-import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-@TeleOp(name="Turret and Dynamic HORS", group="Linear OpMode")
+@TeleOp(name="LED Testing", group="Linear OpMode")
 public class forthexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, turret, intakeMotor;
     private Servo clawServo, leftCompressionServo, rightCompressionServo;
     private Servo leftHoodServo, rightHoodServo;
-    private Servo gateServo;
 
-    private boolean dpadUpLast = false;
+    // Gate servo
+    private Servo gateServo;
     private boolean gateClosed = false;
-    private static final double GATE_OPEN = 0.67;
+    private static final double GATE_OPEN = 0.67; // lmao
     private static final double GATE_CLOSED = 0.5;
 
+    // REV Digital LED Indicator (active-low) using hardware map names led1 (red) and led2 (green)
+    private DigitalChannel ledLineRed;   // led1
+    private DigitalChannel ledLineGreen; // led2
+
+    // Subsystems
+    private TurretController turretController;
     private DriveController driveController;
     private Flywheel flywheel;
-    private FlywheelVersatile flywheelVersatile;
-    private TurretGoalAimer turretGoalAimer;
 
-    private Follower follower;
-    private Pose currentPose = new Pose();
-
+    // UI / debounce and other small state
     private boolean dpadDownLast = false;
     private boolean dpadLeftLast = false;
     private boolean dpadRightLast = false;
     private boolean xPressedLast = false;
+    private boolean yPressedLast = false;
 
+    // hood/claw
     private double leftHoodPosition = 0.12;
     private double rightHoodPosition = 0.12;
     private long lastLeftHoodAdjustMs = 0L;
@@ -57,17 +56,24 @@ public class forthexperimentalHORS extends LinearOpMode {
     private long clawActionStartMs = 0L;
     private static final long CLAW_CLOSE_MS = 500L;
 
+    // Far/Close mode
+    private boolean isFarMode = false;
+    private boolean touchpadPressedLast = false;
+    private static final double RIGHT_HOOD_CLOSE   = 0.12;
+    private static final double RIGHT_HOOD_FAR     = 0.24;
+
+    // For gamepad2 touchpad reset
     private boolean gamepad2TouchpadLast = false;
 
-    private BNO055IMU imu;
-    private BNO055IMU pinpointImu;
-    private BNO055IMU turretImu;
-
-    private static final Pose BLUE_GOAL = new Pose(14, 134, 0);
+    // IMUs
+    private BNO055IMU imu;            // existing expansion-hub IMU (named "imu" in config)
+    private BNO055IMU pinpointImu;    // optional pinpoint IMU (named "pinpoint" in config)
+    private BNO055IMU turretImu;      // the IMU actually used by the turret (pinpoint if present otherwise imu)
 
     @Override
     public void runOpMode() {
 
+        // Hardware map
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
@@ -80,8 +86,24 @@ public class forthexperimentalHORS extends LinearOpMode {
         rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
+        // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
+        // REV Digital LED Indicator (single module, two DIO lines) using led1/led2
+        try {
+            ledLineRed = hardwareMap.get(DigitalChannel.class, "led1");   // assign red to led1
+            ledLineGreen = hardwareMap.get(DigitalChannel.class, "led2"); // assign green to led2
+            ledLineRed.setMode(DigitalChannel.Mode.OUTPUT);
+            ledLineGreen.setMode(DigitalChannel.Mode.OUTPUT);
+            // Active-low: true = off, false = on
+            ledLineRed.setState(true);
+            ledLineGreen.setState(true);
+        } catch (Exception e) {
+            ledLineRed = null;
+            ledLineGreen = null;
+        }
+
+        // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -91,67 +113,83 @@ public class forthexperimentalHORS extends LinearOpMode {
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        frontLeftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        frontRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        backLeftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        backRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // IMU init
-        try { imu = hardwareMap.get(BNO055IMU.class, "imu"); } catch (Exception e) { imu = null; }
-        try { pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint"); } catch (Exception e) { pinpointImu = null; }
+        try {
+            imu = hardwareMap.get(BNO055IMU.class, "imu");
+        } catch (Exception e) {
+            imu = null;
+        }
+
+        try {
+            pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+        } catch (Exception e) {
+            pinpointImu = null;
+        }
+
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
         imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-        if (imu != null) try { imu.initialize(imuParams); } catch (Exception ignored) {}
-        if (pinpointImu != null) try { pinpointImu.initialize(imuParams); } catch (Exception ignored) {}
+
+        if (imu != null) {
+            try {
+                imu.initialize(imuParams);
+            } catch (Exception ignored) {}
+        }
+        if (pinpointImu != null) {
+            try {
+                pinpointImu.initialize(imuParams);
+            } catch (Exception ignored) {}
+        }
+
+        // Choose turret IMU: prefer pinpoint if available
         turretImu = (pinpointImu != null) ? pinpointImu : imu;
 
+        // Create subsystem controllers
+        turretController = new TurretController(turret, turretImu, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new Flywheel(shooter, telemetry);
 
-        try {
-            follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(72, 72, 0));
-            follower.update();
-            currentPose = follower.getPose();
-        } catch (Exception e) {
-            follower = null;
-        }
-
-        List<CalibrationPoint> calibrationPoints = Arrays.asList(
-                new CalibrationPoint(new Pose(48, 96, 135), 90.0),
-                new CalibrationPoint(new Pose(60, 125, 0), 95.0),
-                new CalibrationPoint(new Pose(60, 82, 0), 100.0),
-                new CalibrationPoint(new Pose(72, 72, 0), 110.0),
-                new CalibrationPoint(new Pose(52, 14, 0), 140.0)
-        );
-        flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 90.0, 150.0);
-
-        // Use pose-based turret aiming
-        turretGoalAimer = new TurretGoalAimer(turret, turretImu, telemetry);
-
+        // initial positions
         clawServo.setPosition(0.63);
         leftCompressionServo.setPosition(0.5);
         rightCompressionServo.setPosition(0.5);
         leftHoodServo.setPosition(leftHoodPosition);
-        rightHoodPosition = 0.12;
+        rightHoodPosition = RIGHT_HOOD_CLOSE;
         rightHoodServo.setPosition(rightHoodPosition);
+        // Gate defaults to open
         gateClosed = false;
         gateServo.setPosition(GATE_OPEN);
+        updateGateLed(); // reflect initial gate state
 
-        telemetry.addData("Status", "Initialized (auto RPM + pose turret aim)");
+        String imuUsed = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
+                (turretImu == imu && imu != null) ? "imu (expansion hub)" : "none";
+        telemetry.addData("Status", "Initialized (mode = CLOSE)");
+        telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
+
+        // ensure subsystems are ready
+        turretController.captureReferences();
+        turretController.resetPidState();
 
         waitForStart();
 
         while (opModeIsActive()) {
             long nowMs = System.currentTimeMillis();
 
-            if (follower != null) {
-                try {
-                    follower.update();
-                    currentPose = follower.getPose();
-                } catch (Exception e) {
-                    // keep last pose
-                }
+            // ------------------------------
+            // Touchpad toggles & reset
+            // ------------------------------
+            boolean touchpadNow = false;
+            try { touchpadNow = gamepad1.touchpad; } catch (Throwable t) {
+                touchpadNow = (gamepad1.left_stick_button && gamepad1.right_stick_button);
             }
 
             boolean gamepad2TouchpadNow = false;
@@ -161,18 +199,41 @@ public class forthexperimentalHORS extends LinearOpMode {
             if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
                 turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                turretController.captureReferences();
+                turretController.resetPidState();
+
                 driveController.stop();
-                telemetry.addData("Reset", "Turret encoder set to zero!");
+
+                telemetry.addData("Reset", "IMU heading reference and turret encoder set to zero!");
                 telemetry.update();
             }
             gamepad2TouchpadLast = gamepad2TouchpadNow;
 
-            double axial   = -gamepad1.left_stick_y;
-            double lateral = gamepad1.left_stick_x;
-            double yaw     = gamepad1.right_stick_x;
+            if (touchpadNow && !touchpadPressedLast) {
+                isFarMode = !isFarMode;
+                flywheel.setModeFar(isFarMode);
+                if (isFarMode) {
+                    rightHoodPosition = RIGHT_HOOD_FAR;
+                    rightHoodServo.setPosition(rightHoodPosition);
+                } else {
+                    rightHoodPosition = RIGHT_HOOD_CLOSE;
+                    rightHoodServo.setPosition(rightHoodPosition);
+                }
+            }
+            touchpadPressedLast = touchpadNow;
+
+            // ------------------------------
+            // DRIVE: delegate to DriveController
+            // ------------------------------
+            double axial   = gamepad1.left_stick_y;
+            double lateral = -gamepad1.left_stick_x;
+            double yaw     = -gamepad1.right_stick_x;
             double driveSpeed = 1.0;
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
+            // ------------------------------
+            // DPAD shooter adjustments
+            // ------------------------------
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) {
                 flywheel.toggleShooterOn();
@@ -181,44 +242,59 @@ public class forthexperimentalHORS extends LinearOpMode {
 
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
             if (dpadLeftNow && !dpadLeftLast) {
-                flywheelVersatile.adjustTrim(-10.0);
+                flywheel.adjustTargetRPM(-5.0);
             }
             dpadLeftLast = dpadLeftNow;
 
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
             if (dpadRightNow && !dpadRightLast) {
-                flywheelVersatile.adjustTrim(10.0);
+                flywheel.adjustTargetRPM(5.0);
             }
             dpadRightLast = dpadRightNow;
 
-            boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
-            if (dpadUpNow && !dpadUpLast) {
+            // ------------------------------
+            // Gate servo toggle on Y for both controllers + LED color
+            // ------------------------------
+            boolean yNow = gamepad1.y || gamepad2.y;
+            if (yNow && !yPressedLast) {
                 gateClosed = !gateClosed;
                 gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
+                updateGateLed();
             }
-            dpadUpLast = dpadUpNow;
+            yPressedLast = yNow;
 
-            boolean yNow = gamepad1.y || gamepad2.y;
+            // ------------------------------
+            // Flywheel update (measurement + PID + motor write)
+            // ------------------------------
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
-
-            double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
-            flywheel.setTargetRPM(targetRpm);
             flywheel.update(nowMs, yNow);
 
+            // ------------------------------
+            // CONTINUOUS RUMBLE while flywheel within tolerance
+            // ------------------------------
             if (flywheel.isAtTarget()) {
                 final int RUMBLE_MS = 200;
                 try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Pose-based turret aiming at BLUE_GOAL
-            turretGoalAimer.update(
-                    /*manualNow=*/false,
-                    /*manualPower=*/0.0,
-                    currentPose,
-                    BLUE_GOAL
-            );
+            // ------------------------------
+            // TURRET: manual detection and control
+            // ------------------------------
+            boolean manualNow = false;
+            double manualPower = 0.0;
+            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
+                manualNow = true;
+                manualPower = 0.5;
+            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
+                manualNow = true;
+                manualPower = -0.5;
+            }
+            turretController.update(manualNow, manualPower);
 
+            // ------------------------------
+            // INTAKE + COMPRESSION
+            // ------------------------------
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {
                 intakeMotor.setPower(-1.0);
@@ -226,7 +302,7 @@ public class forthexperimentalHORS extends LinearOpMode {
                 rightCompressionServo.setPosition(1.0);
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(1.0);
+                    intakeMotor.setPower(0.8);
                     leftCompressionServo.setPosition(1.0);
                     rightCompressionServo.setPosition(0.0);
                 } else {
@@ -236,6 +312,7 @@ public class forthexperimentalHORS extends LinearOpMode {
                 }
             }
 
+            // CLAW toggle
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xPressedLast) {
                 clawServo.setPosition(0.2);
@@ -248,6 +325,7 @@ public class forthexperimentalHORS extends LinearOpMode {
                 clawActionPhase = 0;
             }
 
+            // Hood adjustments
             if (gamepad1.a && nowMs - lastLeftHoodAdjustMs >= HOOD_ADJUST_DEBOUNCE_MS) {
                 lastLeftHoodAdjustMs = nowMs;
                 leftHoodPosition = Math.min(0.45, leftHoodPosition + 0.025);
@@ -269,21 +347,43 @@ public class forthexperimentalHORS extends LinearOpMode {
                 rightHoodServo.setPosition(rightHoodPosition);
             }
 
-            telemetry.addData("Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
-            telemetry.addData("Dist->Goal", currentPose != null
-                    ? String.format("%.1f", flywheelVersatile.getLastDistance()) : "N/A");
-            telemetry.addData("Base RPM (model)", String.format("%.1f", flywheelVersatile.getLastBaseRpm()));
-            telemetry.addData("Trim RPM", String.format("%.1f", flywheelVersatile.getTrimRpm()));
-            telemetry.addData("Target RPM", String.format("%.1f", targetRpm));
+            // Summary telemetry
+            telemetry.addData("Mode", isFarMode ? "FAR" : "CLOSE");
+            telemetry.addData("Turret Enc", turret.getCurrentPosition());
+            telemetry.addData("Turret Power (applied)", turretController.getLastAppliedPower());
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
+            telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
             telemetry.addData("Gate", gateClosed ? "CLOSED" : "OPEN");
             telemetry.addData("Gate Pos", gateServo.getPosition());
-            telemetry.addData("Turret Power", turret.getPower());
+
+            String imuUsedNow = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
+                    (turretImu == imu && imu != null) ? "imu (exp hub)" : "none";
+            telemetry.addData("Turret IMU Used", imuUsedNow);
 
             telemetry.update();
         }
+    }
+
+    private void headingReferenceReset() {
+        // turretController.captureReferences() handles the turret mapping if needed.
+    }
+
+    // Active-low LED helper: gate open -> green, gate closed -> red
+    private void updateGateLed() {
+        if (ledLineRed == null || ledLineGreen == null) return;
+        // off = true, on = false (active-low)
+        ledLineRed.setState(true);
+        ledLineGreen.setState(true);
+        if (gateClosed) {
+            // gate closed -> RED ON, GREEN OFF
+            ledLineRed.setState(false);
+            ledLineGreen.setState(true);
+        } else {
+            // gate open -> GREEN ON, RED OFF
+            ledLineRed.setState(true);
+            ledLineGreen.setState(false);
+        }
+        // For amber (if ever needed): ledLineRed.setState(false); ledLineGreen.setState(false);
     }
 }

@@ -28,7 +28,7 @@ public class Flywheel {
     private static final double TICKS_PER_REV = 537.6;
 
     private static final double K_P = 0.0003;
-    private static final double EMA_ALPHA = 0.15; // smoothing for measured RPM
+    private static final double EMA_ALPHA = 0.35; // smoothing for measured RPM
     private static final double DEFAULT_RPM_SCALE = 0.78;
 
     private static final double TARGET_RPM_CLOSE = 90.0;
