@@ -55,7 +55,7 @@ public class TurretController {
     private static final double TURRET_MAX_POWER = 1.0;
 
     // Feedforward and smoothing/filtering
-    private static final double FF_GAIN = 0.030;//0.28
+    private static final double FF_GAIN = 0.029;//0.28
     private static final double POWER_SMOOTH_ALPHA = 0.96;//0.96
     private static final double DERIV_FILTER_ALPHA = 0.40;//0.7
 
