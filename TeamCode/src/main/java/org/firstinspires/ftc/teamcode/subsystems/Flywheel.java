@@ -1,41 +1,36 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import com.bylazar.configurables.annotations.Configurable;
+import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-/*
-  Flywheel.java
-  --------------
-  Changes in this version:
-  - Exposes isAtTarget() so the OpMode can rumble continuously while the flywheel
-    is within the tolerance window.
-  - Keeps the justReachedTarget() one-shot API (unchanged) in case other code uses it.
-  - Keeps runtime getter/setter for the tolerance (setTargetToleranceRpm/getTargetToleranceRpm).
-
-  Usage:
-  - Call update(nowMs, calibPressed) every loop.
-  - Call handleLeftTrigger(...) to preserve the intake temporary-target behavior.
-  - Call isAtTarget() from the OpMode and trigger rumble repeatedly while true to get continuous vibration.
-*/
-
+@Configurable
 public class Flywheel {
 
     private final DcMotor shooter;
     private final Telemetry telemetry; // nullable
 
-    // --- Tunable constants ---
-    private static final double MAX_RPM = 200.0;
-    private static final double TICKS_PER_REV = 537.6;
+    // --- Panels-configurable constants (public static) ---
+    @Sorter(sort = 0)
+    public static double MAX_RPM = 200.0;
+    @Sorter(sort = 1)
+    public static double TICKS_PER_REV = 537.6;
 
-    private static final double K_P = 0.0003;
-    private static final double EMA_ALPHA = 0.35; // smoothing for measured RPM
-    private static final double DEFAULT_RPM_SCALE = 0.78;
+    @Sorter(sort = 2)
+    public static double K_P = 0.0003;
+    @Sorter(sort = 3)
+    public static double EMA_ALPHA = 0.35; // smoothing for measured RPM
+    @Sorter(sort = 4)
+    public static double DEFAULT_RPM_SCALE = 0.78;
 
-    private static final double TARGET_RPM_CLOSE = 90.0;
-    private static final double TARGET_RPM_FAR   = 140.0;
+    @Sorter(sort = 5)
+    public static double TARGET_RPM_CLOSE = 90.0;
+    @Sorter(sort = 6)
+    public static double TARGET_RPM_FAR   = 140.0;
 
-    // runtime tolerance used for "at target" detection (vibration). Default increased per request.
-    private double targetToleranceRpm = 10.0; // you can change via setTargetToleranceRpm(...)
+    @Sorter(sort = 7)
+    public static double TARGET_TOLERANCE_RPM = 10.0; // runtime tolerance for "at target" check
 
     // --- Internal state ---
     private double currentRPM = 0.0;
@@ -62,35 +57,41 @@ public class Flywheel {
     // last applied motor power (for telemetry)
     private double lastAppliedPower = 0.0;
 
+    // runtime tolerance used for "at target" detection
+    private double targetToleranceRpm = TARGET_TOLERANCE_RPM;
+
     public Flywheel(DcMotor shooterMotor, Telemetry telemetry) {
         this.shooter = shooterMotor;
         this.telemetry = telemetry;
         this.targetRPM = TARGET_RPM_CLOSE;
         this.shooterOn = true;
 
-        // ensure shooter motor mode is expected (OpMode generally sets this)
         this.lastShooterPosition = shooter.getCurrentPosition();
         this.lastShooterTime = System.currentTimeMillis();
     }
 
     /**
      * Primary periodic update. Call from OpMode loop with current time and calibration button state.
-     *
-     * @param nowMs       current timestamp in ms
-     * @param calibPressed whether the calibration button (your 'y') is currently pressed
      */
     public void update(long nowMs, boolean calibPressed) {
+        // Pull latest config each loop so UI changes apply live
+        double maxRpmCfg = MAX_RPM;
+        double ticksPerRevCfg = TICKS_PER_REV;
+        double kPCfg = K_P;
+        double emaCfg = EMA_ALPHA;
+        double toleranceCfg = TARGET_TOLERANCE_RPM;
+
         // RPM measurement
         int shooterCurrentPosition = shooter.getCurrentPosition();
         long now = nowMs;
         long deltaTimeMs = (lastShooterTime < 0) ? 1 : Math.max(1, now - lastShooterTime);
         int deltaTicks = shooterCurrentPosition - lastShooterPosition;
         double ticksPerSec = (deltaTicks * 1000.0) / deltaTimeMs;
-        double measuredRPMRaw = (ticksPerSec / TICKS_PER_REV) * 60.0;
+        double measuredRPMRaw = (ticksPerSec / ticksPerRevCfg) * 60.0;
         double measuredRPMScaled = measuredRPMRaw * rpmScale;
 
         // exponential smoothing for current RPM
-        currentRPM = (1.0 - EMA_ALPHA) * currentRPM + EMA_ALPHA * measuredRPMScaled;
+        currentRPM = (1.0 - emaCfg) * currentRPM + emaCfg * measuredRPMScaled;
         if (currentRPM < 0.0) currentRPM = 0.0;
 
         // Save for next iteration
@@ -111,9 +112,9 @@ public class Flywheel {
         lastCalibPressed = calibPressed;
 
         // PID-like control (simple P + feedforward)
-        double ff = targetRPM / Math.max(1.0, MAX_RPM);
+        double ff = targetRPM / Math.max(1.0, maxRpmCfg);
         double error = targetRPM - currentRPM;
-        double pTerm = K_P * error;
+        double pTerm = kPCfg * error;
         double shooterPower = ff + pTerm;
 
         // clamp commanded power to [0,1] and only enable when shooterOn
@@ -125,19 +126,19 @@ public class Flywheel {
         lastAppliedPower = applied;
 
         // At-target detection (rising edge sets justReachedTargetFlag) using runtime tolerance
-        boolean atTargetNow = Math.abs(targetRPM - currentRPM) <= targetToleranceRpm;
+        boolean atTargetNow = Math.abs(targetRPM - currentRPM) <= toleranceCfg;
         if (atTargetNow && !lastAtTarget) {
             justReachedTargetFlag = true;
         }
         lastAtTarget = atTargetNow;
 
-        // telemetry
+        // telemetry (minimal)
         if (telemetry != null) {
             telemetry.addData("fly.Current RPM/n", String.format("%.1f", currentRPM));
             telemetry.addData("fly.targetRPM/n", String.format("%.1f", targetRPM));
             telemetry.addData("fly.power/n", String.format("%.3f", lastAppliedPower));
 //            telemetry.addData("fly.scale", String.format("%.3f", rpmScale));
-//            telemetry.addData("fly.tolerance", String.format("%.2f", targetToleranceRpm));
+//            telemetry.addData("fly.tolerance", String.format("%.2f", toleranceCfg));
 //            telemetry.addData("fly.atTarget", atTargetNow);
         }
     }
@@ -198,20 +199,23 @@ public class Flywheel {
      * Use this from the OpMode to trigger continuous controller vibration while true.
      */
     public boolean isAtTarget() {
-        return Math.abs(targetRPM - currentRPM) <= targetToleranceRpm;
+        return Math.abs(targetRPM - currentRPM) <= TARGET_TOLERANCE_RPM;
     }
 
     // Optional: getters for telemetry-friendly values
     public double getRpmScale() { return rpmScale; }
-    public double getFpPercent() { return (MAX_RPM > 0) ? (targetRPM / MAX_RPM) : 0.0; }
+    public double getFpPercent() {
+        return (MAX_RPM > 0) ? (targetRPM / MAX_RPM) : 0.0;
+    }
 
     // Runtime tuning of the tolerance for rumble/vibrate trigger
     public void setTargetToleranceRpm(double tolerance) {
         if (tolerance < 0) tolerance = 0;
         this.targetToleranceRpm = tolerance;
+        TARGET_TOLERANCE_RPM = tolerance; // keep dashboard in sync if changed programmatically
     }
 
     public double getTargetToleranceRpm() {
-        return this.targetToleranceRpm;
+        return TARGET_TOLERANCE_RPM;
     }
 }
