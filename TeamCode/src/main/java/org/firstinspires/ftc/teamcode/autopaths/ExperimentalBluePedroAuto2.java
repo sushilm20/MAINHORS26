@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.autopaths;
 
 import com.bylazar.configurables.annotations.Configurable;
+import com.bylazar.configurables.annotations.Sorter;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
@@ -19,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
 
-@Autonomous(name = "Slower 12 ball blue ", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "Config 12 ball ", group = "Autonomous", preselectTeleOp = "???HORS???")
 @Configurable
 public class ExperimentalBluePedroAuto2 extends OpMode {
 
@@ -34,26 +35,32 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
+    @Sorter(sort = 0)
+    public static double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
 
-    private Timer timedIntakeTimer;
-    private static final double TIMED_INTAKE_SECONDS = 1.0;
+    private Timer timedIntakeTimer;//test
+    @Sorter(sort = 1)
+    public static double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
-    private static final long CLAW_CLOSE_MS = 250L;
+    @Sorter(sort = 2)
+    public static long CLAW_CLOSE_MS = 250L;
 
     private Timer preActionTimer;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.25;
+    @Sorter(sort = 3)
+    public static double PRE_ACTION_WAIT_SECONDS = 0.25;
 
     private Timer poseWaitTimer;
-    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
+    @Sorter(sort = 4)
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
     private long shooterWaitStartMs = -1;
-    private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
+    @Sorter(sort = 5)
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
     private DcMotor turretMotor;
@@ -64,9 +71,8 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     private Flywheel flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 90.0;
-    private static final double PATH1_SHOOTER_RPM = 88.0; // Path1-only shooter RPM
-    private static final double PATH1_VELOCITY_CONSTRAINT = 15.0; // in/s, slower approach on Path1
+    @Sorter(sort = 6)
+    public static double AUTO_SHOOTER_RPM = 90.5;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -74,32 +80,45 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     private Servo clawServo;
 
-    private static final double INTAKE_ON_POWER = 1.0;
-    private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.4;     // pre-spin before gate opens
-    private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
+    @Sorter(sort = 7)
+    public static double INTAKE_ON_POWER = 1.0;
+    @Sorter(sort = 8)
+    public static double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
+    @Sorter(sort = 9)
+    public static double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
+    @Sorter(sort = 10)
+    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
+    @Sorter(sort = 11)
+    public static double LEFT_COMPRESSION_OFF = 0.5;
+    @Sorter(sort = 12)
+    public static double RIGHT_COMPRESSION_OFF = 0.5;
 
     private int intakeSegmentEnd = -1;
 
-    private static final double SHOOT_POSE_X = 48.0;
-    private static final double SHOOT_POSE_Y = 96.0;
-    private static final double START_POSE_TOLERANCE_IN = 6.0;
+    @Sorter(sort = 13)
+    public static double SHOOT_POSE_X = 48.0;
+    @Sorter(sort = 14)
+    public static double SHOOT_POSE_Y = 96.0;
+    @Sorter(sort = 15)
+    public static double START_POSE_TOLERANCE_IN = 6.0;
 
     private final boolean turretForceManualNoMove = false;
 
     private Servo gateServo;
     private boolean dpadUpLast = false;
     private boolean gateClosed = false;
-    private static final double GATE_OPEN = 0.67;
-    private static final double GATE_CLOSED = 0.5;
+    @Sorter(sort = 16)
+    public static double GATE_OPEN = 0.67;
+    @Sorter(sort = 17)
+    public static double GATE_CLOSED = 0.5;
 
     // Gate control thresholds (open slightly earlier than pose tolerance, close as soon as out of range)
-    private static final double GATE_OPEN_TOLERANCE_IN = START_POSE_TOLERANCE_IN + 3.0; // widened gate-open window
-    private static final double GATE_CLOSE_TOLERANCE_IN = GATE_OPEN_TOLERANCE_IN + 1.0; // small hysteresis for close
+    @Sorter(sort = 18)
+    public static double GATE_OPEN_TOLERANCE_IN = START_POSE_TOLERANCE_IN + 3.0; // widened gate-open window
+    @Sorter(sort = 19)
+    public static double GATE_CLOSE_TOLERANCE_IN = GATE_OPEN_TOLERANCE_IN + 1.0; // small hysteresis for close
 
     public ExperimentalBluePedroAuto2() {}
 
@@ -239,7 +258,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     public void start() {
         if (flywheel != null) {
             flywheel.setShooterOn(true);
-            flywheel.setTargetRPM(PATH1_SHOOTER_RPM); // Path1 starts at 88 RPM
+            flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
         }
         if (turretController != null) {
             turretController.captureReferences();
@@ -247,8 +266,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
 
         shooterWaitStartMs = System.currentTimeMillis();
-        // Move immediately on Path1 with reduced velocity instead of waiting for spin-up
-        startPath(1);
+        state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
@@ -393,15 +411,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
         }
 
-        // Per-path shooter RPM
-        if (flywheel != null) {
-            if (idx == 1) {
-                flywheel.setTargetRPM(PATH1_SHOOTER_RPM);
-            } else {
-                flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
-            }
-        }
-
         switch (idx) {
             case 1: follower.followPath(paths.Path1); break;
             case 2: follower.followPath(paths.Path2); break;
@@ -435,7 +444,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
         switch (state) {
             case WAIT_FOR_SHOOTER:
-                // left for compatibility; start() moves immediately now
                 boolean atTarget = (flywheel != null && flywheel.isAtTarget());
                 long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
                 if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
@@ -590,7 +598,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
                     .build();
-
 
             Path2 = follower
                     .pathBuilder()
