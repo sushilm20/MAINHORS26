@@ -30,7 +30,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 public class secondexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
-    private DcMotor shooter, turret, intakeMotor;
+    private DcMotor shooter, shooter2, turret, intakeMotor;
     private Servo clawServo, leftCompressionServo, rightCompressionServo;
     private Servo leftHoodServo, rightHoodServo;
 
@@ -90,6 +90,7 @@ public class secondexperimentalHORS extends LinearOpMode {
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
         backRightDrive = hardwareMap.get(DcMotor.class, "backRight");
         shooter = hardwareMap.get(DcMotor.class, "shooter");
+        shooter2 = hardwareMap.get(DcMotor.class, "shooter2"); // new secondary shooter motor
         turret = hardwareMap.get(DcMotor.class, "turret");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
         clawServo = hardwareMap.get(Servo.class, "clawServo");
@@ -120,10 +121,12 @@ public class secondexperimentalHORS extends LinearOpMode {
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
         backRightDrive.setDirection(DcMotor.Direction.REVERSE);
         shooter.setDirection(DcMotor.Direction.REVERSE);
+        shooter2.setDirection(DcMotor.Direction.FORWARD); // opposite of shooter
         turret.setDirection(DcMotor.Direction.FORWARD);
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter2.setMode(DcMotor.RunMode.RUN_USING_ENCODER); // mirror shooter mode
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -280,6 +283,9 @@ public class secondexperimentalHORS extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, yNow);
 
+            // Mirror shooter power to shooter2 (opposite direction via motor config)
+            shooter2.setPower(shooter.getPower());
+
             // ------------------------------
             // CONTINUOUS RUMBLE while flywheel within tolerance
             // ------------------------------
@@ -309,17 +315,14 @@ public class secondexperimentalHORS extends LinearOpMode {
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {
                 intakeMotor.setPower(-1.0);
-                leftCompressionServo.setPosition(0.0);
-                rightCompressionServo.setPosition(1.0);
+
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
-                    intakeMotor.setPower(0.8);
-                    leftCompressionServo.setPosition(1.0);
-                    rightCompressionServo.setPosition(0.0);
+                    intakeMotor.setPower(1.0);
+
                 } else {
                     intakeMotor.setPower(0.0);
-                    leftCompressionServo.setPosition(0.5);
-                    rightCompressionServo.setPosition(0.5);
+
                 }
             }
 
