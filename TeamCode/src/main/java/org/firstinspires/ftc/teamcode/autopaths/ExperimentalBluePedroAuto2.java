@@ -36,7 +36,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     private Timer intakeTimer;
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
+    public static double INTAKE_RUN_SECONDS = 1.5; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
     @Sorter(sort = 1)
@@ -63,6 +63,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     public static long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
+    private DcMotor shooterMotor2;
     private DcMotor turretMotor;
 
     private BNO055IMU pinpointImu = null;
@@ -75,8 +76,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     public static double AUTO_SHOOTER_RPM = 90.5;
 
     private DcMotor intakeMotor;
-    private Servo leftCompressionServo;
-    private Servo rightCompressionServo;
 
     private Servo clawServo;
 
@@ -88,12 +87,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     public static double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
     @Sorter(sort = 10)
     public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
-
-    // Compression servos no longer used in the intake sequence
-    @Sorter(sort = 11)
-    public static double LEFT_COMPRESSION_OFF = 0.5;
-    @Sorter(sort = 12)
-    public static double RIGHT_COMPRESSION_OFF = 0.5;
 
     private int intakeSegmentEnd = -1;
 
@@ -143,9 +136,14 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
+            shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+            if (shooterMotor2 != null) {
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD); // mirror of shooter
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
             turretMotor.setDirection(DcMotor.Direction.FORWARD);
 
             shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -209,16 +207,10 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
-            leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
-            rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
-
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
-
             intakeMotor.setPower(0.0);
-            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
-            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Intake mapping failed: " + e.getMessage());
         }
 
         try {
@@ -246,9 +238,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     @Override
     public void init_loop() {
-        if (flywheel != null) {
-//            flywheel.update(System.currentTimeMillis(), false);
-        }
         if (turretController != null) {
             turretController.update(false, 0.0);
         }
@@ -280,6 +269,15 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             flywheel.update(nowMs, false);
         }
 
+        // Mirror shooter power to secondary motor
+        if (shooterMotor != null && shooterMotor2 != null) {
+            try {
+                shooterMotor2.setPower(shooterMotor.getPower());
+            } catch (Exception e) {
+                panelsTelemetry.debug("Shooter2", "Power mirror error: " + e.getMessage());
+            }
+        }
+
         if (turretController != null) {
             turretController.update(false, 0.0);
         }
@@ -306,8 +304,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
-            panelsTelemetry.debug("LeftCompPos", leftCompressionServo != null ? leftCompressionServo.getPosition() : -1);
-            panelsTelemetry.debug("RightCompPos", rightCompressionServo != null ? rightCompressionServo.getPosition() : -1);
         }
         if (clawServo != null) {
             panelsTelemetry.debug("ClawPos", clawServo.getPosition());
@@ -356,7 +352,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private void startIntake(double power) {
         try {
             if (intakeMotor != null) intakeMotor.setPower(power);
-            // compression servos intentionally not moved during intake sequence
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
         }
@@ -365,7 +360,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private void stopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(0.0);
-            // leave compression servos untouched
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
         }
@@ -476,12 +470,10 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                 break;
 
             case CLOSED_INTAKE_SEQUENCE:
-                // Pre-spin intake (gate stays closed until gate tolerance hit)
                 double distPre = distanceToShootPose();
                 if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) {
                     startIntake(CLOSED_INTAKE_POWER);
                 }
-                // Transition to PRE_ACTION once within main pose tolerance
                 if (distPre <= START_POSE_TOLERANCE_IN) {
                     state = AutoState.PRE_ACTION;
                 }
@@ -510,7 +502,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // Reduced intake power only when starting intake at the shoot pose
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
@@ -551,12 +542,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
     }
 
-    /**
-     * Gate behavior:
-     * - Open quickly when within GATE_OPEN_TOLERANCE_IN of the shoot pose.
-     * - Close immediately once outside GATE_CLOSE_TOLERANCE_IN.
-     * This keeps the gate closed whenever we're not effectively at the shoot state.
-     */
     private void updateGate() {
         try {
             double dist = distanceToShootPose();

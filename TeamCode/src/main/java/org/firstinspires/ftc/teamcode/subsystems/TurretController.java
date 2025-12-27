@@ -49,7 +49,7 @@ public class TurretController {
 
     // ticks-per-radian mapping (configurable scale; base is derived each loop)
     @Sorter(sort = 2)
-    public static double TICKS_PER_RADIAN_SCALE = 0.8;
+    public static double TICKS_PER_RADIAN_SCALE = 0.75;
 
     // PID & control gains (configurable)
     @Sorter(sort = 3)
