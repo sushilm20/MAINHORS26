@@ -31,7 +31,7 @@ public class secondexperimentalHORS extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, shooter2, turret, intakeMotor;
-    private Servo clawServo, leftCompressionServo, rightCompressionServo;
+    private Servo clawServo;
     private Servo leftHoodServo, rightHoodServo;
 
     // Gate servo
@@ -94,8 +94,6 @@ public class secondexperimentalHORS extends LinearOpMode {
         turret = hardwareMap.get(DcMotor.class, "turret");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
         clawServo = hardwareMap.get(Servo.class, "clawServo");
-        leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
-        rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
@@ -173,8 +171,6 @@ public class secondexperimentalHORS extends LinearOpMode {
 
         // initial positions
         clawServo.setPosition(0.63);
-        leftCompressionServo.setPosition(0.5);
-        rightCompressionServo.setPosition(0.5);
         leftHoodServo.setPosition(leftHoodPosition);
         rightHoodPosition = RIGHT_HOOD_CLOSE;
         rightHoodServo.setPosition(rightHoodPosition);
@@ -302,27 +298,24 @@ public class secondexperimentalHORS extends LinearOpMode {
             double manualPower = 0.0;
             if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
                 manualNow = true;
-                manualPower = 0.5;
+                manualPower = 0.25;
             } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
                 manualNow = true;
-                manualPower = -0.5;
+                manualPower = -0.25;
             }
             turretController.update(manualNow, manualPower);
 
             // ------------------------------
-            // INTAKE + COMPRESSION
+            // INTAKE
             // ------------------------------
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {
                 intakeMotor.setPower(-1.0);
-
             } else {
                 if ((gamepad1.right_trigger > 0.1) || (gamepad2.right_trigger > 0.1)) {
                     intakeMotor.setPower(1.0);
-
                 } else {
                     intakeMotor.setPower(0.0);
-
                 }
             }
 
