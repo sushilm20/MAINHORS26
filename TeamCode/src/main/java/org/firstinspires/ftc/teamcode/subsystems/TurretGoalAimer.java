@@ -13,7 +13,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * TurretGoalAimer:
  * - Faces a single field goal point.
  * - Uses robot pose + IMU heading.
- * - Adds lateral-offset correction: if the robot is left/right of the goal line, apply a small heading offset.
+ * - Adds lateral-offset correction (side of line from start->goal).
  * - Manual override is respected.
  */
 public class TurretGoalAimer {
@@ -23,8 +23,9 @@ public class TurretGoalAimer {
     private final BNO055IMU imu;
     private final Telemetry telemetry; // optional
 
-    // Target to aim at (field coords). Replace via setTargetPose as needed.
-    private Pose targetPose = new Pose(14, 134, 0); // default example (blue goal)
+    // Field references
+    private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(135));
+    private Pose targetPose = new Pose(14, 134, Math.toRadians(135)); // default (blue goal)
 
     // Limits (aligned with TurretController)
     public static final int TURRET_MIN_POS = -900;
@@ -50,7 +51,7 @@ public class TurretGoalAimer {
     private static final int SMALL_DEADBAND_TICKS = 1;
     private static final double INTEGRAL_CLAMP = 0.0;
 
-    // Lateral offset tuning (applied to target angle)
+    // Lateral offset tuning (applied to target angle based on side of line start->goal)
     private static final double OFFSET_GAIN_RAD_PER_IN = 0.005;               // ~0.29 deg per inch
     private static final double OFFSET_CLAMP_RAD = Math.toRadians(25.0);      // clamp offset to +/-25 deg
 
@@ -61,11 +62,14 @@ public class TurretGoalAimer {
     private double lastAppliedPower = 0.0;
     private double lastDerivative = 0.0;
 
-    // Reference mapping between heading and encoder
     private double headingReferenceRad = 0.0;
     private double lastHeadingRad = 0.0;
     private int turretEncoderReference = 0;
     private boolean manualActiveLast = false;
+
+    // Aim reference: ensures zero error at the starting pose
+    private boolean aimReferenceCaptured = false;
+    private double aimReferenceRad = 0.0; // (goalBearing - heading + offset) at start
 
     // Telemetry values
     private int lastDesiredTicks = 0;
@@ -94,9 +98,12 @@ public class TurretGoalAimer {
         headingReferenceRad = getHeadingRadians();
         lastHeadingRad = headingReferenceRad;
         turretEncoderReference = turretMotor.getCurrentPosition();
+        // reset aim reference so it will re-capture next time we have a pose
+        aimReferenceCaptured = false;
+        aimReferenceRad = 0.0;
     }
 
-    /** Reset PID state. */
+    /** Reset PID internal state. */
     public void resetPidState() {
         turretIntegral = 0.0;
         lastErrorTicks = 0;
@@ -118,7 +125,6 @@ public class TurretGoalAimer {
     public void update(boolean manualNow, double manualPower, Pose robotPose) {
         long nowMs = System.currentTimeMillis();
 
-        // Manual override
         if (manualNow) {
             applyManualPower(manualPower);
             turretIntegral = 0.0;
@@ -130,7 +136,6 @@ public class TurretGoalAimer {
             return;
         }
 
-        // Transition from manual -> auto
         if (manualActiveLast && !manualNow) {
             captureReferences();
             lastTimeMs = nowMs;
@@ -139,7 +144,6 @@ public class TurretGoalAimer {
         }
         manualActiveLast = false;
 
-        // Determine target angle relative to robot heading
         double currentHeadingRad = getHeadingRadians();
         double targetAngleRad;
         double goalBearing = 0.0;
@@ -149,28 +153,49 @@ public class TurretGoalAimer {
             double dx = targetPose.getX() - robotPose.getX();
             double dy = targetPose.getY() - robotPose.getY();
             goalBearing = Math.atan2(dy, dx);                // field-centric
-            double robotHeading = currentHeadingRad;         // field-centric heading
-            double relativeAngle = normalizeAngle(goalBearing - robotHeading);
 
-            // Lateral error relative to goal line (using field Y as lateral reference to goal)
-            // Positive error => robot is "left" (higher Y) of the goal line; negative => "right".
-            double lateralErrorIn = (robotPose.getY() - targetPose.getY());
-            offsetRad = OFFSET_GAIN_RAD_PER_IN * lateralErrorIn;
+            // Line from START_POSE to targetPose
+            double lineX = targetPose.getX() - START_POSE.getX();
+            double lineY = targetPose.getY() - START_POSE.getY();
+            double lineMag = Math.hypot(lineX, lineY);
+
+            // Vector from START_POSE to robotPose
+            double rX = robotPose.getX() - START_POSE.getX();
+            double rY = robotPose.getY() - START_POSE.getY();
+
+            // Signed perpendicular distance using 2D cross product (line x robot)
+            double cross = lineX * rY - lineY * rX;
+            double perpDist = (lineMag > 1e-6) ? cross / lineMag : 0.0; // inches, signed
+
+            // FLIPPED SIGN: move turret opposite to previous offset direction
+            offsetRad = -perpDist * OFFSET_GAIN_RAD_PER_IN;
             if (offsetRad > OFFSET_CLAMP_RAD) offsetRad = OFFSET_CLAMP_RAD;
             if (offsetRad < -OFFSET_CLAMP_RAD) offsetRad = -OFFSET_CLAMP_RAD;
 
-            targetAngleRad = normalizeAngle(relativeAngle + offsetRad);
+            // Capture aim reference once (at the first valid pose) so turret doesn't jump at start
+            if (!aimReferenceCaptured) {
+                double startOffsetRad = offsetRad;
+                double startGoalBearing = goalBearing;
+                aimReferenceRad = normalizeAngle(startGoalBearing - currentHeadingRad + startOffsetRad);
+                aimReferenceCaptured = true;
+            }
+
+            // Desired turret angle relative to the captured aim reference
+            targetAngleRad = normalizeAngle((goalBearing - currentHeadingRad + offsetRad) - aimReferenceRad);
+
         } else {
-            // fallback: hold initial heading
+            // Fallback: heading hold like TurretController
             double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
             targetAngleRad = -headingDelta;
+            aimReferenceCaptured = false; // force re-capture when pose returns
         }
 
-        lastGoalBearingRad = goalBearing;
+        // Save telemetry values
         lastOffsetRad = offsetRad;
+        lastGoalBearingRad = goalBearing;
         lastTargetAngleRad = targetAngleRad;
 
-        // Angular velocity for feedforward
+        // Compute angular velocity for feedforward
         double angularVel = 0.0;
         if (lastTimeMs > 0) {
             double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
@@ -203,7 +228,6 @@ public class TurretGoalAimer {
             turretIntegral *= 0.90;
         }
 
-        // Clamp integral
         if (turretIntegral > INTEGRAL_CLAMP) turretIntegral = INTEGRAL_CLAMP;
         if (turretIntegral < -INTEGRAL_CLAMP) turretIntegral = -INTEGRAL_CLAMP;
 
@@ -211,35 +235,33 @@ public class TurretGoalAimer {
         double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = DERIV_FILTER_ALPHA * rawDerivative + (1.0 - DERIV_FILTER_ALPHA) * lastDerivative;
 
-        // PID + FF
+        // PID
         double pidOut = TURRET_KP * errorTicks + TURRET_KI * turretIntegral + TURRET_KD * derivativeFiltered;
+
+        // Feedforward: oppose robot yaw rate
         double ff = -angularVel * FF_GAIN;
+
         double cmdPower = pidOut + ff;
 
-        // Deadband
-        if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS) cmdPower = 0.0;
+        if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS) {
+            cmdPower = 0.0;
+        }
 
-        // Clamp
         if (cmdPower > TURRET_MAX_POWER) cmdPower = TURRET_MAX_POWER;
         if (cmdPower < -TURRET_MAX_POWER) cmdPower = -TURRET_MAX_POWER;
 
-        // Smooth
         double applied = POWER_SMOOTH_ALPHA * lastAppliedPower + (1.0 - POWER_SMOOTH_ALPHA) * cmdPower;
 
-        // Hard-stop protection
         if ((currentTicks >= TURRET_MAX_POS && applied > 0.0) || (currentTicks <= TURRET_MIN_POS && applied < 0.0)) {
             applied = 0.0;
         }
 
-        // Apply
         turretMotor.setPower(applied);
 
-        // Update state
         lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
-        // Telemetry fields
         lastDesiredTicks = desiredTicks;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
@@ -250,20 +272,22 @@ public class TurretGoalAimer {
 
     private void applyManualPower(double manualPower) {
         int currentTicks = turretMotor.getCurrentPosition();
+
         double requested = manualPower;
         if ((currentTicks >= TURRET_MAX_POS && requested > 0.0) || (currentTicks <= TURRET_MIN_POS && requested < 0.0)) {
             requested = 0.0;
         }
         if (requested > 1.0) requested = 1.0;
         if (requested < -1.0) requested = -1.0;
-        turretMotor.setPower(requested);
 
+        turretMotor.setPower(requested);
         lastDesiredTicks = turretEncoderReference;
         lastErrorReported = lastDesiredTicks - currentTicks;
         lastPidOut = 0.0;
         lastFf = 0.0;
         lastOffsetRad = 0.0;
         lastTargetAngleRad = 0.0;
+        aimReferenceCaptured = false; // re-capture after manual
     }
 
     private double getHeadingRadians() {
@@ -290,13 +314,13 @@ public class TurretGoalAimer {
 
     private void publishTelemetry() {
         if (telemetry == null) return;
-//        telemetry.addData("turret.desired", lastDesiredTicks);
-//        telemetry.addData("turret.error", lastErrorReported);
-//        telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
-//        telemetry.addData("turret.ff", String.format("%.4f", lastFf));
-//        telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-//        telemetry.addData("turret.offset(deg)", String.format("%.2f", Math.toDegrees(lastOffsetRad)));
-//        telemetry.addData("turret.targetAng(deg)", String.format("%.2f", Math.toDegrees(lastTargetAngleRad)));
-//        telemetry.addData("turret.goalBearing(deg)", String.format("%.2f", Math.toDegrees(lastGoalBearingRad)));
+        // telemetry.addData("turret.desired", lastDesiredTicks);
+        // telemetry.addData("turret.error", lastErrorReported);
+        // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
+        // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
+        // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
+        // telemetry.addData("turret.offset(deg)", String.format("%.2f", Math.toDegrees(lastOffsetRad)));
+        // telemetry.addData("turret.goalBearing(deg)", String.format("%.2f", Math.toDegrees(lastGoalBearingRad)));
+        // telemetry.addData("turret.targetAngle(deg)", String.format("%.2f", Math.toDegrees(lastTargetAngleRad)));
     }
 }
