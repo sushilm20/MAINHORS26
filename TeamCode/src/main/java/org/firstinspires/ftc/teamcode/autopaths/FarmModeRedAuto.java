@@ -77,6 +77,7 @@ public class FarmModeRedAuto extends OpMode {
 
     // Shooter + rpm/stability settings
     private DcMotor shooterMotor;
+    private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
     private Flywheel flywheel;
     private static final double AUTO_SHOOTER_RPM = 130.0; // overall auto shooter RPM
     private static final double RPM_TOLERANCE = 0.05; // 5% tolerance for "stable" detection
@@ -161,6 +162,17 @@ public class FarmModeRedAuto extends OpMode {
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "shooter map failed: " + e.getMessage());
+        }
+
+        // Secondary shooter motor (mirrors primary shooter power)
+        try {
+            shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
+            if (shooterMotor2 != null) {
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD); // mirror of shooter
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Init", "shooter2 map failed: " + e.getMessage());
         }
 
         try {
@@ -249,6 +261,15 @@ public class FarmModeRedAuto extends OpMode {
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
+        }
+
+        // Mirror shooter power to secondary motor
+        if (shooterMotor != null && shooterMotor2 != null) {
+            try {
+                shooterMotor2.setPower(shooterMotor.getPower());
+            } catch (Exception e) {
+                panelsTelemetry.debug("Shooter2", "Power mirror error: " + e.getMessage());
+            }
         }
 
         runStateMachine(nowMs);
