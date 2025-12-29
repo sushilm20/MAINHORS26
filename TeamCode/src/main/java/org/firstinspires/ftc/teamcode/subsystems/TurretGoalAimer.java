@@ -20,29 +20,29 @@ public class TurretGoalAimer {
     private final BNO055IMU imu;
     private final Telemetry telemetry; // optional
 
-    // Limits
-    public static final int TURRET_MIN_POS = -600;
-    public static final int TURRET_MAX_POS = 600;
+    // Limits (aligned with TurretController)
+    public static final int TURRET_MIN_POS = -900;
+    public static final int TURRET_MAX_POS = 900;
 
-    // Ticks mapping
-    private static final double BASE_TICKS_PER_RADIAN = TURRET_MAX_POS / Math.PI;
-    private static final double TICKS_PER_RADIAN_SCALE = 2;
-    private static final double TICKS_PER_RADIAN = BASE_TICKS_PER_RADIAN * TICKS_PER_RADIAN_SCALE;
+    // Ticks mapping (aligned with TurretController)
+    private static final double TICKS_PER_RADIAN_SCALE = 1.0;
+    private static final double TICKS_PER_RADIAN =
+            ((TURRET_MAX_POS - TURRET_MIN_POS) / (2.0 * Math.PI)) * TICKS_PER_RADIAN_SCALE;
 
-    // Gains
-    private static final double TURRET_KP = 1.3;
+    // Gains (aligned with TurretController)
+    private static final double TURRET_KP = 1.2;
     private static final double TURRET_KI = 0.09;
     private static final double TURRET_KD = 0.3;
     private static final double TURRET_MAX_POWER = 1.0;
 
-    // FF & smoothing
-    private static final double FF_GAIN = 0.030;
+    // FF & smoothing (aligned with TurretController)
+    private static final double FF_GAIN = 0.04;
     private static final double POWER_SMOOTH_ALPHA = 0.96;
     private static final double DERIV_FILTER_ALPHA = 0.40;
 
-    // Deadband & anti-windup
-    private static final int SMALL_DEADBAND_TICKS = 4;
-    private static final double INTEGRAL_CLAMP = 200.0;
+    // Deadband & anti-windup (aligned with TurretController)
+    private static final int SMALL_DEADBAND_TICKS = 1;
+    private static final double INTEGRAL_CLAMP = 0.0;
 
     // State
     private double turretIntegral = 0.0;
