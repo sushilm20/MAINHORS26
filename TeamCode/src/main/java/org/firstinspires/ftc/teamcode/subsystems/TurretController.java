@@ -57,7 +57,7 @@ public class TurretController {
 
     // PID & control gains (configurable)
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.0;
+    public static double TURRET_KP = 1.05;
     // previous: 1.2
 
     @Sorter(sort = 4)
