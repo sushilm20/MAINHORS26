@@ -51,7 +51,7 @@ public class TurretGoalAimer {
     private static final int SMALL_DEADBAND_TICKS = 1;
     private static final double INTEGRAL_CLAMP = 0.0;
 
-    // Lateral offset tuning (applied to target angle based on side of line start->goal)
+    // Lateral offset tuning
     private static final double OFFSET_GAIN_RAD_PER_IN = 0.005;               // ~0.29 deg per inch
     private static final double OFFSET_CLAMP_RAD = Math.toRadians(25.0);      // clamp offset to +/-25 deg
 
@@ -69,7 +69,7 @@ public class TurretGoalAimer {
 
     // Aim reference: ensures zero error at the starting pose
     private boolean aimReferenceCaptured = false;
-    private double aimReferenceRad = 0.0; // (goalBearing - heading + offset) at start
+    private double aimReferenceRad = 0.0; // (goalBearing - heading - offset) at start
 
     // Telemetry values
     private int lastDesiredTicks = 0;
@@ -167,8 +167,8 @@ public class TurretGoalAimer {
             double cross = lineX * rY - lineY * rX;
             double perpDist = (lineMag > 1e-6) ? cross / lineMag : 0.0; // inches, signed
 
-            // FLIPPED SIGN: move turret opposite to previous offset direction
-            offsetRad = -perpDist * OFFSET_GAIN_RAD_PER_IN;
+            // Offset magnitude (sign as before); apply opposite effect in target angle below
+            offsetRad = perpDist * OFFSET_GAIN_RAD_PER_IN;
             if (offsetRad > OFFSET_CLAMP_RAD) offsetRad = OFFSET_CLAMP_RAD;
             if (offsetRad < -OFFSET_CLAMP_RAD) offsetRad = -OFFSET_CLAMP_RAD;
 
@@ -176,12 +176,14 @@ public class TurretGoalAimer {
             if (!aimReferenceCaptured) {
                 double startOffsetRad = offsetRad;
                 double startGoalBearing = goalBearing;
-                aimReferenceRad = normalizeAngle(startGoalBearing - currentHeadingRad + startOffsetRad);
+                // Note: subtract offset here to match the flipped effect
+                aimReferenceRad = normalizeAngle(startGoalBearing - currentHeadingRad - startOffsetRad);
                 aimReferenceCaptured = true;
             }
 
             // Desired turret angle relative to the captured aim reference
-            targetAngleRad = normalizeAngle((goalBearing - currentHeadingRad + offsetRad) - aimReferenceRad);
+            // FLIPPED EFFECT: subtract offsetRad (previously added)
+            targetAngleRad = normalizeAngle((goalBearing - currentHeadingRad - offsetRad) - aimReferenceRad);
 
         } else {
             // Fallback: heading hold like TurretController

@@ -44,36 +44,55 @@ public class TurretController {
     // Turret encoder hard limits (configurable)
     @Sorter(sort = 0)
     public static int TURRET_MIN_POS = -900;
+    // previous: -900
+
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 900;
+    // previous: 900
 
     // ticks-per-radian mapping (configurable scale; base is derived each loop)
     @Sorter(sort = 2)
     public static double TICKS_PER_RADIAN_SCALE = 1.0;
+    // previous: 1.0
 
     // PID & control gains (configurable)
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.2;    // was 0.20
+    public static double TURRET_KP = 1.0;
+    // previous: 1.2
+
     @Sorter(sort = 4)
-    public static double TURRET_KI = 0.09;
+    public static double TURRET_KI = 0.0;
+    // previous: 0.09
+
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.3;    // was 0.16
+    public static double TURRET_KD = 0.22;
+    // previous: 0.3
+
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
+    // previous: 1.0
 
     // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
-    public static double FF_GAIN = 0.04;          // was 0.28
+    public static double FF_GAIN = 1.5;
+    // previous: 0.04
+
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.96; // was 0.96
+    public static double POWER_SMOOTH_ALPHA = 0.94;
+    // previous: 0.96
+
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 0.40; // was 0.70
+    public static double DERIV_FILTER_ALPHA = 1.2;
+    // previous: 0.40
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 1;    // was 3
+    public static int SMALL_DEADBAND_TICKS = 13;
+    // previous: 1
+
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 0;
+    public static double INTEGRAL_CLAMP = 50;
+    // previous: 0
 
     // Internal state
     private double turretIntegral = 0.0;
