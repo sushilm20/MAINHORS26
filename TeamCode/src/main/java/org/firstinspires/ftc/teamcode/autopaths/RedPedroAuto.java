@@ -56,6 +56,7 @@ public class RedPedroAuto extends OpMode {
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
+    private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
     private DcMotor turretMotor;
 
     private BNO055IMU pinpointImu = null;
@@ -136,6 +137,17 @@ public class RedPedroAuto extends OpMode {
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
+        }
+
+        // Secondary shooter motor (mirrors primary shooter power)
+        try {
+            shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
+            if (shooterMotor2 != null) {
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD); // mirror of shooter
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Init", "shooter2 map failed: " + e.getMessage());
         }
 
         try {
@@ -259,6 +271,15 @@ public class RedPedroAuto extends OpMode {
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
+        }
+
+        // Mirror shooter power to secondary motor
+        if (shooterMotor != null && shooterMotor2 != null) {
+            try {
+                shooterMotor2.setPower(shooterMotor.getPower());
+            } catch (Exception e) {
+                panelsTelemetry.debug("Shooter2", "Power mirror error: " + e.getMessage());
+            }
         }
 
         if (turretController != null) {
