@@ -224,13 +224,7 @@ public class forthexperimentalHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Pose-based turret aiming at BLUE_GOAL
-            turretGoalAimer.update(
-                    /*manualNow=*/false,
-                    /*manualPower=*/0.0,
-                    currentPose,
-                    BLUE_GOAL
-            );
+
 
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {

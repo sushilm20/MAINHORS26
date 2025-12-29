@@ -18,15 +18,19 @@ import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
 
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 // subsystem imports (adjust package paths if yours differ)
-import org.firstinspires.ftc.teamcode.subsystems.TurretController;
+import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 
-@TeleOp(name="HORS OVER CHRISTMAS", group="Linear OpMode")
+@TeleOp(name="HORS Turret changes", group="Linear OpMode")
 public class dualmotor extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -45,9 +49,15 @@ public class dualmotor extends LinearOpMode {
     private DigitalChannel ledLineGreen; // led2
 
     // Subsystems
-    private TurretController turretController;
+    private TurretGoalAimer turretGoalAimer;
     private DriveController driveController;
     private Flywheel flywheel;
+
+    // PedroPathing follower (for pose to aim the turret)
+    private Follower follower;
+    private Pose currentPose = new Pose(20, 122, Math.toRadians(135)); // updated start pose
+    // Single goal pose to track (blue goal); adjust if needed for alliance
+    private static final Pose GOAL_POSE = new Pose(14, 134, 0);
 
     // UI / debounce and other small state
     private boolean dpadDownLast = false;
@@ -120,7 +130,7 @@ public class dualmotor extends LinearOpMode {
         backRightDrive.setDirection(DcMotor.Direction.REVERSE);
         shooter.setDirection(DcMotor.Direction.REVERSE);
         shooter2.setDirection(DcMotor.Direction.FORWARD); // opposite of shooter
-        turret.setDirection(DcMotor.Direction.FORWARD);
+        turret.setDirection(DcMotor.Direction.REVERSE);
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -165,9 +175,18 @@ public class dualmotor extends LinearOpMode {
         turretImu = (pinpointImu != null) ? pinpointImu : imu;
 
         // Create subsystem controllers
-        turretController = new TurretController(turret, turretImu, telemetry);
+        turretGoalAimer = new TurretGoalAimer(turret, turretImu, telemetry);
+        turretGoalAimer.setTargetPose(GOAL_POSE);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new Flywheel(shooter, telemetry);
+
+        // PedroPathing follower for robot pose (used by turretGoalAimer)
+        try {
+            follower = Constants.createFollower(hardwareMap);
+            follower.setStartingPose(currentPose); // updated start pose applied
+        } catch (Exception e) {
+            follower = null; // if missing, turretGoalAimer will fall back to heading-hold
+        }
 
         // initial positions
         clawServo.setPosition(0.63);
@@ -186,13 +205,21 @@ public class dualmotor extends LinearOpMode {
         telemetry.update();
 
         // ensure subsystems are ready
-        turretController.captureReferences();
-        turretController.resetPidState();
+        turretGoalAimer.captureReferences();
+        turretGoalAimer.resetPidState();
 
         waitForStart();
 
         while (opModeIsActive()) {
             long nowMs = System.currentTimeMillis();
+
+            // Update pose for turret aiming
+            if (follower != null) {
+                try {
+                    follower.update();
+                    currentPose = follower.getPose();
+                } catch (Exception ignored) {}
+            }
 
             // ------------------------------
             // Touchpad toggles & reset
@@ -209,8 +236,8 @@ public class dualmotor extends LinearOpMode {
             if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
                 turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                turretController.captureReferences();
-                turretController.resetPidState();
+                turretGoalAimer.captureReferences();
+                turretGoalAimer.resetPidState();
 
                 driveController.stop();
 
@@ -235,9 +262,9 @@ public class dualmotor extends LinearOpMode {
             // ------------------------------
             // DRIVE: delegate to DriveController
             // ------------------------------
-            double axial   = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw     = -gamepad1.right_stick_x;
+            double axial   = -gamepad1.left_stick_y;
+            double lateral = gamepad1.left_stick_x;
+            double yaw     = gamepad1.right_stick_x;
             double driveSpeed = 1.0;
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
@@ -292,7 +319,7 @@ public class dualmotor extends LinearOpMode {
             }
 
             // ------------------------------
-            // TURRET: manual detection and control
+            // TURRET: manual detection and auto-aim using TurretGoalAimer with pose tracking
             // ------------------------------
             boolean manualNow = false;
             double manualPower = 0.0;
@@ -303,7 +330,7 @@ public class dualmotor extends LinearOpMode {
                 manualNow = true;
                 manualPower = -0.25;
             }
-            turretController.update(manualNow, manualPower);
+            turretGoalAimer.update(manualNow, manualPower, currentPose);
 
             // ------------------------------
             // INTAKE
@@ -354,10 +381,14 @@ public class dualmotor extends LinearOpMode {
                 rightHoodServo.setPosition(rightHoodPosition);
             }
 
-            // Summary telemetry
+            // Summary telemetry (headings in degrees)
             telemetry.addData("Mode", isFarMode ? "FAR" : "CLOSE");
             telemetry.addData("Turret Enc", turret.getCurrentPosition());
-            telemetry.addData("Turret Power (applied)", turretController.getLastAppliedPower());
+            telemetry.addData("Turret Power (applied)", turretGoalAimer.getLastAppliedPower());
+            telemetry.addData("Turret Error", turretGoalAimer.getLastErrorTicks());
+            telemetry.addData("Turret Offset(deg)", String.format("%.2f", turretGoalAimer.getLastOffsetDeg()));
+            telemetry.addData("Turret TargetAng(deg)", String.format("%.2f", turretGoalAimer.getLastTargetAngleDeg()));
+            telemetry.addData("Goal Bearing(deg)", String.format("%.2f", turretGoalAimer.getLastGoalBearingDeg()));
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
@@ -367,13 +398,15 @@ public class dualmotor extends LinearOpMode {
             String imuUsedNow = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
                     (turretImu == imu && imu != null) ? "imu (exp hub)" : "none";
             telemetry.addData("Turret IMU Used", imuUsedNow);
+            telemetry.addData("Pose", String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading())));
+            telemetry.addData("Robot Heading(deg)", String.format("%.1f", Math.toDegrees(currentPose.getHeading())));
 
             telemetry.update();
         }
     }
 
     private void headingReferenceReset() {
-        // turretController.captureReferences() handles the turret mapping if needed.
+        // turretGoalAimer.captureReferences() handles the turret mapping if needed.
     }
 
     // Active-low LED helper: gate open -> green, gate closed -> red
