@@ -58,7 +58,7 @@ public class FlywheelVersatile {
         this.minRpm = minRpm;
         this.maxRpm = maxRpm;
         this.flatRadius = Math.max(0.0, flatRadius);
-        this.lastBaseRpm = clamp((minRpm + maxRpm) / 2.0);
+        this.lastBaseRpm = clamp((minRpm + maxRpm) / 1.99);
         computeRegression();
     }
 
