@@ -167,8 +167,8 @@ public class TurretGoalAimer {
             double cross = lineX * rY - lineY * rX;
             double perpDist = (lineMag > 1e-6) ? cross / lineMag : 0.0; // inches, signed
 
-            // Offset magnitude (sign as before); apply opposite effect in target angle below
-            offsetRad = perpDist * OFFSET_GAIN_RAD_PER_IN;
+            // Offset magnitude (sign flipped to apply in the opposite direction)
+            offsetRad = -perpDist * OFFSET_GAIN_RAD_PER_IN;
             if (offsetRad > OFFSET_CLAMP_RAD) offsetRad = OFFSET_CLAMP_RAD;
             if (offsetRad < -OFFSET_CLAMP_RAD) offsetRad = -OFFSET_CLAMP_RAD;
 
@@ -206,8 +206,8 @@ public class TurretGoalAimer {
         }
         lastHeadingRad = currentHeadingRad;
 
-        // Desired ticks from target angle
-        double desiredTicksDouble = turretEncoderReference - targetAngleRad * TICKS_PER_RADIAN;
+        // Desired ticks from target angle (direction flipped: add instead of subtract)
+        double desiredTicksDouble = turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN;
         int desiredTicks = (int)Math.round(desiredTicksDouble);
         if (desiredTicks > TURRET_MAX_POS) desiredTicks = TURRET_MAX_POS;
         if (desiredTicks < TURRET_MIN_POS) desiredTicks = TURRET_MIN_POS;

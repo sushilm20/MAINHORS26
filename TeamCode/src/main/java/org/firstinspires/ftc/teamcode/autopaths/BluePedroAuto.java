@@ -73,7 +73,7 @@ public class BluePedroAuto extends OpMode {
     private Servo clawServo;
 
     private static final double INTAKE_ON_POWER = 1.0;
-    private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
+    private static final double SHOOT_POSE_INTAKE_POWER = 0.8; // reduced power only when starting intake at the shoot pose
     private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
     private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
