@@ -74,7 +74,7 @@ public class TurretController {
 
     // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
-    public static double FF_GAIN = 1.5;
+    public static double FF_GAIN = 1.51;
     // previous: 0.04
 
     @Sorter(sort = 8)
