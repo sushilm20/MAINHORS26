@@ -16,8 +16,8 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 
-@TeleOp(name="HORS Turret changes", group="Linear OpMode")
-public class dualmotor extends LinearOpMode {
+@TeleOp(name="HORS Experimental", group="Linear OpMode")
+public class wildexperiment extends LinearOpMode {
 
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, shooter2, turret, intakeMotor;
