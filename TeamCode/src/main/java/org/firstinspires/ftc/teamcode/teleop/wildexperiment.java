@@ -1,11 +1,10 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
-
 /*
   secondexperimentalHORS.java
   ---------------------------
   - Gate servo toggles on B (gamepad1 or gamepad2) with LED indication (open = green, closed = red).
-  - Y-button intake sequence: opens gate (if needed), runs intake for 2.0s, then closes gate and stops intake.
+  - Y-button intake sequence: opens gate (if needed), runs intake, then closes gate and stops intake.
   - Shooter uses Flywheel subsystem logic (toggle on dpad down, left trigger low-RPM override, far/close modes via touchpad).
   - Shooter2 mirrors shooter power.
   - Rumble logic: continuous short rumbles while flywheel.isAtTarget().
@@ -40,12 +39,15 @@ public class wildexperiment extends LinearOpMode {
     private static final double GATE_CLOSED = 0.5;
 
     // Gate + intake automation
-    private static final long INTAKE_DURATION_MS = 1300; // 2.0s
-    private static final double INTAKE_POWER = 1.0;
+    private static final long INTAKE_DURATION_MS = 1600; // sequence duration
+    private static final long CLAW_TRIGGER_BEFORE_END_MS = 500; // trigger claw 0.5s before sequence ends
+    private static final double INTAKE_POWER = 0.92;              // manual intake
+    private static final double INTAKE_SEQUENCE_POWER = 0.6;     // Y-button intake sequence power
     private enum GateCycleState { IDLE, OPEN_INTAKE }
     private GateCycleState gateCycleState = GateCycleState.IDLE;
     private boolean yPressedLast = false;
     private long gateActionStartMs = 0;
+    private boolean intakeSequenceClawTriggered = false;
 
     // REV Digital LED Indicator (active-low) using hardware map names led1 (red) and led2 (green)
     private DigitalChannel ledLineRed;   // led1
@@ -285,21 +287,35 @@ public class wildexperiment extends LinearOpMode {
             bPressedLast = bNow;
 
             // ------------------------------
-            // Y-button intake sequence (2.0s): open gate (if needed), run intake, then close gate
+            // Y-button intake sequence: open gate, run intake at INTAKE_SEQUENCE_POWER,
+            // trigger claw in last 0.5s, then close gate. No extra claw action at the end.
             // ------------------------------
             boolean yNow = gamepad1.y || gamepad2.y;
             if (yNow && !yPressedLast && gateCycleState == GateCycleState.IDLE) {
                 gateClosed = false;
                 gateServo.setPosition(GATE_OPEN);
                 updateGateLed();
-                intakeMotor.setPower(INTAKE_POWER);
+                intakeMotor.setPower(INTAKE_SEQUENCE_POWER); // use separate intake sequence power
                 gateActionStartMs = nowMs;
                 gateCycleState = GateCycleState.OPEN_INTAKE;
+                intakeSequenceClawTriggered = false;
             }
             yPressedLast = yNow;
 
             if (gateCycleState == GateCycleState.OPEN_INTAKE) {
-                if (nowMs - gateActionStartMs >= INTAKE_DURATION_MS) {
+                long elapsedMs = nowMs - gateActionStartMs;
+                long timeRemainingMs = INTAKE_DURATION_MS - elapsedMs;
+
+                // Trigger claw action during the last 0.5 seconds (no additional claw action at end)
+                if (timeRemainingMs <= CLAW_TRIGGER_BEFORE_END_MS && !intakeSequenceClawTriggered) {
+                    clawServo.setPosition(0.2);
+                    clawActionPhase = 1;
+                    clawActionStartMs = nowMs;
+                    intakeSequenceClawTriggered = true;
+                }
+
+                // End of intake sequence
+                if (elapsedMs >= INTAKE_DURATION_MS) {
                     intakeMotor.setPower(0.0);
                     gateClosed = true;
                     gateServo.setPosition(GATE_CLOSED);
