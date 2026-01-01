@@ -40,7 +40,7 @@ public class wildexperiment extends LinearOpMode {
     private static final double GATE_CLOSED = 0.5;
 
     // Gate + intake automation
-    private static final long INTAKE_DURATION_MS = 2000; // 2.0s
+    private static final long INTAKE_DURATION_MS = 1300; // 2.0s
     private static final double INTAKE_POWER = 1.0;
     private enum GateCycleState { IDLE, OPEN_INTAKE }
     private GateCycleState gateCycleState = GateCycleState.IDLE;
