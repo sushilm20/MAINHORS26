@@ -4,8 +4,8 @@ package org.firstinspires.ftc.teamcode.teleop;
 /*
   secondexperimentalHORS.java
   ---------------------------
-  - Gate servo toggles on Y (gamepad1 or gamepad2) with LED indication (open = green, closed = red).
-  - A-button intake sequence: opens gate (if needed), runs intake for 2.0s, then closes gate and stops intake.
+  - Gate servo toggles on B (gamepad1 or gamepad2) with LED indication (open = green, closed = red).
+  - Y-button intake sequence: opens gate (if needed), runs intake for 2.0s, then closes gate and stops intake.
   - Shooter uses Flywheel subsystem logic (toggle on dpad down, left trigger low-RPM override, far/close modes via touchpad).
   - Shooter2 mirrors shooter power.
   - Rumble logic: continuous short rumbles while flywheel.isAtTarget().
@@ -40,11 +40,11 @@ public class wildexperiment extends LinearOpMode {
     private static final double GATE_CLOSED = 0.5;
 
     // Gate + intake automation
-    private static final long INTAKE_DURATION_MS = 1300; // 2.0s
+    private static final long INTAKE_DURATION_MS = 2000; // 2.0s
     private static final double INTAKE_POWER = 1.0;
     private enum GateCycleState { IDLE, OPEN_INTAKE }
     private GateCycleState gateCycleState = GateCycleState.IDLE;
-    private boolean aPressedLast = false;
+    private boolean yPressedLast = false;
     private long gateActionStartMs = 0;
 
     // REV Digital LED Indicator (active-low) using hardware map names led1 (red) and led2 (green)
@@ -61,7 +61,7 @@ public class wildexperiment extends LinearOpMode {
     private boolean dpadLeftLast = false;
     private boolean dpadRightLast = false;
     private boolean xPressedLast = false;
-    private boolean yPressedLast = false;
+    private boolean bPressedLast = false;
 
     // hood/claw
     private double leftHoodPosition = 0.12;
@@ -274,22 +274,21 @@ public class wildexperiment extends LinearOpMode {
             dpadRightLast = dpadRightNow;
 
             // ------------------------------
-            // Gate servo toggle on Y for both controllers + LED color
-            // (disabled only while intake sequence runs)
+            // B-button manual gate toggle (only when not in intake sequence)
             // ------------------------------
-            boolean yNow = gamepad1.y || gamepad2.y;
-            if (yNow && !yPressedLast && gateCycleState == GateCycleState.IDLE) {
+            boolean bNow = gamepad1.b || gamepad2.b;
+            if (bNow && !bPressedLast && gateCycleState == GateCycleState.IDLE) {
                 gateClosed = !gateClosed;
                 gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
                 updateGateLed();
             }
-            yPressedLast = yNow;
+            bPressedLast = bNow;
 
             // ------------------------------
-            // A-button intake sequence (2.0s): open gate (if needed), run intake, then close gate
+            // Y-button intake sequence (2.0s): open gate (if needed), run intake, then close gate
             // ------------------------------
-            boolean aNow = gamepad1.a || gamepad2.a;
-            if (aNow && !aPressedLast && gateCycleState == GateCycleState.IDLE) {
+            boolean yNow = gamepad1.y || gamepad2.y;
+            if (yNow && !yPressedLast && gateCycleState == GateCycleState.IDLE) {
                 gateClosed = false;
                 gateServo.setPosition(GATE_OPEN);
                 updateGateLed();
@@ -297,7 +296,7 @@ public class wildexperiment extends LinearOpMode {
                 gateActionStartMs = nowMs;
                 gateCycleState = GateCycleState.OPEN_INTAKE;
             }
-            aPressedLast = aNow;
+            yPressedLast = yNow;
 
             if (gateCycleState == GateCycleState.OPEN_INTAKE) {
                 if (nowMs - gateActionStartMs >= INTAKE_DURATION_MS) {
@@ -343,7 +342,7 @@ public class wildexperiment extends LinearOpMode {
             turretController.update(manualNow, manualPower);
 
             // ------------------------------
-            // INTAKE manual control (still available when not in auto sequence)
+            // INTAKE manual control (only when not in auto sequence)
             // ------------------------------
             if (gateCycleState == GateCycleState.IDLE) {
                 boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
@@ -358,7 +357,7 @@ public class wildexperiment extends LinearOpMode {
                 }
             }
 
-            // CLAW toggle
+            // CLAW toggle (X)
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xPressedLast) {
                 clawServo.setPosition(0.2);
@@ -371,7 +370,7 @@ public class wildexperiment extends LinearOpMode {
                 clawActionPhase = 0;
             }
 
-            // Hood adjustments
+            // Hood adjustments (A/B kept for hood adjust; gate toggle moved to B above)
             if (gamepad1.a && nowMs - lastLeftHoodAdjustMs >= HOOD_ADJUST_DEBOUNCE_MS) {
                 lastLeftHoodAdjustMs = nowMs;
                 leftHoodPosition = Math.min(0.45, leftHoodPosition + 0.025);
