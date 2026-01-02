@@ -34,7 +34,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 2.15; // reduced from 2.5
+    private static final double INTAKE_RUN_SECONDS = 1.3; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
     private static final double TIMED_INTAKE_SECONDS = 0.93;
@@ -64,7 +64,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private Flywheel flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 90.5;
+    private static final double AUTO_SHOOTER_RPM = 2500;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;

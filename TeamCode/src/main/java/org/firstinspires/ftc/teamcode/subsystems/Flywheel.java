@@ -13,24 +13,24 @@ public class Flywheel {
 
     // --- Panels-configurable constants (public static) ---
     @Sorter(sort = 0)
-    public static double MAX_RPM = 200.0;
+    public static double MAX_RPM = 6000;
     @Sorter(sort = 1)
-    public static double TICKS_PER_REV = 537.6;
+    public static double TICKS_PER_REV = 28.0;
 
     @Sorter(sort = 2)
     public static double K_P = 0.01;
     @Sorter(sort = 3)
     public static double EMA_ALPHA = 0.3; // smoothing for measured RPM
     @Sorter(sort = 4)
-    public static double DEFAULT_RPM_SCALE = 0.78;
+    public static double DEFAULT_RPM_SCALE = 1.0;
 
     @Sorter(sort = 5)
-    public static double TARGET_RPM_CLOSE = 90.0;
+    public static double TARGET_RPM_CLOSE = 2500;
     @Sorter(sort = 6)
-    public static double TARGET_RPM_FAR   = 140.0;
+    public static double TARGET_RPM_FAR   = 4800;
 
     @Sorter(sort = 7)
-    public static double TARGET_TOLERANCE_RPM = 10.0; // runtime tolerance for "at target" check
+    public static double TARGET_TOLERANCE_RPM = 50; // runtime tolerance for "at target" check
 
     // --- Internal state ---
     private double currentRPM = 0.0;

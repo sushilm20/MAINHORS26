@@ -134,7 +134,6 @@ public class wildexperiment extends LinearOpMode {
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        shooter2.setMode(DcMotor.RunMode.RUN_USING_ENCODER); // mirror shooter mode
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -288,13 +287,13 @@ public class wildexperiment extends LinearOpMode {
 
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
             if (dpadLeftNow && !dpadLeftLast) {
-                flywheel.adjustTargetRPM(-5.0);
+                flywheel.adjustTargetRPM(-50.0);
             }
             dpadLeftLast = dpadLeftNow;
 
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
             if (dpadRightNow && !dpadRightLast) {
-                flywheel.adjustTargetRPM(5.0);
+                flywheel.adjustTargetRPM(50.0);
             }
             dpadRightLast = dpadRightNow;
 

@@ -73,7 +73,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private Flywheel flywheel;
     private TurretController turretController;
     @Sorter(sort = 6)
-    public static double AUTO_SHOOTER_RPM = 90.5;
+    public static double AUTO_SHOOTER_RPM = 2500.0;
 
     private DcMotor intakeMotor;
 

@@ -49,12 +49,10 @@ public class TurretController {
 
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 1000;
-
-    // ticks-per-radian mapping (configurable scale; base is derived each loop)
     @Sorter(sort = 2)
     public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
-    // PID & control gains (configurable)
+    // PID liek config
     @Sorter(sort = 3)
     public static double TURRET_KP = 1.15;
 
