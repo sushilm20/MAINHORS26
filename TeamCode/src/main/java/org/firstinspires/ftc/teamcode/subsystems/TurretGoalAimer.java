@@ -39,19 +39,19 @@ public class TurretGoalAimer {
             ((TURRET_MAX_POS - TURRET_MIN_POS) / (2.0 * Math.PI)) * TICKS_PER_RADIAN_SCALE;
 
     // Gains (aligned with TurretController)
-    private static final double TURRET_KP = 1.2;
-    private static final double TURRET_KI = 0.09;
-    private static final double TURRET_KD = 0.3;
+    private static final double TURRET_KP = 1.15;
+    private static final double TURRET_KI = 0.0;
+    private static final double TURRET_KD = 0.22;
     private static final double TURRET_MAX_POWER = 1.0;
 
     // FF & smoothing
-    private static final double FF_GAIN = 0.04;
-    private static final double POWER_SMOOTH_ALPHA = 0.96;
-    private static final double DERIV_FILTER_ALPHA = 0.40;
+    private static final double FF_GAIN = 5.0;
+    private static final double POWER_SMOOTH_ALPHA = 0.935;
+    private static final double DERIV_FILTER_ALPHA = 1.25;
 
     // Deadband & anti-windup
-    private static final int SMALL_DEADBAND_TICKS = 1;
-    private static final double INTEGRAL_CLAMP = 0.0;
+    private static final int SMALL_DEADBAND_TICKS = 14;
+    private static final double INTEGRAL_CLAMP = 50.0;
 
     // Lateral offset tuning
     private static final double OFFSET_GAIN_RAD_PER_IN = 0.005;               // ~0.29 deg per inch
