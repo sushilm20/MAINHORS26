@@ -16,8 +16,11 @@ import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.Servo;
+
+import com.bylazar.telemetry.PanelsTelemetry;
+import com.bylazar.telemetry.TelemetryManager;
 
 // subsystem imports (adjust package paths if yours differ)
 import org.firstinspires.ftc.teamcode.subsystems.TurretController;
@@ -43,7 +46,9 @@ public class wildexperiment extends LinearOpMode {
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 500; // trigger claw 0.5s before sequence ends
     private static final double INTAKE_POWER = 0.92;              // manual intake
     private static final double INTAKE_SEQUENCE_POWER = 0.6;     // Y-button intake sequence power
-    private enum GateCycleState { IDLE, OPEN_INTAKE }
+
+    private enum GateCycleState {IDLE, OPEN_INTAKE}
+
     private GateCycleState gateCycleState = GateCycleState.IDLE;
     private boolean yPressedLast = false;
     private long gateActionStartMs = 0;
@@ -57,6 +62,9 @@ public class wildexperiment extends LinearOpMode {
     private TurretController turretController;
     private DriveController driveController;
     private Flywheel flywheel;
+
+    // Panels telemetry (TelemetryManager style used across autos)
+    private TelemetryManager panelsTelemetry;
 
     // UI / debounce and other small state
     private boolean dpadDownLast = false;
@@ -79,8 +87,8 @@ public class wildexperiment extends LinearOpMode {
     // Far/Close mode
     private boolean isFarMode = false;
     private boolean touchpadPressedLast = false;
-    private static final double RIGHT_HOOD_CLOSE   = 0.12;
-    private static final double RIGHT_HOOD_FAR     = 0.24;
+    private static final double RIGHT_HOOD_CLOSE = 0.12;
+    private static final double RIGHT_HOOD_FAR = 0.24;
 
     // For gamepad2 touchpad reset
     private boolean gamepad2TouchpadLast = false;
@@ -93,34 +101,28 @@ public class wildexperiment extends LinearOpMode {
     @Override
     public void runOpMode() {
 
+        // Panels telemetry init
+        panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
+
         // Hardware map
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
         backRightDrive = hardwareMap.get(DcMotor.class, "backRight");
+        //all my dt motors
+
         shooter = hardwareMap.get(DcMotor.class, "shooter");
         shooter2 = hardwareMap.get(DcMotor.class, "shooter2"); // new secondary shooter motor
         turret = hardwareMap.get(DcMotor.class, "turret");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+        //all other main subsystem motors
+
         clawServo = hardwareMap.get(Servo.class, "clawServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
-        // Gate servo (ensure hardware config uses the name "gateServo" or change accordingly)
         gateServo = hardwareMap.get(Servo.class, "gateServo");
+        //main servos
 
-        // REV Digital LED Indicator (single module, two DIO lines) using led1/led2
-        try {
-            ledLineRed = hardwareMap.get(DigitalChannel.class, "led1");   // assign red to led1
-            ledLineGreen = hardwareMap.get(DigitalChannel.class, "led2"); // assign green to led2
-            ledLineRed.setMode(DigitalChannel.Mode.OUTPUT);
-            ledLineGreen.setMode(DigitalChannel.Mode.OUTPUT);
-            // Active-low: true = off, false = on
-            ledLineRed.setState(true);
-            ledLineGreen.setState(true);
-        } catch (Exception e) {
-            ledLineRed = null;
-            ledLineGreen = null;
-        }
 
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -162,12 +164,14 @@ public class wildexperiment extends LinearOpMode {
         if (imu != null) {
             try {
                 imu.initialize(imuParams);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         if (pinpointImu != null) {
             try {
                 pinpointImu.initialize(imuParams);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         // Choose turret IMU: prefer pinpoint if available
@@ -187,7 +191,7 @@ public class wildexperiment extends LinearOpMode {
         // Gate defaults to open
         gateClosed = false;
         gateServo.setPosition(GATE_OPEN);
-        updateGateLed(); // reflect initial gate state
+
 
         String imuUsed = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
                 (turretImu == imu && imu != null) ? "imu (expansion hub)" : "none";
@@ -211,12 +215,16 @@ public class wildexperiment extends LinearOpMode {
             // Touchpad toggles & reset
             // ------------------------------
             boolean touchpadNow = false;
-            try { touchpadNow = gamepad1.touchpad; } catch (Throwable t) {
+            try {
+                touchpadNow = gamepad1.touchpad;
+            } catch (Throwable t) {
                 touchpadNow = (gamepad1.left_stick_button && gamepad1.right_stick_button);
             }
 
             boolean gamepad2TouchpadNow = false;
-            try { gamepad2TouchpadNow = gamepad2.touchpad; } catch (Throwable t) {
+            try {
+                gamepad2TouchpadNow = gamepad2.touchpad;
+            } catch (Throwable t) {
                 gamepad2TouchpadNow = (gamepad2.left_stick_button && gamepad2.right_stick_button);
             }
             if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
@@ -248,9 +256,9 @@ public class wildexperiment extends LinearOpMode {
             // ------------------------------
             // DRIVE: delegate to DriveController
             // ------------------------------
-            double axial   = gamepad1.left_stick_y;
+            double axial = gamepad1.left_stick_y;
             double lateral = -gamepad1.left_stick_x;
-            double yaw     = -gamepad1.right_stick_x;
+            double yaw = -gamepad1.right_stick_x;
             double driveSpeed = 1.0;
             driveController.setDrive(axial, lateral, yaw, driveSpeed);
 
@@ -282,7 +290,7 @@ public class wildexperiment extends LinearOpMode {
             if (bNow && !bPressedLast && gateCycleState == GateCycleState.IDLE) {
                 gateClosed = !gateClosed;
                 gateServo.setPosition(gateClosed ? GATE_CLOSED : GATE_OPEN);
-                updateGateLed();
+
             }
             bPressedLast = bNow;
 
@@ -294,7 +302,6 @@ public class wildexperiment extends LinearOpMode {
             if (yNow && !yPressedLast && gateCycleState == GateCycleState.IDLE) {
                 gateClosed = false;
                 gateServo.setPosition(GATE_OPEN);
-                updateGateLed();
                 intakeMotor.setPower(INTAKE_SEQUENCE_POWER); // use separate intake sequence power
                 gateActionStartMs = nowMs;
                 gateCycleState = GateCycleState.OPEN_INTAKE;
@@ -319,7 +326,6 @@ public class wildexperiment extends LinearOpMode {
                     intakeMotor.setPower(0.0);
                     gateClosed = true;
                     gateServo.setPosition(GATE_CLOSED);
-                    updateGateLed();
                     gateCycleState = GateCycleState.IDLE;
                 }
             }
@@ -339,8 +345,14 @@ public class wildexperiment extends LinearOpMode {
             // ------------------------------
             if (flywheel.isAtTarget()) {
                 final int RUMBLE_MS = 200;
-                try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
-                try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
+                try {
+                    gamepad1.rumble(RUMBLE_MS);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    gamepad2.rumble(RUMBLE_MS);
+                } catch (Throwable ignored) {
+                }
             }
 
             // ------------------------------
@@ -408,15 +420,32 @@ public class wildexperiment extends LinearOpMode {
                 rightHoodServo.setPosition(rightHoodPosition);
             }
 
+            // ------------------------------
+            // Panels Graph output using TelemetryManager (as in autos)
+            // ------------------------------
+            if (panelsTelemetry != null) {
+                double target = flywheel.getTargetRPM();
+                double actual = flywheel.getCurrentRPM();
+                double error = target - actual;
+                double pTerm = Flywheel.K_P * error;
+                double powerCmd = flywheel.getLastAppliedPower();
+
+//                panelsTelemetry.debug("fly.targetRPM", String.valueOf(target));
+//                panelsTelemetry.debug("fly.actualRPM", String.valueOf(actual));
+////                panelsTelemetry.debug("fly.errorRPM", String.valueOf(error));
+////                panelsTelemetry.debug("fly.pTerm", String.valueOf(pTerm));
+////                panelsTelemetry.debug("fly.powerCmd", String.valueOf(powerCmd));
+//                panelsTelemetry.update(telemetry);
+            }
+
             // Summary telemetry
-            telemetry.addData("Mode", isFarMode ? "FAR" : "CLOSE");
-            telemetry.addData("Turret Enc", turret.getCurrentPosition());
-            telemetry.addData("Turret Power (applied)", turretController.getLastAppliedPower());
+
+
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
-            telemetry.addData("Fly AtTarget", flywheel.isAtTarget());
+
             telemetry.addData("Gate", gateClosed ? "CLOSED" : "OPEN");
-            telemetry.addData("Gate Pos", gateServo.getPosition());
+
             telemetry.addData("Gate Cycle", gateCycleState);
 
             String imuUsedNow = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
@@ -431,18 +460,5 @@ public class wildexperiment extends LinearOpMode {
         // turretController.captureReferences() handles the turret mapping if needed.
     }
 
-    // Active-low LED helper: gate open -> green, gate closed -> red
-    private void updateGateLed() {
-        if (ledLineRed == null || ledLineGreen == null) return;
-        // off = true, on = false (active-low)
-        if (gateClosed) {
-            // gate closed -> RED ON, GREEN OFF
-            ledLineRed.setState(false);
-            ledLineGreen.setState(true);
-        } else {
-            // gate open -> GREEN ON, RED OFF
-            ledLineRed.setState(true);
-            ledLineGreen.setState(false);
-        }
-    }
+
 }

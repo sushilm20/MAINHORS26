@@ -18,9 +18,9 @@ public class Flywheel {
     public static double TICKS_PER_REV = 537.6;
 
     @Sorter(sort = 2)
-    public static double K_P = 0.0003;
+    public static double K_P = 0.01;
     @Sorter(sort = 3)
-    public static double EMA_ALPHA = 0.35; // smoothing for measured RPM
+    public static double EMA_ALPHA = 0.3; // smoothing for measured RPM
     @Sorter(sort = 4)
     public static double DEFAULT_RPM_SCALE = 0.78;
 
@@ -133,14 +133,14 @@ public class Flywheel {
         lastAtTarget = atTargetNow;
 
         // telemetry (minimal)
-        if (telemetry != null) {
-            telemetry.addData("fly.Current RPM/n", String.format("%.1f", currentRPM));
-            telemetry.addData("fly.targetRPM/n", String.format("%.1f", targetRPM));
-            telemetry.addData("fly.power/n", String.format("%.3f", lastAppliedPower));
-//            telemetry.addData("fly.scale", String.format("%.3f", rpmScale));
-//            telemetry.addData("fly.tolerance", String.format("%.2f", toleranceCfg));
-//            telemetry.addData("fly.atTarget", atTargetNow);
-        }
+//        if (telemetry != null) {
+////            telemetry.addData("fly.Current RPM/n", String.format("%.1f", currentRPM));
+////            telemetry.addData("fly.targetRPM/n", String.format("%.1f", targetRPM));
+////            telemetry.addData("fly.power/n", String.format("%.3f", lastAppliedPower));
+////            telemetry.addData("fly.scale", String.format("%.3f", rpmScale));
+////            telemetry.addData("fly.tolerance", String.format("%.2f", toleranceCfg));
+////            telemetry.addData("fly.atTarget", atTargetNow);
+//        }
     }
 
     /**
