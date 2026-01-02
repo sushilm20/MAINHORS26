@@ -45,14 +45,14 @@ public class TurretController {
 
     // Turret encoder hard limits (configurable)
     @Sorter(sort = 0)
-    public static int TURRET_MIN_POS = -900;
+    public static int TURRET_MIN_POS = -1000;
 
     @Sorter(sort = 1)
-    public static int TURRET_MAX_POS = 900;
+    public static int TURRET_MAX_POS = 1000;
 
     // ticks-per-radian mapping (configurable scale; base is derived each loop)
     @Sorter(sort = 2)
-    public static double TICKS_PER_RADIAN_SCALE = 1.0;
+    public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
     // PID & control gains (configurable)
     @Sorter(sort = 3)

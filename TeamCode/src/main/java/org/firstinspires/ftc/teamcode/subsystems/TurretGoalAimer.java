@@ -30,11 +30,11 @@ public class TurretGoalAimer {
     private Pose targetPose = new Pose(14, 134, Math.toRadians(135)); // default (blue goal)
 
     // Limits (aligned with TurretController)
-    public static final int TURRET_MIN_POS = -900;
-    public static final int TURRET_MAX_POS = 900;
+    public static final int TURRET_MIN_POS = -1000;
+    public static final int TURRET_MAX_POS = 1000;
 
     // Mapping (aligned with TurretController)
-    private static final double TICKS_PER_RADIAN_SCALE = 1.0;
+    private static final double TICKS_PER_RADIAN_SCALE = 0.9;
     private static final double TICKS_PER_RADIAN =
             ((TURRET_MAX_POS - TURRET_MIN_POS) / (2.0 * Math.PI)) * TICKS_PER_RADIAN_SCALE;
 
