@@ -26,6 +26,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
@@ -38,7 +39,8 @@ public class TurretController {
 
     // Hardware references
     private final DcMotor turretMotor;
-    private final BNO055IMU imu;
+    private final BNO055IMU imu;                    // Expansion Hub IMU fallback
+    private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
     private final Telemetry telemetry; // optional, may be null
 
     // Turret encoder hard limits (configurable)
@@ -115,18 +117,28 @@ public class TurretController {
     private double lastPidOut = 0.0;
     private double lastFf = 0.0;
 
-    public TurretController(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
+    /**
+     * Preferred constructor: allows supplying a Pinpoint plus a fallback IMU.
+     */
+    public TurretController(DcMotor turretMotor, BNO055IMU imu, GoBildaPinpointDriver pinpoint, Telemetry telemetry) {
         this.turretMotor = turretMotor;
         this.imu = imu;
+        this.pinpoint = pinpoint;
         this.telemetry = telemetry;
 
-        // Make sure motor is configured appropriately outside this class (encoder reset etc.)
         captureReferences(); // initial capture
         resetPidState();
     }
 
     /**
-     * Capture the current IMU heading and turret encoder as the reference points.
+     * Backward-compatible constructor (no Pinpoint provided).
+     */
+    public TurretController(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
+        this(turretMotor, imu, null, telemetry);
+    }
+
+    /**
+     * Capture the current heading and turret encoder as the reference points.
      * Call this when you want to (re)zero the turret's mapping to robot heading (e.g., after manual control).
      */
     public void captureReferences() {
@@ -150,7 +162,7 @@ public class TurretController {
     /**
      * Main update method. Call from OpMode loop.
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
-     * - If manualNow is false: the controller will run automatic tracking using IMU heading + turret encoder mapping.
+     * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
      *
      * @param manualNow whether operator control is active
      * @param manualPower requested manual power in [-1, 1] (only used if manualNow)
@@ -315,10 +327,16 @@ public class TurretController {
     }
 
     /**
-     * Return current heading reading (Z axis) in radians using the supplied IMU.
-     * If imu is null, returns 0.0.
+     * Return current heading (Z) in radians. Prefer Pinpoint; fall back to BNO IMU; else 0.
+     * NOTE: Pinpoint heading is negated to match the previous BNO055 sign convention.
      */
     private double getHeadingRadians() {
+        if (pinpoint != null) {
+            try {
+                return -pinpoint.getHeading(AngleUnit.RADIANS); // invert to match prior BNO IMU convention
+            } catch (Exception ignored) {
+            }
+        }
         if (imu == null) return 0.0;
         Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
         return -o.firstAngle;

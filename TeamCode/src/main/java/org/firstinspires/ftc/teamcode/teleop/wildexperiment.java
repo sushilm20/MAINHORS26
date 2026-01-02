@@ -13,6 +13,7 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -94,9 +95,8 @@ public class wildexperiment extends LinearOpMode {
     private boolean gamepad2TouchpadLast = false;
 
     // IMUs
-    private BNO055IMU imu;            // existing expansion-hub IMU (named "imu" in config)
-    private BNO055IMU pinpointImu;    // optional pinpoint IMU (named "pinpoint" in config)
-    private BNO055IMU turretImu;      // the IMU actually used by the turret (pinpoint if present otherwise imu)
+    private BNO055IMU imu;                 // expansion hub IMU (named "imu" in config)
+    private GoBildaPinpointDriver pinpoint; // goBILDA Pinpoint odometry computer (I2C, named "pinpoint" in config)
 
     @Override
     public void runOpMode() {
@@ -123,7 +123,6 @@ public class wildexperiment extends LinearOpMode {
         gateServo = hardwareMap.get(Servo.class, "gateServo");
         //main servos
 
-
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -144,17 +143,20 @@ public class wildexperiment extends LinearOpMode {
 //        backLeftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 //        backRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // IMU init
+        // IMU init (Expansion Hub)
         try {
             imu = hardwareMap.get(BNO055IMU.class, "imu");
         } catch (Exception e) {
             imu = null;
         }
 
+        // Pinpoint init (goBILDA I2C odometry computer)
         try {
-            pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+            pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+            // Zero heading/position at init so turret mapping aligns to start pose
+            pinpoint.resetPosAndIMU();
         } catch (Exception e) {
-            pinpointImu = null;
+            pinpoint = null;
         }
 
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
@@ -167,18 +169,19 @@ public class wildexperiment extends LinearOpMode {
             } catch (Exception ignored) {
             }
         }
-        if (pinpointImu != null) {
-            try {
-                pinpointImu.initialize(imuParams);
-            } catch (Exception ignored) {
-            }
+
+        // Choose turret heading source: prefer Pinpoint if available
+        String imuUsed;
+        if (pinpoint != null) {
+            imuUsed = "pinpoint";
+        } else if (imu != null) {
+            imuUsed = "imu (expansion hub)";
+        } else {
+            imuUsed = "none";
         }
 
-        // Choose turret IMU: prefer pinpoint if available
-        turretImu = (pinpointImu != null) ? pinpointImu : imu;
-
-        // Create subsystem controllers
-        turretController = new TurretController(turret, turretImu, telemetry);
+        // Create subsystem controllers (TurretController now takes Pinpoint + fallback IMU)
+        turretController = new TurretController(turret, imu, pinpoint, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new Flywheel(shooter, telemetry);
         flywheel.setShooterOn(false); // keep shooter OFF during init
@@ -192,9 +195,6 @@ public class wildexperiment extends LinearOpMode {
         gateClosed = false;
         gateServo.setPosition(GATE_OPEN);
 
-
-        String imuUsed = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
-                (turretImu == imu && imu != null) ? "imu (expansion hub)" : "none";
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
@@ -210,6 +210,14 @@ public class wildexperiment extends LinearOpMode {
 
         while (opModeIsActive()) {
             long nowMs = System.currentTimeMillis();
+
+            // --- REFRESH PINPOINT DATA EACH LOOP ---
+            if (pinpoint != null) {
+                try {
+                    pinpoint.update(); // critical: fetch latest heading/pose
+                } catch (Exception ignored) {
+                }
+            }
 
             // ------------------------------
             // Touchpad toggles & reset
@@ -230,12 +238,19 @@ public class wildexperiment extends LinearOpMode {
             if (gamepad2TouchpadNow && !gamepad2TouchpadLast) {
                 turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                // Reset Pinpoint and heading reference together
+                if (pinpoint != null) {
+                    try {
+                        pinpoint.resetPosAndIMU();
+                    } catch (Exception ignored) {
+                    }
+                }
                 turretController.captureReferences();
                 turretController.resetPidState();
 
                 driveController.stop();
 
-                telemetry.addData("Reset", "IMU heading reference and turret encoder set to zero!");
+                telemetry.addData("Reset", "Heading reference and turret encoder set to zero!");
                 telemetry.update();
             }
             gamepad2TouchpadLast = gamepad2TouchpadNow;
@@ -295,8 +310,7 @@ public class wildexperiment extends LinearOpMode {
             bPressedLast = bNow;
 
             // ------------------------------
-            // Y-button intake sequence: open gate, run intake at INTAKE_SEQUENCE_POWER,
-            // trigger claw in last 0.5s, then close gate. No extra claw action at the end.
+            // Y-button intake sequence
             // ------------------------------
             boolean yNow = gamepad1.y || gamepad2.y;
             if (yNow && !yPressedLast && gateCycleState == GateCycleState.IDLE) {
@@ -439,8 +453,6 @@ public class wildexperiment extends LinearOpMode {
             }
 
             // Summary telemetry
-
-
             telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
 
@@ -448,8 +460,8 @@ public class wildexperiment extends LinearOpMode {
 
             telemetry.addData("Gate Cycle", gateCycleState);
 
-            String imuUsedNow = (turretImu == pinpointImu && pinpointImu != null) ? "pinpoint" :
-                    (turretImu == imu && imu != null) ? "imu (exp hub)" : "none";
+            String imuUsedNow = (pinpoint != null) ? "pinpoint" :
+                    (imu != null) ? "imu (exp hub)" : "none";
             telemetry.addData("Turret IMU Used", imuUsedNow);
 
             telemetry.update();
