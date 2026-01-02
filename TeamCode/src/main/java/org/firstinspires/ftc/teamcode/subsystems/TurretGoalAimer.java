@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -20,7 +21,8 @@ public class TurretGoalAimer {
 
     // Hardware
     private final DcMotor turretMotor;
-    private final BNO055IMU imu;
+    private final BNO055IMU imu;                     // fallback
+    private final GoBildaPinpointDriver pinpoint;    // preferred
     private final Telemetry telemetry; // optional
 
     // Field references
@@ -80,12 +82,18 @@ public class TurretGoalAimer {
     private double lastTargetAngleRad = 0.0;
     private double lastGoalBearingRad = 0.0;
 
-    public TurretGoalAimer(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
+    public TurretGoalAimer(DcMotor turretMotor, BNO055IMU imu, GoBildaPinpointDriver pinpoint, Telemetry telemetry) {
         this.turretMotor = turretMotor;
         this.imu = imu;
+        this.pinpoint = pinpoint;
         this.telemetry = telemetry;
         captureReferences();
         resetPidState();
+    }
+
+    // Backward-compatible ctor (no Pinpoint)
+    public TurretGoalAimer(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
+        this(turretMotor, imu, null, telemetry);
     }
 
     /** Set the field target to aim at. */
@@ -293,6 +301,12 @@ public class TurretGoalAimer {
     }
 
     private double getHeadingRadians() {
+        // Prefer Pinpoint; invert to match previous BNO sign convention. Fallback to BNO.
+        if (pinpoint != null) {
+            try {
+                return -pinpoint.getHeading(AngleUnit.RADIANS);
+            } catch (Exception ignored) { }
+        }
         if (imu == null) return 0.0;
         Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
         return -o.firstAngle;
