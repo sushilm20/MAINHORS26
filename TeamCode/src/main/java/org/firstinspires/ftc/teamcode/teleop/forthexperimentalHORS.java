@@ -15,10 +15,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
-import org.firstinspires.ftc.teamcode.subsystems.TurretGoalAimer;
+import org.firstinspires.ftc.teamcode.tracking.TurretGoalAimer;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 @TeleOp(name="LED HORS", group="Linear OpMode")
@@ -40,7 +40,7 @@ public class forthexperimentalHORS extends LinearOpMode {
     private static final double GATE_CLOSED = 0.5;
 
     private DriveController driveController;
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
     private FlywheelVersatile flywheelVersatile;
     private TurretGoalAimer turretGoalAimer;
 
@@ -116,7 +116,7 @@ public class forthexperimentalHORS extends LinearOpMode {
         turretImu = (pinpointImu != null) ? pinpointImu : imu;
 
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new Flywheel(shooter, telemetry);
+        flywheel = new FlywheelController(shooter, telemetry);
 
         try {
             follower = Constants.createFollower(hardwareMap);

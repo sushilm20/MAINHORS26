@@ -16,8 +16,8 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
-import org.firstinspires.ftc.teamcode.subsystems.TurretController;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @Autonomous(name = "Red 12 Ball 🔴", group = "Autonomous", preselectTeleOp = "???HORS???")
 @Configurable
@@ -63,9 +63,9 @@ public class RedPedroAuto extends OpMode {
     private BNO055IMU hubImu = null;
     private BNO055IMU imu = null;
 
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 92.0;
+    private static final double AUTO_SHOOTER_RPM = 2500;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -183,7 +183,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
             if (turretMotor != null) {
                 turretController = new TurretController(turretMotor, imu, telemetry);
             }

@@ -16,8 +16,8 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
-import org.firstinspires.ftc.teamcode.subsystems.TurretController;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 /**
  * ExperimentalPedroAuto (improved PRE_ACTION pose handling + fallback)
@@ -84,7 +84,7 @@ public class pedroauto extends OpMode {
     private DcMotor shooterMotor;
     private DcMotor turretMotor;
     private BNO055IMU imu;
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
     private TurretController turretController;
     private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
 
@@ -168,7 +168,7 @@ public class pedroauto extends OpMode {
 
         // Instantiate subsystems using the provided classes (pass OpMode telemetry for telemetry output)
         try {
-            if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
             if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
 
             // Prepare turret controller just like teleop

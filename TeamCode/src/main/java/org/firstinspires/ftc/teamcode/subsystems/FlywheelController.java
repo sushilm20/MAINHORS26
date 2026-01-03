@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 @Configurable
-public class Flywheel {
+public class FlywheelController {
 
     private final DcMotor shooter;
     private final Telemetry telemetry; // nullable
@@ -60,7 +60,7 @@ public class Flywheel {
     // runtime tolerance used for "at target" detection
     private double targetToleranceRpm = TARGET_TOLERANCE_RPM;
 
-    public Flywheel(DcMotor shooterMotor, Telemetry telemetry) {
+    public FlywheelController(DcMotor shooterMotor, Telemetry telemetry) {
         this.shooter = shooterMotor;
         this.telemetry = telemetry;
         this.targetRPM = TARGET_RPM_CLOSE;

@@ -21,7 +21,7 @@ public class FlywheelVersatile {
         }
     }
 
-    private final Flywheel flywheel;
+    private final FlywheelController flywheel;
     private final Pose goalPose;
     private final List<CalibrationPoint> calibration;
     private final double minRpm;
@@ -37,7 +37,7 @@ public class FlywheelVersatile {
     private double lastDistance = 0.0;
 
     // Existing constructor (keeps backward compatibility, flatRadius=0)
-    public FlywheelVersatile(Flywheel flywheel,
+    public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
                              List<CalibrationPoint> calibration,
                              double minRpm,
@@ -46,7 +46,7 @@ public class FlywheelVersatile {
     }
 
     // New constructor with configurable flat radius
-    public FlywheelVersatile(Flywheel flywheel,
+    public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
                              List<CalibrationPoint> calibration,
                              double minRpm,

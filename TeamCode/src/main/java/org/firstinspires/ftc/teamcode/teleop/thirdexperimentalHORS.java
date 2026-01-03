@@ -25,9 +25,9 @@ import java.util.Arrays;
 import java.util.List;
 
 // subsystem imports (adjust package paths if yours differ)
-import org.firstinspires.ftc.teamcode.subsystems.TurretController;
+import org.firstinspires.ftc.teamcode.tracking.TurretController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants; // ensure this exists in your project
@@ -49,7 +49,7 @@ public class thirdexperimentalHORS extends LinearOpMode {
     // Subsystems
     private TurretController turretController;
     private DriveController driveController;
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
     private FlywheelVersatile flywheelVersatile;
 
     // PedroPathing follower (for localization)
@@ -154,7 +154,7 @@ public class thirdexperimentalHORS extends LinearOpMode {
         // Create subsystem controllers
         turretController = new TurretController(turret, turretImu, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new Flywheel(shooter, telemetry);
+        flywheel = new FlywheelController(shooter, telemetry);
 
         // PedroPathing follower for localization (driving still handled by DriveController)
         try {

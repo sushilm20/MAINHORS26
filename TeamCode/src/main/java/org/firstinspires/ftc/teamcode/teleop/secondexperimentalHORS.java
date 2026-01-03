@@ -22,9 +22,9 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 
 // subsystem imports (adjust package paths if yours differ)
-import org.firstinspires.ftc.teamcode.subsystems.TurretController;
+import org.firstinspires.ftc.teamcode.tracking.TurretController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 @TeleOp(name="???HORS???", group="Linear OpMode")
 public class secondexperimentalHORS extends LinearOpMode {
@@ -47,7 +47,7 @@ public class secondexperimentalHORS extends LinearOpMode {
     // Subsystems
     private TurretController turretController;
     private DriveController driveController;
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
 
     // UI / debounce and other small state
     private boolean dpadDownLast = false;
@@ -167,7 +167,7 @@ public class secondexperimentalHORS extends LinearOpMode {
         // Create subsystem controllers
         turretController = new TurretController(turret, turretImu, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new Flywheel(shooter, telemetry);
+        flywheel = new FlywheelController(shooter, telemetry);
 
         // initial positions
         clawServo.setPosition(0.63);

@@ -16,7 +16,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 /**
  * FarmModeBlueAuto — Adapted from BluePedroAuto logic per your instructions.
@@ -78,7 +78,7 @@ public class FarmModeRedAuto extends OpMode {
     // Shooter + rpm/stability settings
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
-    private Flywheel flywheel;
+    private FlywheelController flywheel;
     private static final double AUTO_SHOOTER_RPM = 130.0; // overall auto shooter RPM
     private static final double RPM_TOLERANCE = 0.05; // 5% tolerance for "stable" detection
     private static final double REQUIRED_STABLE_SECONDS = 2.0; // run intake for 5s at stable RPM before claw
@@ -176,7 +176,7 @@ public class FarmModeRedAuto extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new Flywheel(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
             if (flywheel != null) {
                 flywheel.setShooterOn(false);
             }
