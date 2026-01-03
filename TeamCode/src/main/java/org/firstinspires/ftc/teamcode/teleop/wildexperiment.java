@@ -162,7 +162,7 @@ public class wildexperiment extends LinearOpMode {
         );
 
         // Initial positions
-        gateController.setGateClosed(false); // gate open => red on, green off
+        gateController.setGateClosed(true); // gate open => red on, green off, rn made it so that gate is closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("/nTurret IMU", imuUsed);
 
@@ -307,14 +307,7 @@ public class wildexperiment extends LinearOpMode {
             if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
-            // Telemetry
-            telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
-            telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
-            telemetry.addData("Gate", gateController.isGateClosed() ? "CLOSED" : "OPEN");
-            telemetry.addData("Gate Cycle", gateController.getState());
-            telemetry.addData("Hood L", String.format("%.3f", hoodController.getLeftPos()));
-            telemetry.addData("Hood R", String.format("%.3f", hoodController.getRightPos()));
-            telemetry.update();
+
         }
 
         turretController.disable();
