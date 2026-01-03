@@ -167,15 +167,15 @@ public class thirdexperimentalHORS extends LinearOpMode {
 
         // FlywheelVersatile setup with calibration samples and RPM bounds
         List<CalibrationPoint> calibrationPoints = Arrays.asList(
-                new CalibrationPoint(new Pose(48, 96, 135), 90.0),
-                new CalibrationPoint(new Pose(60, 125, 135), 93.0),
-                new CalibrationPoint(new Pose(60, 82, 135), 98.0),
-                new CalibrationPoint(new Pose(72, 72, 135), 103.0),
-                new CalibrationPoint(new Pose(72, 120, 167), 95.0),
-                new CalibrationPoint(new Pose(95, 120, 135), 110.0),
-                new CalibrationPoint(new Pose(52, 14, 135), 140.0)
+                new CalibrationPoint(new Pose(48, 96, 135), 2400),
+                new CalibrationPoint(new Pose(60, 125, 135), 2500),
+                new CalibrationPoint(new Pose(60, 82, 135), 2600),
+                new CalibrationPoint(new Pose(72, 72, 135), 2740),
+                new CalibrationPoint(new Pose(72, 120, 167), 2500),
+                new CalibrationPoint(new Pose(95, 120, 135), 2900),
+                new CalibrationPoint(new Pose(52, 14, 135), 4000)
         );
-        flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 90.0, 150.0);
+        flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 2400, 4000);
 
         // initial positions
         clawServo.setPosition(0.63);

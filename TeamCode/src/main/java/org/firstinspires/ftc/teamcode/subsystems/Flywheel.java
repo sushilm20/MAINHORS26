@@ -18,9 +18,9 @@ public class Flywheel {
     public static double TICKS_PER_REV = 28.0;
 
     @Sorter(sort = 2)
-    public static double K_P = 0.01;
+    public static double K_P = 0.0022;
     @Sorter(sort = 3)
-    public static double EMA_ALPHA = 0.3; // smoothing for measured RPM
+    public static double EMA_ALPHA = 0.1; // smoothing for measured RPM
     @Sorter(sort = 4)
     public static double DEFAULT_RPM_SCALE = 1.0;
 
