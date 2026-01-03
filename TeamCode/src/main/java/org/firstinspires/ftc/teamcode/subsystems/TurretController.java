@@ -146,6 +146,19 @@ public class TurretController {
     }
 
     /**
+     * Cleanly disable turret tracking and stop the motor.
+     */
+    public void disable() {
+        turretIntegral = 0.0;
+        lastErrorTicks = 0;
+        lastDerivative = 0.0;
+        lastAppliedPower = 0.0;
+        lastTimeMs = -1L;
+        manualActiveLast = false;
+        turretMotor.setPower(0.0);
+    }
+
+    /**
      * Main update method. Call from OpMode loop.
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
      * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.

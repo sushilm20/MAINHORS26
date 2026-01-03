@@ -1,15 +1,5 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
-/*
-  secondexperimentalHORS.java
-  ---------------------------
-  - Gate servo toggles on B (gamepad1 or gamepad2) with LED indication (open = green, closed = red).
-  - Y-button intake sequence: opens gate (if needed), runs intake, then closes gate and stops intake.
-  - Shooter uses Flywheel subsystem logic (toggle on dpad down, left trigger low-RPM override, far/close modes via touchpad).
-  - Shooter2 mirrors shooter power.
-  - Rumble logic: continuous short rumbles while flywheel.isAtTarget().
-  - Turret IMU preference: use "pinpoint" if present; otherwise "imu" (expansion hub).
-*/
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
@@ -55,9 +45,6 @@ public class wildexperiment extends LinearOpMode {
     private long gateActionStartMs = 0;
     private boolean intakeSequenceClawTriggered = false;
 
-    // REV Digital LED Indicator (active-low) using hardware map names led1 (red) and led2 (green)
-    private DigitalChannel ledLineRed;   // led1
-    private DigitalChannel ledLineGreen; // led2
 
     // Subsystems
     private TurretController turretController;
@@ -198,16 +185,28 @@ public class wildexperiment extends LinearOpMode {
         telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
 
-        // ensure subsystems are ready
+        // ensure subsystems are ready (pre-start)
         turretController.captureReferences();
         turretController.resetPidState();
 
+        // ---- WAIT FOR START ----
         waitForStart();
+
+        // If stopped before start, ensure turret is idle
+        if (isStopRequested()) {
+            turretController.disable();
+            return;
+        }
+
+        // Fresh IMU/turret zero at the start of EVERY TeleOp run
+        reZeroHeadingAndTurret(imuParams);
 
         // Shooter default ON once TeleOp actually starts
         flywheel.setShooterOn(true);
 
         while (opModeIsActive()) {
+            if (isStopRequested()) break;
+
             long nowMs = System.currentTimeMillis();
 
             // --- REFRESH PINPOINT DATA EACH LOOP ---
@@ -241,6 +240,11 @@ public class wildexperiment extends LinearOpMode {
                 if (pinpoint != null) {
                     try {
                         pinpoint.resetPosAndIMU();
+                    } catch (Exception ignored) {
+                    }
+                } else if (imu != null) {
+                    try {
+                        imu.initialize(imuParams);
                     } catch (Exception ignored) {
                     }
                 }
@@ -465,11 +469,30 @@ public class wildexperiment extends LinearOpMode {
 
             telemetry.update();
         }
+
+        // --- On TeleOp stop: ensure turret control is disabled and motor is idle ---
+        turretController.disable();
     }
 
     private void headingReferenceReset() {
         // turretController.captureReferences() handles the turret mapping if needed.
     }
 
-
+    /**
+     * Re-zero heading source and turret encoder at TeleOp start so old headings are never reused.
+     */
+    private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
+        try {
+            if (pinpoint != null) {
+                pinpoint.resetPosAndIMU(); // new zero heading for this run
+            } else if (imu != null) {
+                imu.initialize(imuParams); // re-init BNO to avoid carrying old heading
+            }
+        } catch (Exception ignored) {
+        }
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        turretController.captureReferences();
+        turretController.resetPidState();
+    }
 }
