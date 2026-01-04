@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
@@ -107,6 +108,12 @@ public class wildexperiment extends LinearOpMode {
         LED led2Red = getLedSafe("led_2_red");
         LED led2Green = getLedSafe("led_2_green");
 
+        // Voltage sensor (first available)
+        VoltageSensor batterySensor = null;
+        try {
+            batterySensor = hardwareMap.voltageSensor.iterator().next();
+        } catch (Exception ignored) {}
+
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -142,7 +149,7 @@ public class wildexperiment extends LinearOpMode {
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new FlywheelController(shooter, shooter2, telemetry); // pass both motors
+        flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor); // pass voltage sensor
         flywheel.setShooterOn(false);
 
         gateController = new GateController(
@@ -328,7 +335,7 @@ public class wildexperiment extends LinearOpMode {
             // Telemetry: flywheel & gate
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.6f",
+            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.4f (dyn)",
                     FlywheelController.kP, FlywheelController.kI,
                     FlywheelController.kD, FlywheelController.kF);
             telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");

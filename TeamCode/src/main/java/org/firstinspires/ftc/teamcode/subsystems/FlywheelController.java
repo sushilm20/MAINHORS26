@@ -4,6 +4,7 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -17,6 +18,7 @@ public class FlywheelController {
     private final DcMotorEx shooter;
     private final DcMotor shooter2; // mirrors power (opposite direction via motor direction)
     private final Telemetry telemetry; // nullable
+    private final VoltageSensor voltageSensor; // nullable
     private final ElapsedTime timer = new ElapsedTime();
 
     // --- Panels-configurable constants (public static) ---
@@ -26,9 +28,9 @@ public class FlywheelController {
     @Sorter(sort = 2) public static double kP = 0.0007;
     @Sorter(sort = 3) public static double kI = 0.0025;//maybe i do
     @Sorter(sort = 4) public static double kD = 0.00003;
-    @Sorter(sort = 5) public static double kF = 0.000204; //was 0.00275
+    @Sorter(sort = 5) public static double kF = 1.53; //was 0.00275
 
-    @Sorter(sort = 6) public static double integralLimit = 50; // ion even use this lol
+    @Sorter(sort = 6) public static double integralLimit = 50; // limit on integral sum (in RPM-error units)
     @Sorter(sort = 7) public static double derivativeAlpha = 0.8;  // low-pass (0..1), higher = smoother
 
     @Sorter(sort = 8) public static double closeRPM = 2650.0;
@@ -40,6 +42,10 @@ public class FlywheelController {
     @Sorter(sort = 11) public static double TARGET_RPM_CLOSE;
     @Sorter(sort = 12) public static double TARGET_RPM_FAR;
     @Sorter(sort = 13) public static double TARGET_TOLERANCE_RPM;
+
+    // Feedforward reference points (ticks/sec at reference voltage)
+    @Sorter(sort = 14) public static double ffReferenceVoltage = 13.0;          // volts
+    @Sorter(sort = 15) public static double ffReferenceMaxTicksPerSec = 4930; // ticks/sec @ reference V
 
     // static initializer must be inside the class
     static {
@@ -65,13 +71,14 @@ public class FlywheelController {
     private double savedTargetBeforeTrigger = -1.0;
     private boolean savedShooterOnBeforeTrigger = false;
 
-    public FlywheelController(DcMotor shooter, DcMotor shooter2, Telemetry telemetry) {
+    public FlywheelController(DcMotor shooter, DcMotor shooter2, Telemetry telemetry, VoltageSensor voltageSensor) {
         if (!(shooter instanceof DcMotorEx)) {
             throw new IllegalArgumentException("Primary shooter must be a DcMotorEx");
         }
         this.shooter = (DcMotorEx) shooter;
         this.shooter2 = shooter2;
         this.telemetry = telemetry;
+        this.voltageSensor = voltageSensor;
 
         try {
             this.shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -95,8 +102,17 @@ public class FlywheelController {
     }
 
     // Backward-compatible ctor for existing single-motor call sites.
+    public FlywheelController(DcMotor shooter, Telemetry telemetry, VoltageSensor voltageSensor) {
+        this(shooter, null, telemetry, voltageSensor);
+    }
+
+    // Backward-compatible ctor without voltage sensor (feedforward will use a fallback voltage)
+    public FlywheelController(DcMotor shooter, DcMotor shooter2, Telemetry telemetry) {
+        this(shooter, shooter2, telemetry, null);
+    }
+
     public FlywheelController(DcMotor shooter, Telemetry telemetry) {
-        this(shooter, null, telemetry);
+        this(shooter, null, telemetry, null);
     }
 
     public void setTargetRpm(double rpm) {
@@ -137,8 +153,12 @@ public class FlywheelController {
         double deriv = derivativeAlpha * lastDerivativeEstimate + (1.0 - derivativeAlpha) * rawDeriv;
         lastDerivativeEstimate = deriv;
 
-        // Feedforward: scale target RPM to power
-        double ff = kF * targetRpm; // expects kF ≈ 1 / maxRPM (tune)
+        // Dynamic feedforward based on battery voltage and measured max ticks/sec
+        double voltage = getBatteryVoltage();
+        double maxTicksPerSec = (voltage / ffReferenceVoltage) * ffReferenceMaxTicksPerSec;
+        if (maxTicksPerSec < 1e-3) maxTicksPerSec = 1e-3;
+        double targetTicksPerSec = (targetRpm * TICKS_PER_REV) / 60.0;
+        double ff = (targetTicksPerSec / maxTicksPerSec) * kF; // kF is a gain on the fraction
 
         // PIDF output
         double out = ff + (kP * error) + (kI * integralSum) + (kD * deriv);
@@ -175,6 +195,16 @@ public class FlywheelController {
 
         // --- Single-line telemetry: target & current side by side, PIDF terms ---
 
+    }
+
+    private double getBatteryVoltage() {
+        try {
+            if (voltageSensor != null) {
+                double v = voltageSensor.getVoltage();
+                if (v > 1e-3) return v;
+            }
+        } catch (Exception ignored) {}
+        return 12.0; // fallback
     }
 
     private double getCurrentRpm(double dtSeconds) {

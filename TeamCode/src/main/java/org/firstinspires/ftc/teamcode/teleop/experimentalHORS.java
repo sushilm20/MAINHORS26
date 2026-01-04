@@ -49,6 +49,7 @@ public class experimentalHORS extends LinearOpMode {
     private boolean yPressedLast = false;
     private boolean touchpadPressedLast = false;
     private boolean gamepad2TouchpadLast = false;
+    private boolean aPressedLast = false; // gamepad1 A reset latch
 
     private boolean isFarMode = false;
 
@@ -207,6 +208,24 @@ public class experimentalHORS extends LinearOpMode {
                 telemetry.update();
             }
             gamepad2TouchpadLast = gp2Touch;
+
+            // A button reset (gamepad1) — mirrors touchpad reset
+            boolean aNow = gamepad1.a;
+            if (aNow && !aPressedLast) {
+                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                if (pinpoint != null) {
+                    try { pinpoint.resetPosAndIMU(); } catch (Exception ignored) {}
+                } else if (imu != null) {
+                    try { imu.initialize(imuParams); } catch (Exception ignored) {}
+                }
+                turretController.captureReferences();
+                turretController.resetPidState();
+                driveController.stop();
+                telemetry.addData("Reset", "Heading ref and turret encoder zeroed (gp1 A)");
+                telemetry.update();
+            }
+            aPressedLast = aNow;
 
             // Far/close toggle on gamepad1 touchpad
             boolean touchpadNow = getTouchpad(gamepad1);
