@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="A HORS OFFICIAL ⭐", group="Linear OpMode")
+@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
 public class experimentalHORS extends LinearOpMode {
 
     // Drive + subsystems
@@ -141,7 +141,7 @@ public class experimentalHORS extends LinearOpMode {
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new FlywheelController(shooter, telemetry);
+        flywheel = new FlywheelController(shooter, shooter2, telemetry); // pass both motors
         flywheel.setShooterOn(false);
 
         gateController = new GateController(
@@ -162,13 +162,10 @@ public class experimentalHORS extends LinearOpMode {
         );
 
         // Initial positions
-        gateController.setGateClosed(false); // gate open => red on, green off
+        gateController.setGateClosed(true); // gate open => red on, green off, rn made it so that gate is closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
-        telemetry.addData("Turret IMU", imuUsed);
-        telemetry.addData("LED1 Red", led1Red != null);
-        telemetry.addData("LED1 Green", led1Green != null);
-        telemetry.addData("LED2 Red", led2Red != null);
-        telemetry.addData("LED2 Green", led2Green != null);
+        telemetry.addData("/nTurret IMU", imuUsed);
+
         telemetry.update();
 
         // Prepare subsystems
@@ -264,8 +261,7 @@ public class experimentalHORS extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Mirror shooter power
-            shooter2.setPower(shooter.getPower());
+            // shooter2 now driven by FlywheelController; no manual mirroring needed
 
             // Rumble when at target
             if (flywheel.isAtTarget()) {
@@ -310,14 +306,15 @@ public class experimentalHORS extends LinearOpMode {
             if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
-            // Telemetry
-            telemetry.addData("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
-            telemetry.addData("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
-            telemetry.addData("Gate", gateController.isGateClosed() ? "CLOSED" : "OPEN");
-            telemetry.addData("Gate Cycle", gateController.getState());
-            telemetry.addData("Hood L", String.format("%.3f", hoodController.getLeftPos()));
-            telemetry.addData("Hood R", String.format("%.3f", hoodController.getRightPos()));
+            // Telemetry: flywheel & gate
+            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
+                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
+            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.6f",
+                    FlywheelController.kP, FlywheelController.kI,
+                    FlywheelController.kD, FlywheelController.kF);
+            telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
             telemetry.update();
+
         }
 
         turretController.disable();
