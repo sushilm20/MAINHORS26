@@ -140,17 +140,24 @@ public class pedroauto extends OpMode {
         // --- Hardware for shooter & turret (match teleop names) ---
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
+            shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
             // Directions and modes (same as teleop)
-            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-            turretMotor.setDirection(DcMotor.Direction.FORWARD);
-
-            shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            if (shooterMotor != null) {
+                shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+                shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
+            if (shooterMotor2 != null) {
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
+            if (turretMotor != null) {
+                turretMotor.setDirection(DcMotor.Direction.FORWARD);
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
@@ -168,7 +175,7 @@ public class pedroauto extends OpMode {
 
         // Instantiate subsystems using the provided classes (pass OpMode telemetry for telemetry output)
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
 
             // Prepare turret controller just like teleop

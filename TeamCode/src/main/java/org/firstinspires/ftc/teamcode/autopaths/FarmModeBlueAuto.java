@@ -175,7 +175,7 @@ public class FarmModeBlueAuto extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (flywheel != null) {
                 flywheel.setShooterOn(false);
             }

@@ -188,7 +188,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
                 turretController = new TurretController(turretMotor, imu, telemetry);
             }
