@@ -25,9 +25,9 @@ public class FlywheelController {
     public static double DEFAULT_RPM_SCALE = 1.0;
 
     @Sorter(sort = 5)
-    public static double TARGET_RPM_CLOSE = 2500;
-    @Sorter(sort = 6)
-    public static double TARGET_RPM_FAR   = 4800;
+    public static double TARGET_RPM_CLOSE = 2650;
+@Sorter(sort = 6)
+    public static double TARGET_RPM_FAR   = 4500;
 
     @Sorter(sort = 7)
     public static double TARGET_TOLERANCE_RPM = 50; // runtime tolerance for "at target" check

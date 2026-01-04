@@ -86,7 +86,7 @@ public class pedroauto extends OpMode {
     private BNO055IMU imu;
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 90.0; // close-mode target
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE; // close-mode target
 
     // Intake + compression hardware (from teleop)
     private DcMotor intakeMotor;
@@ -179,7 +179,7 @@ public class pedroauto extends OpMode {
 
             // Ensure flywheel default mode (close) and turned on so auto will drive it
             if (flywheel != null) {
-                flywheel.setModeFar(false); // set Close mode target (90 rpm)
+                flywheel.setModeFar(false); // set Close mode target (uses FlywheelController default)
                 flywheel.setShooterOn(true);
                 flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
             }

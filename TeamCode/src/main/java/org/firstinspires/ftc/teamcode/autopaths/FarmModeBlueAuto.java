@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
  *  - Added WAIT_NO_MOVEMENT state entered immediately after Path3 finishes.
  *  - WAIT_TIME_NO_MOVEMENT is a configurable variable (default 7.0 seconds).
  *  - During WAIT_NO_MOVEMENT the robot does not start any new path/movement and the flywheel
- *    target RPM is set to 90 (or left unchanged if flywheel missing).
+ *    target RPM is set to the close-mode RPM (or left unchanged if flywheel missing).
  *  - After the wait expires the FSM resumes to the next path.
  *
  * Keep verifying hardware names: "shooter", "intakeMotor", "leftCompressionServo",
@@ -79,7 +79,7 @@ public class FarmModeBlueAuto extends OpMode {
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
     private FlywheelController flywheel;
-    private static final double AUTO_SHOOTER_RPM = 140.0; // overall auto shooter RPM
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE; // overall auto shooter RPM
     private static final double RPM_TOLERANCE = 0.05; // 5% tolerance for "stable" detection
     private static final double REQUIRED_STABLE_SECONDS = 5.0; // run intake for 5s at stable RPM before claw
 
@@ -430,9 +430,9 @@ public class FarmModeBlueAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         waitTimer.resetTimer();
                         if (flywheel != null) {
-                            flywheel.setTargetRPM(90.0);
+                            flywheel.setTargetRPM(FlywheelController.TARGET_RPM_CLOSE);
                         }
-                        panelsTelemetry.debug("WAIT_NO_MOVEMENT", "Entered after Path3; waiting " + WAIT_TIME_NO_MOVEMENT + "s with RPM=90");
+                        panelsTelemetry.debug("WAIT_NO_MOVEMENT", "Entered after Path3; waiting " + WAIT_TIME_NO_MOVEMENT + "s with close-mode RPM");
                         state = AutoState.WAIT_NO_MOVEMENT;
                         break;
                     }
