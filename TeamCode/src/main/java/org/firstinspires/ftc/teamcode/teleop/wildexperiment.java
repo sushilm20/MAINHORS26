@@ -307,6 +307,14 @@ public class wildexperiment extends LinearOpMode {
             if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
+            // Telemetry: flywheel & gate
+            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
+                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
+            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.6f",
+                    FlywheelController.kP, FlywheelController.kI,
+                    FlywheelController.kD, FlywheelController.kF);
+            telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+            telemetry.update();
 
         }
 

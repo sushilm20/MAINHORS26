@@ -23,16 +23,16 @@ public class FlywheelController {
     @Sorter(sort = 0) public static double MAX_RPM = 6000.0;
     @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
-    @Sorter(sort = 2) public static double kP = 0.0025;
+    @Sorter(sort = 2) public static double kP = 0.003;
     @Sorter(sort = 3) public static double kI = 0.0;
-    @Sorter(sort = 4) public static double kD = 0.0003;
-    @Sorter(sort = 5) public static double kF = 1.0 / 6000.0; // feedforward: power per RPM
+    @Sorter(sort = 4) public static double kD = 0.0;
+    @Sorter(sort = 5) public static double kF = 0.000275; // feedforward: power per RPM
 
-    @Sorter(sort = 6) public static double integralLimit = 150.0; // limit on integral sum (in RPM-error units)
-    @Sorter(sort = 7) public static double derivativeAlpha = 0.85;  // low-pass (0..1), higher = smoother
+    @Sorter(sort = 6) public static double integralLimit = 50; // limit on integral sum (in RPM-error units)
+    @Sorter(sort = 7) public static double derivativeAlpha = 0.8;  // low-pass (0..1), higher = smoother
 
     @Sorter(sort = 8) public static double closeRPM = 2650.0;
-    @Sorter(sort = 9) public static double farRPM   = 4500.0;
+    @Sorter(sort = 9) public static double farRPM   = 3500.0;
 
     @Sorter(sort = 10) public static double rpmTolerance = 50.0; // “ready to shoot” window
 
@@ -173,20 +173,7 @@ public class FlywheelController {
         lastAtTarget = atTargetNow;
 
         // --- Single-line telemetry: target & current side by side, PIDF terms ---
-        if (telemetry != null) {
-            telemetry.addLine(String.format(
-                    "Flywheel || tgt: %5.0f rpm || cur: %5.0f rpm || P: %+1.3f I: %+1.3f D: %+1.3f F: %+1.3f || out: %+1.3f || err: %+6.0f || dt: %.3f",
-                    targetRpm,
-                    currentRpmNow,
-                    (kP * error),
-                    (kI * integralSum),
-                    (kD * deriv),
-                    kF * targetRpm,
-                    out,
-                    error,
-                    dt
-            ));
-        }
+
     }
 
     private double getCurrentRpm(double dtSeconds) {
