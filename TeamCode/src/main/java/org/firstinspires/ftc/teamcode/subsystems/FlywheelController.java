@@ -70,12 +70,16 @@ public class FlywheelController {
             this.shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             this.shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             this.shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            if (telemetry != null) telemetry.addData("Flywheel.init", "primary cfg failed: " + e.getMessage());
+        }
 
         if (this.shooter2 != null) {
             try {
                 this.shooter2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                if (telemetry != null) telemetry.addData("Flywheel.init", "secondary cfg failed: " + e.getMessage());
+            }
         }
 
         timer.reset();
@@ -105,6 +109,10 @@ public class FlywheelController {
     }
 
     public void update() {
+        TARGET_RPM_CLOSE = closeRPM;
+        TARGET_RPM_FAR = farRPM;
+        TARGET_TOLERANCE_RPM = rpmTolerance;
+
         double dt = timer.seconds();
         if (dt <= 0) dt = 1e-3; // avoid div/0
 
@@ -139,12 +147,16 @@ public class FlywheelController {
         // Apply to motors (shooter2 spins opposite)
         try {
             shooter.setPower(out);
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            if (telemetry != null) telemetry.addData("Flywheel.power", "primary setPower failed: " + e.getMessage());
+        }
 
         if (shooter2 != null) {
             try {
                 shooter2.setPower(-out);
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                if (telemetry != null) telemetry.addData("Flywheel.power", "secondary setPower failed: " + e.getMessage());
+            }
         }
 
         lastAppliedPower = out;
