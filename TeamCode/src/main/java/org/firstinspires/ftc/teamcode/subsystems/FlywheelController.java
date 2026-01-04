@@ -3,189 +3,224 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+/**
+ * PIDF flywheel controller (dual-motor capable) with backward-compatible shims for existing callers.
+ * Supports configurable close/far RPM targets (2650/4500) that propagate across the codebase.
+ */
 @Configurable
 public class FlywheelController {
 
-    private final DcMotor shooter;
+    private final DcMotorEx shooter;
+    private final DcMotor shooter2; // mirrors power (opposite direction)
     private final Telemetry telemetry; // nullable
+    private final ElapsedTime timer = new ElapsedTime();
 
     // --- Panels-configurable constants (public static) ---
-    @Sorter(sort = 0)
-    public static double MAX_RPM = 6000;
-    @Sorter(sort = 1)
-    public static double TICKS_PER_REV = 28.0;
+    @Sorter(sort = 0) public static double MAX_RPM = 6000.0;
+    @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
-    @Sorter(sort = 2)
-    public static double K_P = 0.0022;
-    @Sorter(sort = 3)
-    public static double EMA_ALPHA = 0.1; // smoothing for measured RPM
-    @Sorter(sort = 4)
-    public static double DEFAULT_RPM_SCALE = 1.0;
+    @Sorter(sort = 2) public static double kP = 0.0025;
+    @Sorter(sort = 3) public static double kI = 0.0;
+    @Sorter(sort = 4) public static double kD = 0.0003;
+    @Sorter(sort = 5) public static double kF = 1.0 / 6000.0; // feedforward: power per RPM
 
-    @Sorter(sort = 5)
-    public static double TARGET_RPM_CLOSE = 2500;
-    @Sorter(sort = 6)
-    public static double TARGET_RPM_FAR   = 4800;
+    @Sorter(sort = 6) public static double integralLimit = 150.0; // limit on integral sum (in RPM-error units)
+    @Sorter(sort = 7) public static double derivativeAlpha = 0.85;  // low-pass (0..1), higher = smoother
 
-    @Sorter(sort = 7)
-    public static double TARGET_TOLERANCE_RPM = 50; // runtime tolerance for "at target" check
+    @Sorter(sort = 8) public static double closeRPM = 2650.0;
+    @Sorter(sort = 9) public static double farRPM   = 4500.0;
 
-    // --- Internal state ---
-    private double currentRPM = 0.0;
-    private int lastShooterPosition = 0;
-    private long lastShooterTime = -1L;
+    @Sorter(sort = 10) public static double rpmTolerance = 50.0; // “ready to shoot” window
 
-    private double targetRPM;
-    private boolean shooterOn = true;
+    // Legacy aliases so existing code can keep compiling while we migrate callers
+    @Sorter(sort = 11) public static double TARGET_RPM_CLOSE;
+    @Sorter(sort = 12) public static double TARGET_RPM_FAR;
+    @Sorter(sort = 13) public static double TARGET_TOLERANCE_RPM;
 
-    private double rpmScale = DEFAULT_RPM_SCALE;
-
-    // Left-trigger / intake temporary-target support
-    private boolean leftTriggerLast = false;
-    private double savedTargetRPMBeforeLeftTrigger = -1.0;
-    private boolean savedShooterOnBeforeLeftTrigger = false;
-
-    // calibration button edge detect
-    private boolean lastCalibPressed = false;
-
-    // "just reached target" one-shot
-    private boolean lastAtTarget = false;
-    private boolean justReachedTargetFlag = false;
-
-    // last applied motor power (for telemetry)
-    private double lastAppliedPower = 0.0;
-
-    // runtime tolerance used for "at target" detection
-    private double targetToleranceRpm = TARGET_TOLERANCE_RPM;
-
-    public FlywheelController(DcMotor shooterMotor, Telemetry telemetry) {
-        this.shooter = shooterMotor;
-        this.telemetry = telemetry;
-        this.targetRPM = TARGET_RPM_CLOSE;
-        this.shooterOn = true;
-
-        this.lastShooterPosition = shooter.getCurrentPosition();
-        this.lastShooterTime = System.currentTimeMillis();
+    // static initializer must be inside the class
+    static {
+        TARGET_RPM_CLOSE = closeRPM;
+        TARGET_RPM_FAR = farRPM;
+        TARGET_TOLERANCE_RPM = rpmTolerance;
     }
 
-    /**
-     * Primary periodic update. Call from OpMode loop with current time and calibration button state.
-     */
-    public void update(long nowMs, boolean calibPressed) {
-        // Pull latest config each loop so UI changes apply live
-        double maxRpmCfg = MAX_RPM;
-        double ticksPerRevCfg = TICKS_PER_REV;
-        double kPCfg = K_P;
-        double emaCfg = EMA_ALPHA;
-        double toleranceCfg = TARGET_TOLERANCE_RPM;
+    // --- Internal state ---
+    private double targetRpm = closeRPM;
+    private double lastError = 0.0;
+    private double integralSum = 0.0;
+    private double lastDerivativeEstimate = 0.0;
+    private int lastPos = 0;
+    private double currentRpm = 0.0;
+    private double lastAppliedPower = 0.0;
 
-        // RPM measurement
-        int shooterCurrentPosition = shooter.getCurrentPosition();
-        long now = nowMs;
-        long deltaTimeMs = (lastShooterTime < 0) ? 1 : Math.max(1, now - lastShooterTime);
-        int deltaTicks = shooterCurrentPosition - lastShooterPosition;
-        double ticksPerSec = (deltaTicks * 1000.0) / deltaTimeMs;
-        double measuredRPMRaw = (ticksPerSec / ticksPerRevCfg) * 60.0;
-        double measuredRPMScaled = measuredRPMRaw * rpmScale;
+    // legacy controls
+    private boolean shooterOn = true;
+    private boolean lastAtTarget = false;
+    private boolean justReachedTargetFlag = false;
+    private boolean leftTriggerLast = false;
+    private double savedTargetBeforeTrigger = -1.0;
+    private boolean savedShooterOnBeforeTrigger = false;
 
-        // exponential smoothing for current RPM
-        currentRPM = (1.0 - emaCfg) * currentRPM + emaCfg * measuredRPMScaled;
-        if (currentRPM < 0.0) currentRPM = 0.0;
+    public FlywheelController(DcMotor shooter, DcMotor shooter2, Telemetry telemetry) {
+        if (!(shooter instanceof DcMotorEx)) {
+            throw new IllegalArgumentException("Primary shooter must be a DcMotorEx");
+        }
+        this.shooter = (DcMotorEx) shooter;
+        this.shooter2 = shooter2;
+        this.telemetry = telemetry;
 
-        // Save for next iteration
-        lastShooterPosition = shooterCurrentPosition;
-        lastShooterTime = now;
+        try {
+            this.shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            this.shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            this.shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        } catch (Exception e) {
+            if (telemetry != null) telemetry.addData("Flywheel.init", "primary cfg failed: " + e.getMessage());
+        }
 
-        // Calibration: on rising edge of calibration button, compute and apply rpmScale
-        if (calibPressed && !lastCalibPressed) {
-            if (Math.abs(measuredRPMRaw) >= 1.0) {
-                double candidateScale = targetRPM / measuredRPMRaw;
-                candidateScale = Math.max(0.2, Math.min(3.0, candidateScale));
-                rpmScale = candidateScale;
-                if (telemetry != null) telemetry.addData("Flywheel.Calib", String.format("scale=%.3f", rpmScale));
-            } else {
-                if (telemetry != null) telemetry.addData("Flywheel.Calib", "raw RPM too small");
+        if (this.shooter2 != null) {
+            try {
+                this.shooter2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+            } catch (Exception e) {
+                if (telemetry != null) telemetry.addData("Flywheel.init", "secondary cfg failed: " + e.getMessage());
             }
         }
-        lastCalibPressed = calibPressed;
 
-        // PID-like control (simple P + feedforward)
-        double ff = targetRPM / Math.max(1.0, maxRpmCfg);
-        double error = targetRPM - currentRPM;
-        double pTerm = kPCfg * error;
-        double shooterPower = ff + pTerm;
+        timer.reset();
+        lastPos = this.shooter.getCurrentPosition();
+    }
 
-        // clamp commanded power to [0,1] and only enable when shooterOn
-        if (shooterPower > 1.0) shooterPower = 1.0;
-        if (shooterPower < 0.0) shooterPower = 0.0;
+    // Backward-compatible ctor for existing single-motor call sites.
+    public FlywheelController(DcMotor shooter, Telemetry telemetry) {
+        this(shooter, null, telemetry);
+    }
 
-        double applied = shooterOn ? shooterPower : 0.0;
-        shooter.setPower(applied);
-        lastAppliedPower = applied;
+    public void setTargetRpm(double rpm) {
+        if (rpm != targetRpm) {
+            // reset integral on setpoint changes (anti-windup)
+            integralSum = 0.0;
+            lastError = 0.0;
+            lastDerivativeEstimate = 0.0;
+        }
+        targetRpm = rpm;
+    }
 
-        // At-target detection (rising edge sets justReachedTargetFlag) using runtime tolerance
-        boolean atTargetNow = Math.abs(targetRPM - currentRPM) <= toleranceCfg;
+    public double getTargetRpm() { return targetRpm; }
+
+    public boolean isAtSpeed() {
+        double error = targetRpm - currentRpm;
+        return Math.abs(error) <= rpmTolerance;
+    }
+
+    public void update() {
+        double dt = timer.seconds();
+        if (dt <= 0) dt = 1e-3; // avoid div/0
+
+        double currentRpmNow = getCurrentRpm(dt);
+        currentRpm = currentRpmNow;
+        timer.reset();
+
+        double error = targetRpm - currentRpmNow;
+
+        // Integral with clamping
+        integralSum += error * dt;
+        double limit = integralLimit;
+        if (integralSum > limit) integralSum = limit;
+        if (integralSum < -limit) integralSum = -limit;
+
+        // Derivative with low-pass on error change
+        double rawDeriv = (error - lastError) / dt;
+        double deriv = derivativeAlpha * lastDerivativeEstimate + (1.0 - derivativeAlpha) * rawDeriv;
+        lastDerivativeEstimate = deriv;
+
+        // Feedforward: scale target RPM to power
+        double ff = kF * targetRpm; // expects kF ≈ 1 / maxRPM (tune)
+
+        // PIDF output
+        double out = ff + (kP * error) + (kI * integralSum) + (kD * deriv);
+
+        // Clamp to [-1, 1]
+        out = Math.max(-1.0, Math.min(1.0, out));
+
+        if (!shooterOn) out = 0.0;
+
+        // Apply to motors (shooter2 spins opposite)
+        try {
+            shooter.setPower(out);
+        } catch (Exception e) {
+            if (telemetry != null) telemetry.addData("Flywheel.power", "primary setPower failed: " + e.getMessage());
+        }
+
+        if (shooter2 != null) {
+            try {
+                shooter2.setPower(-out);
+            } catch (Exception e) {
+                if (telemetry != null) telemetry.addData("Flywheel.power", "secondary setPower failed: " + e.getMessage());
+            }
+        }
+
+        lastAppliedPower = out;
+        lastError = error;
+
+        // At-target detection (rising edge sets justReachedTargetFlag)
+        boolean atTargetNow = Math.abs(error) <= rpmTolerance;
         if (atTargetNow && !lastAtTarget) {
             justReachedTargetFlag = true;
         }
         lastAtTarget = atTargetNow;
 
-        // telemetry (minimal)
-//        if (telemetry != null) {
-////            telemetry.addData("fly.Current RPM/n", String.format("%.1f", currentRPM));
-////            telemetry.addData("fly.targetRPM/n", String.format("%.1f", targetRPM));
-////            telemetry.addData("fly.power/n", String.format("%.3f", lastAppliedPower));
-////            telemetry.addData("fly.scale", String.format("%.3f", rpmScale));
-////            telemetry.addData("fly.tolerance", String.format("%.2f", toleranceCfg));
-////            telemetry.addData("fly.atTarget", atTargetNow);
-//        }
-    }
-
-    /**
-     * Preserve the left-trigger behavior:
-     * - on press: save previous target and set low intake target
-     * - on release: restore previous target and shooter state
-     */
-    public void handleLeftTrigger(boolean leftTriggerNow) {
-        if (leftTriggerNow && !leftTriggerLast) {
-            // pressed: save and set low target
-            savedTargetRPMBeforeLeftTrigger = targetRPM;
-            savedShooterOnBeforeLeftTrigger = shooterOn;
-            targetRPM = 40.0;
-            shooterOn = true;
-        } else if (!leftTriggerNow && leftTriggerLast) {
-            // released: restore
-            if (savedTargetRPMBeforeLeftTrigger >= 0.0) {
-                targetRPM = savedTargetRPMBeforeLeftTrigger;
-                savedTargetRPMBeforeLeftTrigger = -1.0;
-            }
-            shooterOn = savedShooterOnBeforeLeftTrigger;
-            savedShooterOnBeforeLeftTrigger = false;
+        // --- Single-line telemetry: target & current side by side, PIDF terms ---
+        if (telemetry != null) {
+            telemetry.addLine(String.format(
+                    "Flywheel || tgt: %5.0f rpm || cur: %5.0f rpm || P: %+1.3f I: %+1.3f D: %+1.3f F: %+1.3f || out: %+1.3f || err: %+6.0f || dt: %.3f",
+                    targetRpm,
+                    currentRpmNow,
+                    (kP * error),
+                    (kI * integralSum),
+                    (kD * deriv),
+                    kF * targetRpm,
+                    out,
+                    error,
+                    dt
+            ));
         }
-        leftTriggerLast = leftTriggerNow;
     }
 
-    // external controls / helpers
+    private double getCurrentRpm(double dtSeconds) {
+        // Prefer built-in velocity if available; fallback to position diff
+        double ticksPerSecond;
+        try {
+            ticksPerSecond = shooter.getVelocity(); // ticks/sec
+            lastPos = shooter.getCurrentPosition();
+        } catch (Exception e) {
+            int pos = shooter.getCurrentPosition();
+            int delta = pos - lastPos;
+            lastPos = pos;
+            double dt = (dtSeconds <= 0) ? 1e-3 : dtSeconds;
+            ticksPerSecond = delta / dt;
+        }
+        return (ticksPerSecond * 60.0) / TICKS_PER_REV;
+    }
 
-    public void setTargetRPM(double rpm) { targetRPM = rpm; }
-    public double getTargetRPM() { return targetRPM; }
+    // Convenience: set close/far modes
+    public void setCloseMode() { setTargetRpm(closeRPM); }
+    public void setFarMode()   { setTargetRpm(farRPM); }
 
-    public void adjustTargetRPM(double delta) { targetRPM = Math.max(0.0, targetRPM + delta); }
-
-    public void setModeFar(boolean far) { targetRPM = far ? TARGET_RPM_FAR : TARGET_RPM_CLOSE; }
-
+    // --- Legacy API shims (for existing callers) ---
+    public void setTargetRPM(double rpm) { setTargetRpm(rpm); }
+    public double getTargetRPM() { return getTargetRpm(); }
+    public void adjustTargetRPM(double delta) { setTargetRpm(Math.max(0.0, targetRpm + delta)); }
+    public void setModeFar(boolean far) { setTargetRpm(far ? farRPM : closeRPM); }
     public void toggleShooterOn() { shooterOn = !shooterOn; }
     public void setShooterOn(boolean on) { shooterOn = on; }
     public boolean isShooterOn() { return shooterOn; }
-
-    public double getCurrentRPM() { return currentRPM; }
+    public double getCurrentRPM() { return currentRpm; }
     public double getLastAppliedPower() { return lastAppliedPower; }
+    public boolean isAtTarget() { return isAtSpeed(); }
 
-    /**
-     * Returns true once when the flywheel just reached the target (rising edge). The flag is cleared on read.
-     */
     public boolean justReachedTarget() {
         if (justReachedTargetFlag) {
             justReachedTargetFlag = false;
@@ -195,27 +230,40 @@ public class FlywheelController {
     }
 
     /**
-     * Returns true whenever the current RPM is within the configured tolerance of the target.
-     * Use this from the OpMode to trigger continuous controller vibration while true.
+     * Preserve the left-trigger behavior from the prior controller:
+     * - on press: save previous target and set low intake target
+     * - on release: restore previous target and shooter state
      */
-    public boolean isAtTarget() {
-        return Math.abs(targetRPM - currentRPM) <= TARGET_TOLERANCE_RPM;
+    public void handleLeftTrigger(boolean leftTriggerNow) {
+        if (leftTriggerNow && !leftTriggerLast) {
+            savedTargetBeforeTrigger = targetRpm;
+            savedShooterOnBeforeTrigger = shooterOn;
+            setTargetRpm(40.0);
+            shooterOn = true;
+        } else if (!leftTriggerNow && leftTriggerLast) {
+            if (savedTargetBeforeTrigger >= 0.0) {
+                setTargetRpm(savedTargetBeforeTrigger);
+                savedTargetBeforeTrigger = -1.0;
+            }
+            shooterOn = savedShooterOnBeforeTrigger;
+            savedShooterOnBeforeTrigger = false;
+        }
+        leftTriggerLast = leftTriggerNow;
     }
 
-    // Optional: getters for telemetry-friendly values
-    public double getRpmScale() { return rpmScale; }
-    public double getFpPercent() {
-        return (MAX_RPM > 0) ? (targetRPM / MAX_RPM) : 0.0;
+    // Legacy overload to match old update signature
+    public void update(long ignoredNowMs, boolean ignoredCalibPressed) {
+        update();
     }
 
     // Runtime tuning of the tolerance for rumble/vibrate trigger
     public void setTargetToleranceRpm(double tolerance) {
         if (tolerance < 0) tolerance = 0;
-        this.targetToleranceRpm = tolerance;
+        rpmTolerance = tolerance;
         TARGET_TOLERANCE_RPM = tolerance; // keep dashboard in sync if changed programmatically
     }
 
     public double getTargetToleranceRpm() {
-        return TARGET_TOLERANCE_RPM;
+        return rpmTolerance;
     }
 }

@@ -73,7 +73,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private FlywheelController flywheel;
     private TurretController turretController;
     @Sorter(sort = 6)
-    public static double AUTO_SHOOTER_RPM = 2500.0;
+    public static double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
 
@@ -188,7 +188,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
                 turretController = new TurretController(turretMotor, imu, telemetry);
             }

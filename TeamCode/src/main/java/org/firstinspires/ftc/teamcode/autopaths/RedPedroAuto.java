@@ -65,7 +65,7 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2500;
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -125,16 +125,24 @@ public class RedPedroAuto extends OpMode {
 
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
+            shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
-            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-            turretMotor.setDirection(DcMotor.Direction.FORWARD);
+            if (shooterMotor != null) {
+                shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+                shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
+            if (shooterMotor2 != null) {
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            }
 
-            shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            if (turretMotor != null) {
+                turretMotor.setDirection(DcMotor.Direction.FORWARD);
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
@@ -183,7 +191,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, telemetry);
+            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
                 turretController = new TurretController(turretMotor, imu, telemetry);
             }
