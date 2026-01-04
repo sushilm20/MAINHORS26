@@ -82,6 +82,7 @@ public class pedroauto extends OpMode {
 
     // Shooter / Turret hardware & controllers
     private DcMotor shooterMotor;
+    private DcMotor shooterMotor2;
     private DcMotor turretMotor;
     private BNO055IMU imu;
     private FlywheelController flywheel;

@@ -37,9 +37,9 @@ public class FlywheelController {
     @Sorter(sort = 10) public static double rpmTolerance = 50.0; // “ready to shoot” window
 
     // Legacy aliases so existing code can keep compiling while we migrate callers
-    @Sorter(sort = 11) public static double TARGET_RPM_CLOSE = closeRPM;
-    @Sorter(sort = 12) public static double TARGET_RPM_FAR   = farRPM;
-    @Sorter(sort = 13) public static double TARGET_TOLERANCE_RPM = rpmTolerance;
+    @Sorter(sort = 11) public static double TARGET_RPM_CLOSE;
+    @Sorter(sort = 12) public static double TARGET_RPM_FAR;
+    @Sorter(sort = 13) public static double TARGET_TOLERANCE_RPM;
 
     // --- Internal state ---
     private double targetRpm = closeRPM;
@@ -109,10 +109,6 @@ public class FlywheelController {
     }
 
     public void update() {
-        TARGET_RPM_CLOSE = closeRPM;
-        TARGET_RPM_FAR = farRPM;
-        TARGET_TOLERANCE_RPM = rpmTolerance;
-
         double dt = timer.seconds();
         if (dt <= 0) dt = 1e-3; // avoid div/0
 
@@ -191,6 +187,7 @@ public class FlywheelController {
         double ticksPerSecond;
         try {
             ticksPerSecond = shooter.getVelocity(); // ticks/sec
+            lastPos = shooter.getCurrentPosition();
         } catch (Exception e) {
             int pos = shooter.getCurrentPosition();
             int delta = pos - lastPos;
@@ -263,3 +260,8 @@ public class FlywheelController {
         return rpmTolerance;
     }
 }
+    static {
+        TARGET_RPM_CLOSE = closeRPM;
+        TARGET_RPM_FAR = farRPM;
+        TARGET_TOLERANCE_RPM = rpmTolerance;
+    }
