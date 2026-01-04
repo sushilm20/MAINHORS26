@@ -26,7 +26,7 @@ public class FlywheelController {
 
     @Sorter(sort = 5)
     public static double TARGET_RPM_CLOSE = 2650;
-@Sorter(sort = 6)
+    @Sorter(sort = 6)
     public static double TARGET_RPM_FAR   = 4500;
 
     @Sorter(sort = 7)
