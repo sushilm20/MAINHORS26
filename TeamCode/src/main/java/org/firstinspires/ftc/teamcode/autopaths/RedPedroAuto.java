@@ -56,7 +56,6 @@ public class RedPedroAuto extends OpMode {
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
-    private DcMotor shooterMotor2;
     private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
     private DcMotor turretMotor;
 
