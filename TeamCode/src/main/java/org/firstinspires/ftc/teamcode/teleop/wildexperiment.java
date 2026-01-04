@@ -141,7 +141,7 @@ public class wildexperiment extends LinearOpMode {
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new FlywheelController(shooter, telemetry);
+        flywheel = new FlywheelController(shooter, shooter2, telemetry); // pass both motors
         flywheel.setShooterOn(false);
 
         gateController = new GateController(
@@ -261,8 +261,7 @@ public class wildexperiment extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Mirror shooter power
-            shooter2.setPower(shooter.getPower());
+            // shooter2 now driven by FlywheelController; no manual mirroring needed
 
             // Rumble when at target
             if (flywheel.isAtTarget()) {

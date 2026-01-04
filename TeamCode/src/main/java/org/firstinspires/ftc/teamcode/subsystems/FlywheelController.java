@@ -15,7 +15,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 public class FlywheelController {
 
     private final DcMotorEx shooter;
-    private final DcMotor shooter2; // mirrors power (opposite direction)
+    private final DcMotor shooter2; // mirrors power (opposite direction via motor direction)
     private final Telemetry telemetry; // nullable
     private final ElapsedTime timer = new ElapsedTime();
 
@@ -23,12 +23,12 @@ public class FlywheelController {
     @Sorter(sort = 0) public static double MAX_RPM = 6000.0;
     @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
-    @Sorter(sort = 2) public static double kP = 0.003;
-    @Sorter(sort = 3) public static double kI = 0.0;
-    @Sorter(sort = 4) public static double kD = 0.0;
-    @Sorter(sort = 5) public static double kF = 0.000275; // feedforward: power per RPM
+    @Sorter(sort = 2) public static double kP = 0.0007;
+    @Sorter(sort = 3) public static double kI = 0.0025;//maybe i do
+    @Sorter(sort = 4) public static double kD = 0.00003;
+    @Sorter(sort = 5) public static double kF = 0.000204; //was 0.00275
 
-    @Sorter(sort = 6) public static double integralLimit = 50; // limit on integral sum (in RPM-error units)
+    @Sorter(sort = 6) public static double integralLimit = 50; // ion even use this lol
     @Sorter(sort = 7) public static double derivativeAlpha = 0.8;  // low-pass (0..1), higher = smoother
 
     @Sorter(sort = 8) public static double closeRPM = 2650.0;
@@ -84,6 +84,7 @@ public class FlywheelController {
         if (this.shooter2 != null) {
             try {
                 this.shooter2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                this.shooter2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER); // mirror mode (no encoder)
             } catch (Exception e) {
                 if (telemetry != null) telemetry.addData("Flywheel.init", "secondary cfg failed: " + e.getMessage());
             }
@@ -147,7 +148,7 @@ public class FlywheelController {
 
         if (!shooterOn) out = 0.0;
 
-        // Apply to motors (shooter2 spins opposite)
+        // Apply to motors (shooter2 uses motor direction for opposite spin)
         try {
             shooter.setPower(out);
         } catch (Exception e) {
@@ -156,7 +157,7 @@ public class FlywheelController {
 
         if (shooter2 != null) {
             try {
-                shooter2.setPower(-out);
+                shooter2.setPower(out); // same magnitude; opposite comes from hardware direction
             } catch (Exception e) {
                 if (telemetry != null) telemetry.addData("Flywheel.power", "secondary setPower failed: " + e.getMessage());
             }
