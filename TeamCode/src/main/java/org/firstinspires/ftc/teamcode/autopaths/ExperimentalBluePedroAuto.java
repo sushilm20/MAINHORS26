@@ -34,17 +34,17 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 1.3; // reduced from 2.5
+    private static final double INTAKE_RUN_SECONDS = 1.0; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
     private static final double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
-    private static final long CLAW_CLOSE_MS = 250L;
+    private static final long CLAW_CLOSE_MS = 200L;
 
     private Timer preActionTimer;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.25;
+    private static final double PRE_ACTION_WAIT_SECONDS = 0.2;
 
     private Timer poseWaitTimer;
     private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;

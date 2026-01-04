@@ -61,9 +61,9 @@ public class wildexperiment extends LinearOpMode {
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
     private static final double GATE_CLOSED = 0.5;
-    private static final long INTAKE_DURATION_MS = 1600;
-    private static final long CLAW_TRIGGER_BEFORE_END_MS = 500;
-    private static final double INTAKE_SEQUENCE_POWER = 0.6;
+    private static final long INTAKE_DURATION_MS = 1000;
+    private static final long CLAW_TRIGGER_BEFORE_END_MS = 200;
+    private static final double INTAKE_SEQUENCE_POWER = 1.0;
 
     // Claw constants
     private static final double CLAW_OPEN = 0.63;
@@ -335,9 +335,9 @@ public class wildexperiment extends LinearOpMode {
             // Telemetry: flywheel & gate
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.4f (dyn)",
-                    FlywheelController.kP, FlywheelController.kI,
-                    FlywheelController.kD, FlywheelController.kF);
+//            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.4f (dyn)",
+//                    FlywheelController.kP, FlywheelController.kI,
+//                    FlywheelController.kD, FlywheelController.kF);
             telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
             telemetry.update();
 

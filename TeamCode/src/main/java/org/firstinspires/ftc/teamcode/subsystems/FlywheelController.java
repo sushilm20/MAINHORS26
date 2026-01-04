@@ -25,27 +25,31 @@ public class FlywheelController {
     @Sorter(sort = 0) public static double MAX_RPM = 6000.0;
     @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
-    @Sorter(sort = 2) public static double kP = 0.0007;
-    @Sorter(sort = 3) public static double kI = 0.0025;//maybe i do
-    @Sorter(sort = 4) public static double kD = 0.00003;
-    @Sorter(sort = 5) public static double kF = 1.53; //was 0.00275
+    @Sorter(sort = 2) public static double kP = 0.00145;
+    @Sorter(sort = 3) public static double kI = 0.0027;//maybe i do
+    @Sorter(sort = 4) public static double kD = 0.00002;
+    @Sorter(sort = 5) public static double kF = 1.72; //gang im so goated
 
     @Sorter(sort = 6) public static double integralLimit = 50; // limit on integral sum (in RPM-error units)
-    @Sorter(sort = 7) public static double derivativeAlpha = 0.8;  // low-pass (0..1), higher = smoother
+    @Sorter(sort = 7) public static double derivativeAlpha = 0.9;  // low-pass (0..1), higher = smoother
 
-    @Sorter(sort = 8) public static double closeRPM = 2650.0;
+    @Sorter(sort = 8) public static double closeRPM = 2450;
     @Sorter(sort = 9) public static double farRPM   = 3500.0;
 
     @Sorter(sort = 10) public static double rpmTolerance = 50.0; // “ready to shoot” window
 
-    // Legacy aliases so existing code can keep compiling while we migrate callers
-    @Sorter(sort = 11) public static double TARGET_RPM_CLOSE;
-    @Sorter(sort = 12) public static double TARGET_RPM_FAR;
-    @Sorter(sort = 13) public static double TARGET_TOLERANCE_RPM;
-
     // Feedforward reference points (ticks/sec at reference voltage)
-    @Sorter(sort = 14) public static double ffReferenceVoltage = 13.0;          // volts
-    @Sorter(sort = 15) public static double ffReferenceMaxTicksPerSec = 4930; // ticks/sec @ reference V
+    @Sorter(sort = 11) public static double ffReferenceVoltage = 13.0;   //so at 13 volts we run 4930 ticks per second
+    @Sorter(sort = 12) public static double ffReferenceMaxTicksPerSec = 4930; // ticks/sec @ reference
+
+    // Optional smoothing (1.0 = no change; lower = more smoothing)
+    @Sorter(sort = 13) public static double rpmFilterAlpha = 0.72;       // low-pass on measured RPM
+    @Sorter(sort = 14) public static double powerSmoothingAlpha = 0.5;  // low-pass on applied power
+
+    // Legacy variable mapped to new
+    public static double TARGET_RPM_CLOSE;
+    public static double TARGET_RPM_FAR;
+    public static double TARGET_TOLERANCE_RPM;
 
     // static initializer must be inside the class
     static {
@@ -137,10 +141,12 @@ public class FlywheelController {
         if (dt <= 0) dt = 1e-3; // avoid div/0
 
         double currentRpmNow = getCurrentRpm(dt);
-        currentRpm = currentRpmNow;
+        // Low-pass filter on measured RPM (alpha=1 => no filtering)
+        currentRpm = rpmFilterAlpha * currentRpmNow + (1.0 - rpmFilterAlpha) * currentRpm;
+
         timer.reset();
 
-        double error = targetRpm - currentRpmNow;
+        double error = targetRpm - currentRpm;
 
         // Integral with clamping
         integralSum += error * dt;
@@ -168,22 +174,25 @@ public class FlywheelController {
 
         if (!shooterOn) out = 0.0;
 
+        // Optional power smoothing (alpha=1 => no smoothing)
+        double smoothedOut = powerSmoothingAlpha * out + (1.0 - powerSmoothingAlpha) * lastAppliedPower;
+
         // Apply to motors (shooter2 uses motor direction for opposite spin)
         try {
-            shooter.setPower(out);
+            shooter.setPower(smoothedOut);
         } catch (Exception e) {
             if (telemetry != null) telemetry.addData("Flywheel.power", "primary setPower failed: " + e.getMessage());
         }
 
         if (shooter2 != null) {
             try {
-                shooter2.setPower(out); // same magnitude; opposite comes from hardware direction
+                shooter2.setPower(smoothedOut); // same magnitude; opposite comes from hardware direction
             } catch (Exception e) {
                 if (telemetry != null) telemetry.addData("Flywheel.power", "secondary setPower failed: " + e.getMessage());
             }
         }
 
-        lastAppliedPower = out;
+        lastAppliedPower = smoothedOut;
         lastError = error;
 
         // At-target detection (rising edge sets justReachedTargetFlag)
