@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Legacy.*;
+import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Shared.*;
 
 /**
  * ExperimentalPedroAuto (improved PRE_ACTION pose handling + fallback)

@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Config.*;
+import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Shared.*;
 
 @Autonomous(name = "Config 12 ball ", group = "Autonomous", preselectTeleOp = "???HORS???")
 @Configurable
