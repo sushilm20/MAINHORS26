@@ -54,13 +54,13 @@ public class TurretController {
 
     // PID liek config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.15;
+    public static double TURRET_KP = 1.2;
 
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
 
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.22;
+    public static double TURRET_KD = 0.25;
 
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
@@ -70,17 +70,17 @@ public class TurretController {
     public static double FF_GAIN = 5.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.935;
+    public static double POWER_SMOOTH_ALPHA = 0.94;
 
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 1.25;
+    public static double DERIV_FILTER_ALPHA = 1.0;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 14;
+    public static int SMALL_DEADBAND_TICKS = 4; //every 4 ticks change required
 
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 50.0;
+    public static double INTEGRAL_CLAMP = 50.0; //not used at all
 
     // Internal state
     private double turretIntegral = 0.0;
