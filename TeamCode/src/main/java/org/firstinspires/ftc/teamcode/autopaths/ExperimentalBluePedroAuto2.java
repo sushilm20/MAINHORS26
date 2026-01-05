@@ -20,6 +20,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
+import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Config.*;
+
 @Autonomous(name = "Config 12 ball ", group = "Autonomous", preselectTeleOp = "???HORS???")
 @Configurable
 public class ExperimentalBluePedroAuto2 extends OpMode {
@@ -35,32 +37,20 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 1.5; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
-    @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
-    @Sorter(sort = 2)
-    public static long CLAW_CLOSE_MS = 250L;
 
     private Timer preActionTimer;
-    @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.25;
 
     private Timer poseWaitTimer;
-    @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
     private long shooterWaitStartMs = -1;
-    @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
@@ -72,46 +62,18 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    @Sorter(sort = 6)
-    public static double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
 
     private Servo clawServo;
 
-    @Sorter(sort = 7)
-    public static double INTAKE_ON_POWER = 1.0;
-    @Sorter(sort = 8)
-    public static double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
-    @Sorter(sort = 9)
-    public static double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
-    @Sorter(sort = 10)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
-
     private int intakeSegmentEnd = -1;
-
-    @Sorter(sort = 13)
-    public static double SHOOT_POSE_X = 48.0;
-    @Sorter(sort = 14)
-    public static double SHOOT_POSE_Y = 96.0;
-    @Sorter(sort = 15)
-    public static double START_POSE_TOLERANCE_IN = 6.0;
 
     private final boolean turretForceManualNoMove = false;
 
     private Servo gateServo;
     private boolean dpadUpLast = false;
     private boolean gateClosed = false;
-    @Sorter(sort = 16)
-    public static double GATE_OPEN = 0.67;
-    @Sorter(sort = 17)
-    public static double GATE_CLOSED = 0.5;
-
-    // Gate control thresholds (open slightly earlier than pose tolerance, close as soon as out of range)
-    @Sorter(sort = 18)
-    public static double GATE_OPEN_TOLERANCE_IN = START_POSE_TOLERANCE_IN + 3.0; // widened gate-open window
-    @Sorter(sort = 19)
-    public static double GATE_CLOSE_TOLERANCE_IN = GATE_OPEN_TOLERANCE_IN + 1.0; // small hysteresis for close
 
     public ExperimentalBluePedroAuto2() {}
 

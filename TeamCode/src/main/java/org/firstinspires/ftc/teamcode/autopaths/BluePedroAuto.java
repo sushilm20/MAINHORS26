@@ -19,6 +19,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
+import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Main.*;
+
 @Autonomous(name = "zBlue 12 ball", group = "Autonomous",preselectTeleOp = "???HORS???")
 @Configurable
 public class BluePedroAuto extends OpMode {
@@ -34,26 +36,20 @@ public class BluePedroAuto extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 1.4; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
-    private static final double TIMED_INTAKE_SECONDS = 0.93;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
-    private static final long CLAW_CLOSE_MS = 250L;
 
     private Timer preActionTimer;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.25;
 
     private Timer poseWaitTimer;
-    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
     private long shooterWaitStartMs = -1;
-    private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
 
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
@@ -65,7 +61,6 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -73,32 +68,13 @@ public class BluePedroAuto extends OpMode {
 
     private Servo clawServo;
 
-    private static final double INTAKE_ON_POWER = 1.0;
-    private static final double SHOOT_POSE_INTAKE_POWER = 0.8; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
-    private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
-
-    // Compression servos no longer used in the intake sequence
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
-
     private int intakeSegmentEnd = -1;
-
-    private static final double SHOOT_POSE_X = 48.0;
-    private static final double SHOOT_POSE_Y = 96.0;
-    private static final double START_POSE_TOLERANCE_IN = 6.0;
 
     private final boolean turretForceManualNoMove = false;
 
     private Servo gateServo;
     private boolean dpadUpLast = false;
     private boolean gateClosed = false;
-    private static final double GATE_OPEN = 0.67;
-    private static final double GATE_CLOSED = 0.5;
-
-    // Gate control thresholds (open slightly earlier than pose tolerance, close as soon as out of range)
-    private static final double GATE_OPEN_TOLERANCE_IN = START_POSE_TOLERANCE_IN + 3.0; // widened gate-open window
-    private static final double GATE_CLOSE_TOLERANCE_IN = GATE_OPEN_TOLERANCE_IN + 1.0; // small hysteresis for close
 
     public BluePedroAuto() {}
 

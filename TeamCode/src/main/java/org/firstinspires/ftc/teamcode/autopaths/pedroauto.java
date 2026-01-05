@@ -19,6 +19,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
+import static org.firstinspires.ftc.teamcode.autopaths.AutoVarsBlue.Legacy.*;
+
 /**
  * ExperimentalPedroAuto (improved PRE_ACTION pose handling + fallback)
  *
@@ -52,24 +54,19 @@ public class pedroauto extends OpMode {
 
     // Intake-wait state & timer
     private Timer intakeTimer;
-    private static final double INTAKE_WAIT_SECONDS = 2.5; // change to shorten/lengthen intake duration
 
     // Timed intake on-path start (for path4, path7 and path10)
     private Timer timedIntakeTimer;
-    private static final double TIMED_INTAKE_SECONDS = 1.0; // run intake for 1 second when path4, path7 or path10 starts
     private boolean timedIntakeActive = false;
 
     // Claw action state & timing
     private long clawActionStartMs = 0L;
-    private static final long CLAW_CLOSE_MS = 250L; // duration to hold claw closed
 
     // Pre-action (delay before starting intake/claw) timer
     private Timer preActionTimer;
-    private static final double PRE_ACTION_WAIT_SECONDS = 0.3; // lowered by 0.5s from 0.8
 
     // Pose-wait timer (wait for robot to reach pose before starting PRE_ACTION). Fallback if it never quite reaches it.
     private Timer poseWaitTimer;
-    private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3; // fallback after short timeout
 
     // Flag to indicate whether PRE_ACTION timer has been started (we only start it when robot reaches pose or fallback triggers)
     private boolean preActionTimerStarted = false;
@@ -78,7 +75,6 @@ public class pedroauto extends OpMode {
 
     // Shooter-wait state before starting paths
     private long shooterWaitStartMs = -1;
-    private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L; // fallback timeout if shooter doesn't spin up
 
     // Shooter / Turret hardware & controllers
     private DcMotor shooterMotor;
@@ -87,7 +83,6 @@ public class pedroauto extends OpMode {
     private BNO055IMU imu;
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE; // close-mode target
 
     // Intake + compression hardware (from teleop)
     private DcMotor intakeMotor;
@@ -98,11 +93,6 @@ public class pedroauto extends OpMode {
     private Servo clawServo;
 
     // Intake/compression "on" values (match teleop right-trigger behavior)
-    private static final double INTAKE_ON_POWER = 1.0;
-    private static final double LEFT_COMPRESSION_ON = 1.0;
-    private static final double RIGHT_COMPRESSION_ON = 0.0;
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
 
     // Intake-segment tracking: when starting a multi-path intake segment (3, 6, 9),
     // set intakeSegmentEnd to the path index after which the intake should be stopped.
@@ -110,10 +100,6 @@ public class pedroauto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     // Shoot pose constants and tolerance - used to ensure PRE_ACTION timer starts only when robot reaches pose
-    private static final double SHOOT_POSE_X = 48.0;
-    private static final double SHOOT_POSE_Y = 96.0;
-    private static final double START_POSE_TOLERANCE_IN = 6.0; // increased tolerance to avoid tiny-miss stalls
-
     public pedroauto() {}
 
     @Override
