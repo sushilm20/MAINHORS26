@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "???HORS???")
 @Configurable
 public class ExperimentalBluePedroAuto extends OpMode {
 
@@ -37,7 +37,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private Timer intakeTimer;
     private static final double INTAKE_RUN_SECONDS = 0.6; // reduced from 2.5
 
-    private Timer timedIntakeTimer;//test
+    private Timer timedIntakeTimer; // test
     private static final double TIMED_INTAKE_SECONDS = 1.0;
     private boolean timedIntakeActive = false;
 
@@ -54,7 +54,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private boolean preActionEntered = false;
 
     private long shooterWaitStartMs = -1;
-    private static final long SHOOTER_WAIT_TIMEOUT_MS = 3000L;
+    private static final long SHOOTER_WAIT_TIMEOUT_MS = 1000L;
 
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
@@ -74,25 +74,26 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private Servo clawServo;
 
-    private static double INTAKE_ON_POWER = -1.0;
-    private static double SHOOT_POSE_INTAKE_POWER = -1.0; // reduced power only when starting intake at the shoot pose
-    private static double CLOSED_INTAKE_POWER = -0.8;     // pre-spin before gate opens
+    // Intake powers (negative = intake direction)
+    private static double INTAKE_ON_POWER = -0.6;   // travel / non-shoot
+    private static double SHOOT_POSE_INTAKE_POWER = -1.0; // at shoot pose
+    private static double CLOSED_INTAKE_POWER = -0.6;     // pre-spin near shoot
     private static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
     private static final double LEFT_COMPRESSION_OFF = 0.5;
     private static final double RIGHT_COMPRESSION_OFF = 0.5;
 
-    private int intakeSegmentEnd = -1;
+    private int intakeSegmentEnd = -1; // retained but not used to stop intake
 
-    private static final double SHOOT_POSE_X = 65.0;
+    // Primary shoot pose coordinates
+    private static final double SHOOT_POSE_X = 68.0;
     private static final double SHOOT_POSE_Y = 78.0;
     private static final double START_POSE_TOLERANCE_IN = 6.0;
 
     private final boolean turretForceManualNoMove = false;
 
     private Servo gateServo;
-    private boolean dpadUpLast = false;
     private boolean gateClosed = false;
     private static final double GATE_OPEN = 0.67;
     private static final double GATE_CLOSED = 0.5;
@@ -110,6 +111,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
+        // Start pose unchanged
         follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
 
         intakeTimer = new Timer();
@@ -236,7 +238,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     @Override
     public void init_loop() {
         if (flywheel != null) {
-//            flywheel.update(System.currentTimeMillis(), false);
+            // flywheel.update(System.currentTimeMillis(), false);
         }
         if (turretController != null) {
             turretController.update(false, 0.0);
@@ -382,19 +384,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
             return;
         }
 
-        if (idx == 3) {
-            intakeSegmentEnd = 3;
-            startIntake();
-        } else if (idx == 6) {
-            intakeSegmentEnd = 6;
-            startIntake();
-        } else if (idx == 9) {
-            intakeSegmentEnd = 9;
-            startIntake();
-        }
+        // Always run intake while traveling (non-shoot pose)
+        startIntake(INTAKE_ON_POWER);
 
         if (idx == 4 || idx == 7 || idx == 10) {
-            startIntake();
             timedIntakeTimer.resetTimer();
             timedIntakeActive = true;
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
@@ -422,10 +415,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                stopIntake();
+                // keep intake on at travel power instead of stopping
+                startIntake(INTAKE_ON_POWER);
                 timedIntakeActive = false;
-                intakeSegmentEnd = -1;
-                panelsTelemetry.debug("TimedIntake", "Timed intake ended after " + TIMED_INTAKE_SECONDS + "s");
+                panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at travel power");
             } else {
                 panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
             }
@@ -443,10 +436,6 @@ public class ExperimentalBluePedroAuto extends OpMode {
             case RUNNING_PATH:
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
-                    if (intakeSegmentEnd == finished) {
-                        stopIntake();
-                        intakeSegmentEnd = -1;
-                    }
 
                     if (endsAtShoot(finished)) {
                         nextPathIndex = finished + 1;
@@ -499,7 +488,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // Reduced intake power only when starting intake at the shoot pose
+                        // At shoot pose: full intake power
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
@@ -509,9 +498,8 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
             case INTAKE_RUN:
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    if (intakeSegmentEnd == -1) {
-                        stopIntake();
-                    }
+                    // After shoot intake window, go back to travel intake power
+                    startIntake(INTAKE_ON_POWER);
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(0.2); // close
                     clawActionStartMs = System.currentTimeMillis();
@@ -579,98 +567,103 @@ public class ExperimentalBluePedroAuto extends OpMode {
         public PathChain Path11;
 
         public Paths(Follower follower) {
+            // Path1: start -> primary shoot pose (68,78,180)
             Path1 = follower
                     .pathBuilder()
                     .addPath(
-
-                            new BezierLine(new Pose(20.000, 122.000), new Pose(48.000, 96.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(135))
-                    .build();
-
-            Path2 = follower
-                    .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(44.000, 82.000))
+                            new BezierLine(new Pose(20.000, 122.000, Math.toRadians(135)), new Pose(68.000, 78.000, Math.toRadians(180)))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180))
                     .build();
 
+            // Path2: shoot -> (20,80,175)
+            Path2 = follower
+                    .pathBuilder()
+                    .addPath(
+                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(180)), new Pose(20.000, 80.000, Math.toRadians(175)))
+                    )
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(175))
+                    .build();
+
+            // Path3: (20,80,175) -> (12,76,90) gate clear
             Path3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.000, 82.000), new Pose(24.000, 82.000))
+                            new BezierLine(new Pose(20.000, 80.000, Math.toRadians(175)), new Pose(16.0, 76.000, Math.toRadians(90)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(175), Math.toRadians(90))
                     .build();
 
+            // Path4: (12,76,90) -> (68,78,-146) angled shoot
             Path4 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(24.000, 82.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(16.0, 76.000, Math.toRadians(90)), new Pose(68.000, 78.000, Math.toRadians(-146)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(-146))
                     .build();
 
+            // Path5: (68,78,-146) -> (44,57,-175)
             Path5 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(46.000, 57.000))
+                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(-146)), new Pose(44.000, 57.000, Math.toRadians(-175)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(-146), Math.toRadians(-175))
                     .build();
 
+            // Path6: (44,57,-175) -> (12,56,-180)
             Path6 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(46.000, 57.000), new Pose(18.00, 57.000))
+                            new BezierLine(new Pose(44.000, 57.000, Math.toRadians(-175)), new Pose(12.000, 56.000, Math.toRadians(-180)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(-175), Math.toRadians(-180))
                     .build();
 
+            // Path7: (12,56,-180) -> (68,78,-125) angled shoot
             Path7 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(18.00, 57.000), new Pose(34.000, 70.000))
+                            new BezierLine(new Pose(12.000, 56.000, Math.toRadians(-180)), new Pose(68.000, 78.000, Math.toRadians(-125)))
                     )
-                    .setNoDeceleration()
-                    .setLinearHeadingInterpolation(Math.toRadians(180),Math.toRadians(180))
-                    .addPath(
-                            new BezierLine(new Pose(34.000, 70.000), new Pose(48.000, 96.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-125))
                     .build();
 
+            // Path8: (68,78,-125) -> (47,33,-180) alignment before collect 3
             Path8 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(45.000, 33.000))
+                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(-125)), new Pose(47.000, 33.000, Math.toRadians(-180)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(-125), Math.toRadians(-180))
                     .build();
 
+            // Path9: (47,33,-180) -> (12,33,180)
             Path9 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(45.000, 33.000), new Pose(15.000, 33.000))
+                            new BezierLine(new Pose(47.000, 33.000, Math.toRadians(-180)), new Pose(12.000, 33.000, Math.toRadians(180)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(180))
                     .build();
 
+            // Path10: (12,33,180) -> (68,78,180) final shoot pose
             Path10 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(15.000, 33.000), new Pose(48.000, 96.000))
+                            new BezierLine(new Pose(12.000, 33.000, Math.toRadians(180)), new Pose(68.000, 78.000, Math.toRadians(180)))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
+            // Path11: hold/adjust at final shoot pose
             Path11 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(48.000, 96.000), new Pose(40.000, 85.000))
+                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(180)), new Pose(68.000, 78.000, Math.toRadians(180)))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(135))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
         }
     }

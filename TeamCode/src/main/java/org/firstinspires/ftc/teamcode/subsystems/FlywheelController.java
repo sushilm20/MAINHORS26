@@ -33,7 +33,7 @@ public class FlywheelController {
     @Sorter(sort = 6) public static double integralLimit = 50; // limit on integral sum (in RPM-error units)
     @Sorter(sort = 7) public static double derivativeAlpha = 0.9;  // low-pass (0..1), higher = smoother
 
-    @Sorter(sort = 8) public static double closeRPM = 2450;
+    @Sorter(sort = 8) public static double closeRPM = 2630;
     @Sorter(sort = 9) public static double farRPM   = 3500.0;
 
     @Sorter(sort = 10) public static double rpmTolerance = 50.0; // “ready to shoot” window
