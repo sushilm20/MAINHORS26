@@ -11,6 +11,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -34,10 +35,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private static final double INTAKE_RUN_SECONDS = 1.0; // reduced from 2.5
+    private static final double INTAKE_RUN_SECONDS = 0.6; // reduced from 2.5
 
     private Timer timedIntakeTimer;//test
-    private static final double TIMED_INTAKE_SECONDS = 0.93;
+    private static final double TIMED_INTAKE_SECONDS = 1.0;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
@@ -73,10 +74,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private Servo clawServo;
 
-    private static final double INTAKE_ON_POWER = 1.0;
-    private static final double SHOOT_POSE_INTAKE_POWER = 0.4; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
-    private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
+    private static double INTAKE_ON_POWER = -1.0;
+    private static double SHOOT_POSE_INTAKE_POWER = -1.0; // reduced power only when starting intake at the shoot pose
+    private static double CLOSED_INTAKE_POWER = -0.8;     // pre-spin before gate opens
+    private static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
     private static final double LEFT_COMPRESSION_OFF = 0.5;
@@ -84,8 +85,8 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private int intakeSegmentEnd = -1;
 
-    private static final double SHOOT_POSE_X = 48.0;
-    private static final double SHOOT_POSE_Y = 96.0;
+    private static final double SHOOT_POSE_X = 65.0;
+    private static final double SHOOT_POSE_Y = 78.0;
     private static final double START_POSE_TOLERANCE_IN = 6.0;
 
     private final boolean turretForceManualNoMove = false;
@@ -200,7 +201,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
             leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
             rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
 
-            intakeMotor.setDirection(DcMotor.Direction.REVERSE);
+            intakeMotor.setDirection(DcMotor.Direction.FORWARD);
 
             intakeMotor.setPower(0.0);
             if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);

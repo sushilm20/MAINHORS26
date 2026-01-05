@@ -11,6 +11,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -74,8 +75,8 @@ public class BluePedroAuto extends OpMode {
     private Servo clawServo;
 
     private static final double INTAKE_ON_POWER = 1.0;
-    private static final double SHOOT_POSE_INTAKE_POWER = 0.8; // reduced power only when starting intake at the shoot pose
-    private static final double CLOSED_INTAKE_POWER = 0.35;     // pre-spin before gate opens
+    private static final double SHOOT_POSE_INTAKE_POWER = INTAKE_ON_POWER; // full power at shoot pose
+    private static final double CLOSED_INTAKE_POWER = 1.0;     // pre-spin before gate opens
     private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
@@ -498,7 +499,7 @@ public class BluePedroAuto extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // Reduced intake power only when starting intake at the shoot pose
+                        // Full power intake when starting intake at the shoot pose
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
