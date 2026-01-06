@@ -79,7 +79,7 @@ public class FarmModeRedAuto extends OpMode {
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
     private FlywheelController flywheel;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE; // overall auto shooter RPM
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_FAR; // overall auto shooter RPM
     private static final double RPM_TOLERANCE = 0.05; // 5% tolerance for "stable" detection
     private static final double REQUIRED_STABLE_SECONDS = 2.0; // run intake for 5s at stable RPM before claw
 

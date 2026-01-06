@@ -1,18 +1,18 @@
-package org.firstinspires.ftc.teamcode.autopaths;
+package org.firstinspires.ftc.teamcode. autopaths;
 
-import com. bylazar.configurables.annotations.Configurable;
-import com.bylazar.configurables.annotations. Sorter;
-import com.bylazar. telemetry.PanelsTelemetry;
+import com.bylazar.configurables.annotations.Configurable;
+import com.bylazar.configurables. annotations. Sorter;
+import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
-import com.pedropathing.follower.Follower;
-import com. pedropathing. geometry.BezierLine;
+import com.pedropathing.follower. Follower;
+import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry. Pose;
 import com.pedropathing.paths.PathChain;
 import com. pedropathing. util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
-import com. qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
+import com.qualcomm. hardware.bosch. JustLoggingAccelerationIntegrator;
 import com. qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm. robotcore.hardware. Servo;
+import com. qualcomm.robotcore.hardware. Servo;
 import com.qualcomm. robotcore.eventloop.opmode. Autonomous;
 import com.qualcomm. robotcore.eventloop.opmode.OpMode;
 
@@ -20,9 +20,9 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org. firstinspires. ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Experiment 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "???HORS??? ")
+@Autonomous(name = "A Wild Experiment 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "??? HORS??? ")
 @Configurable
-public class ExperimentalBluePedroAuto2 extends OpMode {
+public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -35,32 +35,18 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.6; // reduced from 2.5
-
-    private Timer timedIntakeTimer; // test
-    @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.0;
+    private Timer timedIntakeTimer;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
-    @Sorter(sort = 2)
-    public static long CLAW_CLOSE_MS = 200L;
 
     private Timer preActionTimer;
-    @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.2;
-
     private Timer poseWaitTimer;
-    @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
     private long shooterWaitStartMs = -1;
-    @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1000L;
 
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
@@ -80,46 +66,192 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
     private Servo clawServo;
 
-    // Intake powers (negative = intake direction)
-    @Sorter(sort = 6)
-    public static double INTAKE_ON_POWER = -0.6;   // travel / non-shoot
-    @Sorter(sort = 7)
-    public static double SHOOT_POSE_INTAKE_POWER = -1.0; // at shoot pose
-    @Sorter(sort = 8)
-    public static double CLOSED_INTAKE_POWER = -0.6;     // pre-spin near shoot
-    @Sorter(sort = 9)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
-
-    // Compression servos no longer used in the intake sequence
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
-
-    private int intakeSegmentEnd = -1; // retained but not used to stop intake
-
-    // Primary shoot pose coordinates
-    @Sorter(sort = 10)
-    public static double SHOOT_POSE_X = 68.0;
-    @Sorter(sort = 11)
-    public static double SHOOT_POSE_Y = 78.0;
-    @Sorter(sort = 12)
-    public static double START_POSE_TOLERANCE_IN = 6.0;
+    private int intakeSegmentEnd = -1;
 
     private final boolean turretForceManualNoMove = false;
 
     private Servo gateServo;
     private boolean gateClosed = false;
+
+    // ========================================
+    // TIMING PARAMETERS
+    // ========================================
+    @Sorter(sort = 0)
+    public static double INTAKE_RUN_SECONDS = 0.6;
+
+    @Sorter(sort = 1)
+    public static double TIMED_INTAKE_SECONDS = 1.0;
+
+    @Sorter(sort = 2)
+    public static long CLAW_CLOSE_MS = 200L;
+
+    @Sorter(sort = 3)
+    public static double PRE_ACTION_WAIT_SECONDS = 0.2;
+
+    @Sorter(sort = 4)
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
+
+    @Sorter(sort = 5)
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1000L;
+
+    // ========================================
+    // INTAKE POWER SETTINGS
+    // ========================================
+    @Sorter(sort = 10)
+    public static double INTAKE_ON_POWER = -0.6;
+
+    @Sorter(sort = 11)
+    public static double SHOOT_POSE_INTAKE_POWER = -1.0;
+
+    @Sorter(sort = 12)
+    public static double CLOSED_INTAKE_POWER = -0.6;
+
     @Sorter(sort = 13)
+    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0;
+
+    // ========================================
+    // TOLERANCE SETTINGS
+    // ========================================
+    @Sorter(sort = 20)
+    public static double START_POSE_TOLERANCE_IN = 6.0;
+
+    // ========================================
+    // GATE SETTINGS
+    // ========================================
+    @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
-    @Sorter(sort = 14)
+
+    @Sorter(sort = 31)
     public static double GATE_CLOSED = 0.5;
 
-    // Gate control thresholds (open slightly earlier than pose tolerance, close as soon as out of range)
-    @Sorter(sort = 15)
-    public static double GATE_OPEN_TOLERANCE_IN = 9.0; // widened gate-open window (START_POSE_TOLERANCE_IN + 3. 0)
-    @Sorter(sort = 16)
-    public static double GATE_CLOSE_TOLERANCE_IN = 10.0; // small hysteresis for close (GATE_OPEN_TOLERANCE_IN + 1.0)
+    @Sorter(sort = 32)
+    public static double GATE_OPEN_TOLERANCE_IN = 9.0;
 
-    public ExperimentalBluePedroAuto2() {}
+    @Sorter(sort = 33)
+    public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
+
+    // ========================================
+    // PATH POSES - START POSITION
+    // ========================================
+    @Sorter(sort = 100)
+    public static double START_X = 20.0;
+
+    @Sorter(sort = 101)
+    public static double START_Y = 122.0;
+
+    @Sorter(sort = 102)
+    public static double START_HEADING = 135.0;
+
+    // ========================================
+    // PATH POSES - SHOOT POSITION (Primary)
+    // ========================================
+    @Sorter(sort = 110)
+    public static double SHOOT_POSE_X = 68.0;
+
+    @Sorter(sort = 111)
+    public static double SHOOT_POSE_Y = 78.0;
+
+    @Sorter(sort = 112)
+    public static double SHOOT_HEADING_INITIAL = 180.0;
+
+    @Sorter(sort = 113)
+    public static double SHOOT_HEADING_FIRST3 = -146.0;
+
+    @Sorter(sort = 114)
+    public static double SHOOT_HEADING_SECOND3 = -125.0;
+
+    @Sorter(sort = 115)
+    public static double SHOOT_HEADING_FINAL = 180.0;
+
+    // ========================================
+    // PATH POSES - COLLECT FIRST 3 POSITION
+    // ========================================
+    @Sorter(sort = 120)
+    public static double COLLECT_FIRST3_X = 20.0;
+
+    @Sorter(sort = 121)
+    public static double COLLECT_FIRST3_Y = 80.0;
+
+    @Sorter(sort = 122)
+    public static double COLLECT_FIRST3_HEADING = 175.0;
+
+    // ========================================
+    // PATH POSES - GATE CLEAR POSITION
+    // ========================================
+    @Sorter(sort = 130)
+    public static double GATE_CLEAR_X = 16.0;
+
+    @Sorter(sort = 131)
+    public static double GATE_CLEAR_Y = 76.0;
+
+    @Sorter(sort = 132)
+    public static double GATE_CLEAR_HEADING = 90.0;
+
+    // ========================================
+    // PATH POSES - ALIGN SECOND 3 POSITION
+    // ========================================
+    @Sorter(sort = 140)
+    public static double ALIGN_SECOND3_X = 44.0;
+
+    @Sorter(sort = 141)
+    public static double ALIGN_SECOND3_Y = 57.0;
+
+    @Sorter(sort = 142)
+    public static double ALIGN_SECOND3_HEADING = -175.0;
+
+    // ========================================
+    // PATH POSES - COLLECT SECOND 3 POSITION
+    // ========================================
+    @Sorter(sort = 150)
+    public static double COLLECT_SECOND3_X = 12.0;
+
+    @Sorter(sort = 151)
+    public static double COLLECT_SECOND3_Y = 56.0;
+
+    @Sorter(sort = 152)
+    public static double COLLECT_SECOND3_HEADING = -180.0;
+
+    // ========================================
+    // PATH POSES - ALIGN THIRD 3 POSITION
+    // ========================================
+    @Sorter(sort = 160)
+    public static double ALIGN_THIRD3_X = 47.0;
+
+    @Sorter(sort = 161)
+    public static double ALIGN_THIRD3_Y = 33.0;
+
+    @Sorter(sort = 162)
+    public static double ALIGN_THIRD3_HEADING = -180.0;
+
+    // ========================================
+    // PATH POSES - COLLECT THIRD 3 POSITION
+    // ========================================
+    @Sorter(sort = 170)
+    public static double COLLECT_THIRD3_X = 12.0;
+
+    @Sorter(sort = 171)
+    public static double COLLECT_THIRD3_Y = 33.0;
+
+    @Sorter(sort = 172)
+    public static double COLLECT_THIRD3_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - MOVE FOR RP POSITION
+    // ========================================
+    @Sorter(sort = 180)
+    public static double MOVE_RP_X = 55.0;
+
+    @Sorter(sort = 181)
+    public static double MOVE_RP_Y = 78.0;
+
+    @Sorter(sort = 182)
+    public static double MOVE_RP_HEADING = 135.0;
+
+    // Compression servos (not used in intake sequence)
+    private static final double LEFT_COMPRESSION_OFF = 0.5;
+    private static final double RIGHT_COMPRESSION_OFF = 0.5;
+
+    public ExperimentalBluePedroAuto3() {}
 
     @Override
     public void init() {
@@ -128,8 +260,8 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
-        // Start pose unchanged
-        follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
+        // Start pose using variables
+        follower.setStartingPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING)));
 
         intakeTimer = new Timer();
         timedIntakeTimer = new Timer();
@@ -144,10 +276,10 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
             shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
-            turretMotor = hardwareMap. get(DcMotor.class, "turret");
+            turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
             if (shooterMotor != null) {
-                shooterMotor. setDirection(DcMotor.Direction.REVERSE);
+                shooterMotor. setDirection(DcMotor.Direction. REVERSE);
                 shooterMotor. setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             }
             if (shooterMotor2 != null) {
@@ -159,7 +291,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                 turretMotor.setDirection(DcMotor. Direction.FORWARD);
                 turretMotor.setMode(DcMotor.RunMode. STOP_AND_RESET_ENCODER);
                 turretMotor. setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                turretMotor. setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                turretMotor. setZeroPowerBehavior(DcMotor. ZeroPowerBehavior.BRAKE);
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors:  " + e.getMessage());
@@ -179,7 +311,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                 panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
             } catch (Exception e) {
                 hubImu = null;
-                panelsTelemetry. debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
+                panelsTelemetry.debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
             }
 
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
@@ -220,7 +352,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             leftCompressionServo = hardwareMap. get(Servo. class, "leftCompressionServo");
             rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
 
-            intakeMotor.setDirection(DcMotor.Direction. FORWARD);
+            intakeMotor. setDirection(DcMotor.Direction. FORWARD);
 
             intakeMotor.setPower(0.0);
             if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
@@ -300,7 +432,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
-        panelsTelemetry.debug("Heading", follower. getPose().getHeading());
+        panelsTelemetry.debug("Heading", follower.getPose().getHeading());
         if (flywheel != null) {
             panelsTelemetry. debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
@@ -322,8 +454,8 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
 
         double dist = distanceToShootPose();
-        panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
-        panelsTelemetry.debug("GateClosed", String.valueOf(gateClosed));
+        panelsTelemetry.debug("DistToShootPose", String. format("%.2f", dist));
+        panelsTelemetry.debug("GateClosed", String. valueOf(gateClosed));
 
         if (imu == pinpointImu && pinpointImu != null) {
             panelsTelemetry.debug("IMU Source", "PinPoint ('pinpoint')");
@@ -364,16 +496,14 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private void startIntake(double power) {
         try {
             if (intakeMotor != null) intakeMotor.setPower(power);
-            // compression servos intentionally not moved during intake sequence
         } catch (Exception e) {
-            panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
+            panelsTelemetry.debug("Intake", "startIntake error: " + e. getMessage());
         }
     }
 
     private void stopIntake() {
         try {
-            if (intakeMotor != null) intakeMotor. setPower(0.0);
-            // leave compression servos untouched
+            if (intakeMotor != null) intakeMotor.setPower(0.0);
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
         }
@@ -401,11 +531,10 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             return;
         }
 
-        // Always run intake while traveling (non-shoot pose)
         startIntake(INTAKE_ON_POWER);
 
         if (idx == 4 || idx == 7 || idx == 10) {
-            timedIntakeTimer.resetTimer();
+            timedIntakeTimer. resetTimer();
             timedIntakeActive = true;
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
         }
@@ -415,12 +544,12 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
             case 2: follower.followPath(paths.collectFirst3); break;
             case 3: follower.followPath(paths.gateClear); break;
             case 4: follower.followPath(paths.backToShootFirst3); break;
-            case 5: follower. followPath(paths.alignToCollectSecond3); break;
+            case 5: follower.followPath(paths.alignToCollectSecond3); break;
             case 6: follower.followPath(paths.collectSecond3); break;
-            case 7: follower.followPath(paths.backToShootSecond3); break;
+            case 7: follower. followPath(paths. backToShootSecond3); break;
             case 8: follower.followPath(paths.alignToCollectThird3); break;
             case 9: follower.followPath(paths.collectThird3); break;
-            case 10: follower. followPath(paths.backToShootThird3); break;
+            case 10: follower.followPath(paths.backToShootThird3); break;
             case 11: follower.followPath(paths.moveForRP); break;
             default: break;
         }
@@ -432,7 +561,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer. getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                // keep intake on at travel power instead of stopping
                 startIntake(INTAKE_ON_POWER);
                 timedIntakeActive = false;
                 panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at travel power");
@@ -471,19 +599,17 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                 break;
 
             case CLOSED_INTAKE_SEQUENCE:
-                // Pre-spin intake (gate stays closed until gate tolerance hit)
                 double distPre = distanceToShootPose();
                 if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) {
                     startIntake(CLOSED_INTAKE_POWER);
                 }
-                // Transition to PRE_ACTION once within main pose tolerance
                 if (distPre <= START_POSE_TOLERANCE_IN) {
                     state = AutoState.PRE_ACTION;
                 }
                 break;
 
             case PRE_ACTION:
-                if (! preActionEntered) {
+                if (!preActionEntered) {
                     poseWaitTimer. resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
@@ -505,7 +631,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // At shoot pose:  full intake power
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
                         state = AutoState. INTAKE_RUN;
@@ -515,10 +640,9 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
             case INTAKE_RUN:
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    // After shoot intake window, go back to travel intake power
                     startIntake(INTAKE_ON_POWER);
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                    if (clawServo != null) clawServo.setPosition(0.2); // close
+                    if (clawServo != null) clawServo.setPosition(0.2);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }
@@ -526,7 +650,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
 
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    if (clawServo != null) clawServo.setPosition(0.63); // open
+                    if (clawServo != null) clawServo.setPosition(0.63);
                     if (nextPathIndex > 0 && nextPathIndex <= 11) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
@@ -545,12 +669,6 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         }
     }
 
-    /**
-     * Gate behavior:
-     * - Open quickly when within GATE_OPEN_TOLERANCE_IN of the shoot pose.
-     * - Close immediately once outside GATE_CLOSE_TOLERANCE_IN.
-     * This keeps the gate closed whenever we're not effectively at the shoot state.
-     */
     private void updateGate() {
         try {
             double dist = distanceToShootPose();
@@ -565,7 +683,7 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
                 panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ")");
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Gate", "updateGate error: " + e. getMessage());
+            panelsTelemetry.debug("Gate", "updateGate error: " + e.getMessage());
         }
     }
 
@@ -584,103 +702,125 @@ public class ExperimentalBluePedroAuto2 extends OpMode {
         public PathChain moveForRP;
 
         public Paths(Follower follower) {
-            // Path1:   start -> primary shoot pose (68,78,180)
+            // Path 1: Start -> Primary shoot pose
             startToShoot = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(20.000, 122.000), new Pose(68.000, 78.000))
-                    )
-                    .setLinearHeadingInterpolation(Math. toRadians(135), Math.toRadians(180))
-                    .build();
+                    . addPath(new BezierLine(
+                            new Pose(START_X, START_Y),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(START_HEADING),
+                            Math. toRadians(SHOOT_HEADING_INITIAL))
+                    . build();
 
-            // collectFirst3: shoot -> (20,80,175)
+            // Path 2: Shoot -> Collect first 3
             collectFirst3 = follower
-                    .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(68.000, 78.000), new Pose(20.000, 80.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(175))
+                    . pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
+                            new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SHOOT_HEADING_INITIAL),
+                            Math.toRadians(COLLECT_FIRST3_HEADING))
                     .build();
 
-            // gateClear: (20,80,175) -> (12,76,90) gate clear
+            // Path 3: Collect first 3 -> Gate clear
             gateClear = follower
                     .pathBuilder()
-                    . addPath(
-                            new BezierLine(new Pose(20.000, 80.000), new Pose(16.0, 76.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(175), Math.toRadians(90))
+                    . addPath(new BezierLine(
+                            new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
+                            new Pose(GATE_CLEAR_X, GATE_CLEAR_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(COLLECT_FIRST3_HEADING),
+                            Math. toRadians(GATE_CLEAR_HEADING))
                     .build();
 
-            // backToShootFirst3: (12,76,90) -> (68,78,-146) angled shoot
+            // Path 4: Gate clear -> Shoot (angled for first 3)
             backToShootFirst3 = follower
-                    . pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(16.0, 76.000), new Pose(68.000, 78.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(-146))
-                    .build();
-
-            // alignToCollectSecond3: (68,78,-146) -> (44,57,-175)
-            alignToCollectSecond3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(68.000, 78.000), new Pose(44.000, 57.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(-146), Math.toRadians(-175))
+                    .addPath(new BezierLine(
+                            new Pose(GATE_CLEAR_X, GATE_CLEAR_Y),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                    . setLinearHeadingInterpolation(
+                            Math. toRadians(GATE_CLEAR_HEADING),
+                            Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
-            // collectSecond3: (44,57,-175) -> (12,56,-180)
+            // Path 5: Shoot -> Align for second 3
+            alignToCollectSecond3 = follower
+                    . pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
+                            new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SHOOT_HEADING_FIRST3),
+                            Math.toRadians(ALIGN_SECOND3_HEADING))
+                    . build();
+
+            // Path 6: Align -> Collect second 3
             collectSecond3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(44.000, 57.000), new Pose(12.000, 56.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(-175), Math.toRadians(-180))
+                    .addPath(new BezierLine(
+                            new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y),
+                            new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(ALIGN_SECOND3_HEADING),
+                            Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
-            // backToShootSecond3: (12,56,-180) -> (68,78,-125) angled shoot
+            // Path 7: Collect second 3 -> Shoot (angled for second 3)
             backToShootSecond3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(12.000, 56.000), new Pose(68.000, 78.000))
-                    )
-                    . setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-125))
-                    . build();
+                    .addPath(new BezierLine(
+                            new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(COLLECT_SECOND3_HEADING),
+                            Math.toRadians(SHOOT_HEADING_SECOND3))
+                    .build();
 
-            // alignToCollectThird3: (68,78,-125) -> (47,33,-180) alignment before collect 3
+            // Path 8: Shoot -> Align for third 3
             alignToCollectThird3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(68.000, 78.000), new Pose(47.000, 33.000))
-                    )
-                    . setLinearHeadingInterpolation(Math.toRadians(-125), Math.toRadians(-180))
-                    . build();
+                    .addPath(new BezierLine(
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
+                            new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SHOOT_HEADING_SECOND3),
+                            Math.toRadians(ALIGN_THIRD3_HEADING))
+                    .build();
 
-            // collectThird3: (47,33,-180) -> (12,33,180)
+            // Path 9: Align -> Collect third 3
             collectThird3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(47.000, 33.000), new Pose(12.000, 33.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(180))
+                    .addPath(new BezierLine(
+                            new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y),
+                            new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(ALIGN_THIRD3_HEADING),
+                            Math.toRadians(COLLECT_THIRD3_HEADING))
                     .build();
 
-            // backToShootThird3: (12,33,180) -> (68,78,180) final shoot pose
+            // Path 10: Collect third 3 -> Shoot (final)
             backToShootThird3 = follower
-                    . pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(12.000, 33.000), new Pose(68.000, 78.000))
-                    )
-                    .setLinearHeadingInterpolation(Math. toRadians(180), Math.toRadians(180))
-                    .build();
+                    .pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                    . setLinearHeadingInterpolation(
+                            Math. toRadians(COLLECT_THIRD3_HEADING),
+                            Math.toRadians(SHOOT_HEADING_FINAL))
+                    . build();
 
-            // moveForRP: hold/adjust at final shoot pose
+            // Path 11: Shoot -> Move for RP
             moveForRP = follower
                     .pathBuilder()
-                    . addPath(
-                            new BezierLine(new Pose(68.000, 78.000), new Pose(55.000, 78.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(135))
+                    . addPath(new BezierLine(
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
+                            new Pose(MOVE_RP_X, MOVE_RP_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SHOOT_HEADING_FINAL),
+                            Math.toRadians(MOVE_RP_HEADING))
                     .build();
         }
     }
