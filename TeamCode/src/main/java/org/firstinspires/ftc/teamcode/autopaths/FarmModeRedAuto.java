@@ -335,13 +335,13 @@ public class FarmModeRedAuto extends OpMode {
 
     // Helper: check which path ends at shoot pose
     private boolean endsAtShoot(int pathIndex) {
-        // per provided Paths: Path1, gateClear, Path6 end at 52,14
+        // per provided Paths: Path1, gateClear, collectSecond3 end at 52,14
         return pathIndex == 1 || pathIndex == 3 || pathIndex == 6;
     }
 
     // Helper: check which path starts at shoot pose (we want PRE_ACTION also when next path starts at shoot)
     private boolean startsAtShoot(int pathIndex) {
-        // per provided Paths: collectFirst3, backToShootFirst3, Path7 start at 52,14
+        // per provided Paths: collectFirst3, backToShootFirst3, backToShootSecond3 start at 52,14
         return pathIndex == 2 || pathIndex == 4 || pathIndex == 7;
     }
 

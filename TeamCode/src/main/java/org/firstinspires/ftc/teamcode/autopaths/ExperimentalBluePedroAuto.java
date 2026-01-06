@@ -415,13 +415,13 @@ public class ExperimentalBluePedroAuto extends OpMode {
             case 2: follower.followPath(paths.collectFirst3); break;
             case 3: follower.followPath(paths.gateClear); break;
             case 4: follower.followPath(paths.backToShootFirst3); break;
-            case 5: follower. followPath(paths. Path5); break;
-            case 6: follower.followPath(paths.Path6); break;
-            case 7: follower.followPath(paths.Path7); break;
-            case 8: follower.followPath(paths.Path8); break;
-            case 9: follower.followPath(paths.Path9); break;
-            case 10: follower. followPath(paths. Path10); break;
-            case 11: follower.followPath(paths.Path11); break;
+            case 5: follower. followPath(paths.alignToCollectSecond3); break;
+            case 6: follower.followPath(paths.collectSecond3); break;
+            case 7: follower.followPath(paths.backToShootSecond3); break;
+            case 8: follower.followPath(paths.alignToCollectThird3); break;
+            case 9: follower.followPath(paths.collectThird3); break;
+            case 10: follower. followPath(paths.backToShootThird3); break;
+            case 11: follower.followPath(paths.moveForRP); break;
             default: break;
         }
 
@@ -575,29 +575,29 @@ public class ExperimentalBluePedroAuto extends OpMode {
         public PathChain collectFirst3;
         public PathChain gateClear;
         public PathChain backToShootFirst3;
-        public PathChain Path5;
-        public PathChain Path6;
-        public PathChain Path7;
-        public PathChain Path8;
-        public PathChain Path9;
-        public PathChain Path10;
-        public PathChain Path11;
+        public PathChain alignToCollectSecond3;
+        public PathChain collectSecond3;
+        public PathChain backToShootSecond3;
+        public PathChain alignToCollectThird3;
+        public PathChain collectThird3;
+        public PathChain backToShootThird3;
+        public PathChain moveForRP;
 
         public Paths(Follower follower) {
-            // Path1:  start -> primary shoot pose (68,78,180)
+            // Path1:   start -> primary shoot pose (68,78,180)
             startToShoot = follower
                     .pathBuilder()
-                    . addPath(
-                            new BezierLine(new Pose(20.000, 122.000, Math.toRadians(135)), new Pose(68.000, 78.000, Math. toRadians(180)))
+                    .addPath(
+                            new BezierLine(new Pose(20.000, 122.000), new Pose(68.000, 78.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math. toRadians(135), Math.toRadians(180))
                     .build();
 
             // collectFirst3: shoot -> (20,80,175)
             collectFirst3 = follower
                     .pathBuilder()
-                    . addPath(
-                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(180)), new Pose(20.000, 80.000, Math.toRadians(175)))
+                    .addPath(
+                            new BezierLine(new Pose(68.000, 78.000), new Pose(20.000, 80.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(175))
                     .build();
@@ -605,82 +605,82 @@ public class ExperimentalBluePedroAuto extends OpMode {
             // gateClear: (20,80,175) -> (12,76,90) gate clear
             gateClear = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(20.000, 80.000, Math. toRadians(175)), new Pose(16.0, 76.000, Math.toRadians(90)))
+                    . addPath(
+                            new BezierLine(new Pose(20.000, 80.000), new Pose(16.0, 76.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(175), Math.toRadians(90))
                     .build();
 
             // backToShootFirst3: (12,76,90) -> (68,78,-146) angled shoot
             backToShootFirst3 = follower
-                    .pathBuilder()
+                    . pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(16.0, 76.000, Math.toRadians(90)), new Pose(68.000, 78.000, Math.toRadians(-146)))
+                            new BezierLine(new Pose(16.0, 76.000), new Pose(68.000, 78.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(-146))
                     .build();
 
-            // Path5: (68,78,-146) -> (44,57,-175)
-            Path5 = follower
+            // alignToCollectSecond3: (68,78,-146) -> (44,57,-175)
+            alignToCollectSecond3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(-146)), new Pose(44.000, 57.000, Math.toRadians(-175)))
+                            new BezierLine(new Pose(68.000, 78.000), new Pose(44.000, 57.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(-146), Math.toRadians(-175))
                     .build();
 
-            // Path6: (44,57,-175) -> (12,56,-180)
-            Path6 = follower
+            // collectSecond3: (44,57,-175) -> (12,56,-180)
+            collectSecond3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(44.000, 57.000, Math.toRadians(-175)), new Pose(12.000, 56.000, Math.toRadians(-180)))
+                            new BezierLine(new Pose(44.000, 57.000), new Pose(12.000, 56.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(-175), Math.toRadians(-180))
                     .build();
 
-            // Path7: (12,56,-180) -> (68,78,-125) angled shoot
-            Path7 = follower
-                    . pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(12.000, 56.000, Math.toRadians(-180)), new Pose(68.000, 78.000, Math. toRadians(-125)))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-125))
-                    .build();
-
-            // Path8: (68,78,-125) -> (47,33,-180) alignment before collect 3
-            Path8 = follower
+            // backToShootSecond3: (12,56,-180) -> (68,78,-125) angled shoot
+            backToShootSecond3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(-125)), new Pose(47.000, 33.000, Math.toRadians(-180)))
+                            new BezierLine(new Pose(12.000, 56.000), new Pose(68.000, 78.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(-125), Math.toRadians(-180))
-                    .build();
+                    . setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-125))
+                    . build();
 
-            // Path9: (47,33,-180) -> (12,33,180)
-            Path9 = follower
+            // alignToCollectThird3: (68,78,-125) -> (47,33,-180) alignment before collect 3
+            alignToCollectThird3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(47.000, 33.000, Math.toRadians(-180)), new Pose(12.000, 33.000, Math.toRadians(180)))
+                            new BezierLine(new Pose(68.000, 78.000), new Pose(47.000, 33.000))
+                    )
+                    . setLinearHeadingInterpolation(Math.toRadians(-125), Math.toRadians(-180))
+                    . build();
+
+            // collectThird3: (47,33,-180) -> (12,33,180)
+            collectThird3 = follower
+                    .pathBuilder()
+                    .addPath(
+                            new BezierLine(new Pose(47.000, 33.000), new Pose(12.000, 33.000))
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(180))
                     .build();
 
-            // Path10: (12,33,180) -> (68,78,180) final shoot pose
-            Path10 = follower
-                    .pathBuilder()
+            // backToShootThird3: (12,33,180) -> (68,78,180) final shoot pose
+            backToShootThird3 = follower
+                    . pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(12.000, 33.000, Math.toRadians(180)), new Pose(68.000, 78.000, Math.toRadians(180)))
+                            new BezierLine(new Pose(12.000, 33.000), new Pose(68.000, 78.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math. toRadians(180), Math.toRadians(180))
                     .build();
 
-            // Path11: hold/adjust at final shoot pose
-            Path11 = follower
+            // moveForRP: hold/adjust at final shoot pose
+            moveForRP = follower
                     .pathBuilder()
                     . addPath(
-                            new BezierLine(new Pose(68.000, 78.000, Math.toRadians(180)), new Pose(68.000, 78.000, Math. toRadians(180)))
+                            new BezierLine(new Pose(68.000, 78.000), new Pose(55.000, 78.000))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(135))
                     .build();
         }
     }

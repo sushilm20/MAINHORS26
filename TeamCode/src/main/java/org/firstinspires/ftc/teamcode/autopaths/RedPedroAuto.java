@@ -648,7 +648,7 @@ public class RedPedroAuto extends OpMode {
                     .setConstantHeadingInterpolation(Math.toRadians(0))
                     .build();
 
-            // Path7 split into two segments (mirrors provided red code)
+            // backToShootSecond3 split into two segments (mirrors provided red code)
             Path7 = follower
                     .pathBuilder()
                     .addPath(
