@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
  * FarmModeBlueAuto — Adapted from BluePedroAuto logic per your instructions.
  *
  * Changes in this version:
- *  - Added WAIT_NO_MOVEMENT state entered immediately after Path3 finishes.
+ *  - Added WAIT_NO_MOVEMENT state entered immediately after gateClear finishes.
  *  - WAIT_TIME_NO_MOVEMENT is a configurable variable (default 7.0 seconds).
  *  - During WAIT_NO_MOVEMENT the robot does not start any new path/movement and the flywheel
  *    target RPM is set to the close-mode RPM (or left unchanged if flywheel missing).
@@ -335,13 +335,13 @@ public class FarmModeRedAuto extends OpMode {
 
     // Helper: check which path ends at shoot pose
     private boolean endsAtShoot(int pathIndex) {
-        // per provided Paths: Path1, Path3, Path6 end at 52,14
+        // per provided Paths: Path1, gateClear, Path6 end at 52,14
         return pathIndex == 1 || pathIndex == 3 || pathIndex == 6;
     }
 
     // Helper: check which path starts at shoot pose (we want PRE_ACTION also when next path starts at shoot)
     private boolean startsAtShoot(int pathIndex) {
-        // per provided Paths: Path2, Path4, Path7 start at 52,14
+        // per provided Paths: collectFirst3, backToShootFirst3, Path7 start at 52,14
         return pathIndex == 2 || pathIndex == 4 || pathIndex == 7;
     }
 
@@ -442,7 +442,7 @@ public class FarmModeRedAuto extends OpMode {
                         if (flywheel != null) {
                             flywheel.setTargetRPM(FlywheelController.TARGET_RPM_CLOSE);
                         }
-                        panelsTelemetry.debug("WAIT_NO_MOVEMENT", "Entered after Path3; waiting " + WAIT_TIME_NO_MOVEMENT + "s with close-mode RPM");
+                        panelsTelemetry.debug("WAIT_NO_MOVEMENT", "Entered after gateClear; waiting " + WAIT_TIME_NO_MOVEMENT + "s with close-mode RPM");
                         state = AutoState.WAIT_NO_MOVEMENT;
                         break;
                     }
