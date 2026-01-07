@@ -61,8 +61,6 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
-    private Servo leftCompressionServo;
-    private Servo rightCompressionServo;
 
     private Servo clawServo;
 
@@ -98,13 +96,13 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.6;
+    public static double INTAKE_ON_POWER = -0.67;
 
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
 
     @Sorter(sort = 12)
-    public static double CLOSED_INTAKE_POWER = -0.6;
+    public static double CLOSED_INTAKE_POWER = 0.0;
 
     @Sorter(sort = 13)
     public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0;
@@ -247,9 +245,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 135.0;
 
-    // Compression servos (not used in intake sequence)
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
+
 
     public ExperimentalBluePedroAuto3() {}
 
@@ -349,16 +345,12 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
-            leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
-            rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
-
             intakeMotor.setDirection(DcMotor.Direction.FORWARD);
 
             intakeMotor.setPower(0.0);
-            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
-            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
+
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Intake Motor mapping failed: " + e.getMessage());
         }
 
         try {
@@ -446,8 +438,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         }
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
-            panelsTelemetry.debug("LeftCompPos", leftCompressionServo != null ? leftCompressionServo.getPosition() : -1);
-            panelsTelemetry.debug("RightCompPos", rightCompressionServo != null ? rightCompressionServo.getPosition() : -1);
+
         }
         if (clawServo != null) {
             panelsTelemetry.debug("ClawPos", clawServo.getPosition());
