@@ -1,23 +1,23 @@
-package org.firstinspires.ftc.teamcode. autopaths;
+package org.firstinspires.ftc.teamcode.autopaths;
 
 import com.bylazar.configurables.annotations.Configurable;
-import com.bylazar.configurables. annotations. Sorter;
+import com.bylazar.configurables.annotations.Sorter;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
-import com.pedropathing.follower. Follower;
+import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
-import com.pedropathing.geometry. Pose;
+import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
-import com. pedropathing. util.Timer;
+import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
-import com.qualcomm. hardware.bosch. JustLoggingAccelerationIntegrator;
-import com. qualcomm.robotcore.hardware.DcMotor;
-import com. qualcomm.robotcore.hardware. Servo;
-import com.qualcomm. robotcore.eventloop.opmode. Autonomous;
-import com.qualcomm. robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org. firstinspires. ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @Autonomous(name = "A Wild Experiment 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "??? HORS??? ")
@@ -29,7 +29,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     private Paths paths;
 
     private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED }
-    private AutoState state = AutoState. IDLE;
+    private AutoState state = AutoState.IDLE;
 
     private int currentPathIndex = 0;
     private int nextPathIndex = -1;
@@ -58,7 +58,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController. TARGET_RPM_CLOSE;
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
 
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
@@ -179,19 +179,19 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 16.0;
+    public static double GATE_CLEAR_X = 14.0;
 
     @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 76.0;
+    public static double GATE_CLEAR_Y = 78.0;
 
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 90.0;
+    public static double GATE_CLEAR_HEADING = 75.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 140)
-    public static double ALIGN_SECOND3_X = 44.0;
+    public static double ALIGN_SECOND3_X = 46.0;
 
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 57.0;
@@ -203,7 +203,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - COLLECT SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 12.0;
+    public static double COLLECT_SECOND3_X = 14.0;
 
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 56.0;
@@ -227,7 +227,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 12.0;
+    public static double COLLECT_THIRD3_X = 14.0;
 
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 33.0;
@@ -255,7 +255,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     @Override
     public void init() {
-        panelsTelemetry = PanelsTelemetry. INSTANCE. getTelemetry();
+        panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
@@ -279,22 +279,22 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
             if (shooterMotor != null) {
-                shooterMotor. setDirection(DcMotor.Direction. REVERSE);
-                shooterMotor. setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+                shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             }
             if (shooterMotor2 != null) {
                 shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
-                shooterMotor2.setMode(DcMotor.RunMode. RUN_USING_ENCODER);
+                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             }
 
             if (turretMotor != null) {
-                turretMotor.setDirection(DcMotor. Direction.FORWARD);
-                turretMotor.setMode(DcMotor.RunMode. STOP_AND_RESET_ENCODER);
-                turretMotor. setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                turretMotor. setZeroPowerBehavior(DcMotor. ZeroPowerBehavior.BRAKE);
+                turretMotor.setDirection(DcMotor.Direction.FORWARD);
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Failed to map shooter/turret motors:  " + e.getMessage());
+            panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
 
         try {
@@ -303,7 +303,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                 panelsTelemetry.debug("Init", "Found PinPoint IMU as 'pinpoint'");
             } catch (Exception e) {
                 pinpointImu = null;
-                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found:  " + e.getMessage());
+                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
             }
 
             try {
@@ -321,12 +321,12 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                 imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
                 imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
                 imu.initialize(imuParams);
-                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" :  "Expansion Hub") + ")");
+                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" : "Expansion Hub") + ")");
             } else {
                 panelsTelemetry.debug("Init", "No IMU found (neither 'pinpoint' nor 'imu'). Turret will not have heading data.");
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e. getMessage());
+            panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e.getMessage());
         }
 
         try {
@@ -344,21 +344,21 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                 flywheel.setShooterOn(false);
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e. getMessage());
+            panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
         }
 
         try {
-            intakeMotor = hardwareMap.get(DcMotor. class, "intakeMotor");
-            leftCompressionServo = hardwareMap. get(Servo. class, "leftCompressionServo");
+            intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            leftCompressionServo = hardwareMap.get(Servo.class, "leftCompressionServo");
             rightCompressionServo = hardwareMap.get(Servo.class, "rightCompressionServo");
 
-            intakeMotor. setDirection(DcMotor.Direction. FORWARD);
+            intakeMotor.setDirection(DcMotor.Direction.FORWARD);
 
             intakeMotor.setPower(0.0);
             if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
             if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e. getMessage());
+            panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
         }
 
         try {
@@ -377,7 +377,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                 gateClosed = true;
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Gate servo mapping failed: " + e. getMessage());
+            panelsTelemetry.debug("Init", "Gate servo mapping failed: " + e.getMessage());
         }
 
         panelsTelemetry.debug("Status", "Initialized (shooter remains OFF until start())");
@@ -402,11 +402,11 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         }
         if (turretController != null) {
             turretController.captureReferences();
-            turretController. resetPidState();
+            turretController.resetPidState();
         }
 
         shooterWaitStartMs = System.currentTimeMillis();
-        state = AutoState. WAIT_FOR_SHOOTER;
+        state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
@@ -434,15 +434,15 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
         if (flywheel != null) {
-            panelsTelemetry. debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
+            panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
-            panelsTelemetry.debug("Fly On", flywheel. isShooterOn());
+            panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
             panelsTelemetry.debug("Fly AtTarget", flywheel.isAtTarget());
         }
         if (turretMotor != null && turretController != null) {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
             panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
-            panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(! turretForceManualNoMove));
+            panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
         }
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
@@ -450,17 +450,17 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             panelsTelemetry.debug("RightCompPos", rightCompressionServo != null ? rightCompressionServo.getPosition() : -1);
         }
         if (clawServo != null) {
-            panelsTelemetry. debug("ClawPos", clawServo.getPosition());
+            panelsTelemetry.debug("ClawPos", clawServo.getPosition());
         }
 
         double dist = distanceToShootPose();
-        panelsTelemetry.debug("DistToShootPose", String. format("%.2f", dist));
-        panelsTelemetry.debug("GateClosed", String. valueOf(gateClosed));
+        panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
+        panelsTelemetry.debug("GateClosed", String.valueOf(gateClosed));
 
         if (imu == pinpointImu && pinpointImu != null) {
             panelsTelemetry.debug("IMU Source", "PinPoint ('pinpoint')");
         } else if (imu == hubImu && hubImu != null) {
-            panelsTelemetry. debug("IMU Source", "Expansion Hub ('imu')");
+            panelsTelemetry.debug("IMU Source", "Expansion Hub ('imu')");
         } else {
             panelsTelemetry.debug("IMU Source", "None");
         }
@@ -471,11 +471,11 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     @Override
     public void stop() {
         if (flywheel != null) {
-            flywheel. setShooterOn(false);
+            flywheel.setShooterOn(false);
             flywheel.update(System.currentTimeMillis(), false);
         }
         if (turretController != null) {
-            turretController. update(false, 0.0);
+            turretController.update(false, 0.0);
         }
 
         stopIntake();
@@ -486,7 +486,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             gateClosed = true;
         }
 
-        state = AutoState. FINISHED;
+        state = AutoState.FINISHED;
     }
 
     private void startIntake() {
@@ -497,7 +497,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         try {
             if (intakeMotor != null) intakeMotor.setPower(power);
         } catch (Exception e) {
-            panelsTelemetry.debug("Intake", "startIntake error: " + e. getMessage());
+            panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
         }
     }
 
@@ -520,21 +520,21 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             double dy = p.getY() - SHOOT_POSE_Y;
             return Math.hypot(dx, dy);
         } catch (Exception e) {
-            return Double. POSITIVE_INFINITY;
+            return Double.POSITIVE_INFINITY;
         }
     }
 
     private void startPath(int idx) {
         if (idx < 1 || idx > 11) {
             currentPathIndex = 0;
-            state = AutoState. FINISHED;
+            state = AutoState.FINISHED;
             return;
         }
 
         startIntake(INTAKE_ON_POWER);
 
         if (idx == 4 || idx == 7 || idx == 10) {
-            timedIntakeTimer. resetTimer();
+            timedIntakeTimer.resetTimer();
             timedIntakeActive = true;
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
         }
@@ -546,7 +546,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             case 4: follower.followPath(paths.backToShootFirst3); break;
             case 5: follower.followPath(paths.alignToCollectSecond3); break;
             case 6: follower.followPath(paths.collectSecond3); break;
-            case 7: follower. followPath(paths. backToShootSecond3); break;
+            case 7: follower.followPath(paths.backToShootSecond3); break;
             case 8: follower.followPath(paths.alignToCollectThird3); break;
             case 9: follower.followPath(paths.collectThird3); break;
             case 10: follower.followPath(paths.backToShootThird3); break;
@@ -560,12 +560,12 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
-            if (timedIntakeTimer. getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
+            if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
                 startIntake(INTAKE_ON_POWER);
                 timedIntakeActive = false;
                 panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at travel power");
             } else {
-                panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer. getElapsedTimeSeconds()));
+                panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
             }
         }
 
@@ -579,18 +579,18 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                 break;
 
             case RUNNING_PATH:
-                if (! follower.isBusy()) {
+                if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
                     if (endsAtShoot(finished)) {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
-                        state = AutoState. CLOSED_INTAKE_SEQUENCE;
+                        state = AutoState.CLOSED_INTAKE_SEQUENCE;
                     } else {
                         int next = finished + 1;
                         if (next > 11) {
-                            state = AutoState. FINISHED;
+                            state = AutoState.FINISHED;
                         } else {
                             startPath(next);
                         }
@@ -610,30 +610,30 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
             case PRE_ACTION:
                 if (!preActionEntered) {
-                    poseWaitTimer. resetTimer();
+                    poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
                     panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
                 }
 
-                if (! preActionTimerStarted) {
+                if (!preActionTimerStarted) {
                     double dist = distanceToShootPose();
                     if (dist <= START_POSE_TOLERANCE_IN) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "At pose:  starting PRE_ACTION timer");
-                    } else if (poseWaitTimer. getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
+                        panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
+                    } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout:  starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
                     } else {
-                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String. format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
-                        state = AutoState. INTAKE_RUN;
+                        state = AutoState.INTAKE_RUN;
                     }
                 }
                 break;
@@ -655,7 +655,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
                     } else {
-                        state = AutoState. FINISHED;
+                        state = AutoState.FINISHED;
                     }
                 }
                 break;
@@ -676,8 +676,8 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             if (dist <= GATE_OPEN_TOLERANCE_IN && gateServo != null && gateClosed) {
                 gateServo.setPosition(GATE_OPEN);
                 gateClosed = false;
-                panelsTelemetry.debug("Gate", "Opened (dist=" + String. format("%.2f", dist) + ")");
-            } else if (dist >= GATE_CLOSE_TOLERANCE_IN && gateServo != null && ! gateClosed) {
+                panelsTelemetry.debug("Gate", "Opened (dist=" + String.format("%.2f", dist) + ")");
+            } else if (dist >= GATE_CLOSE_TOLERANCE_IN && gateServo != null && !gateClosed) {
                 gateServo.setPosition(GATE_CLOSED);
                 gateClosed = true;
                 panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ")");
@@ -705,17 +705,17 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             // Path 1: Start -> Primary shoot pose
             startToShoot = follower
                     .pathBuilder()
-                    . addPath(new BezierLine(
+                    .addPath(new BezierLine(
                             new Pose(START_X, START_Y),
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(START_HEADING),
-                            Math. toRadians(SHOOT_HEADING_INITIAL))
-                    . build();
+                            Math.toRadians(SHOOT_HEADING_INITIAL))
+                    .build();
 
             // Path 2: Shoot -> Collect first 3
             collectFirst3 = follower
-                    . pathBuilder()
+                    .pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y)))
@@ -727,12 +727,12 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             // Path 3: Collect first 3 -> Gate clear
             gateClear = follower
                     .pathBuilder()
-                    . addPath(new BezierLine(
+                    .addPath(new BezierLine(
                             new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
                             new Pose(GATE_CLEAR_X, GATE_CLEAR_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(COLLECT_FIRST3_HEADING),
-                            Math. toRadians(GATE_CLEAR_HEADING))
+                            Math.toRadians(GATE_CLEAR_HEADING))
                     .build();
 
             // Path 4: Gate clear -> Shoot (angled for first 3)
@@ -741,21 +741,21 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                     .addPath(new BezierLine(
                             new Pose(GATE_CLEAR_X, GATE_CLEAR_Y),
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
-                    . setLinearHeadingInterpolation(
-                            Math. toRadians(GATE_CLEAR_HEADING),
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(GATE_CLEAR_HEADING),
                             Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
             // Path 5: Shoot -> Align for second 3
             alignToCollectSecond3 = follower
-                    . pathBuilder()
+                    .pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(SHOOT_HEADING_FIRST3),
                             Math.toRadians(ALIGN_SECOND3_HEADING))
-                    . build();
+                    .build();
 
             // Path 6: Align -> Collect second 3
             collectSecond3 = follower
@@ -807,15 +807,15 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                     .addPath(new BezierLine(
                             new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
-                    . setLinearHeadingInterpolation(
-                            Math. toRadians(COLLECT_THIRD3_HEADING),
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(COLLECT_THIRD3_HEADING),
                             Math.toRadians(SHOOT_HEADING_FINAL))
-                    . build();
+                    .build();
 
             // Path 11: Shoot -> Move for RP
             moveForRP = follower
                     .pathBuilder()
-                    . addPath(new BezierLine(
+                    .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(MOVE_RP_X, MOVE_RP_Y)))
                     .setLinearHeadingInterpolation(

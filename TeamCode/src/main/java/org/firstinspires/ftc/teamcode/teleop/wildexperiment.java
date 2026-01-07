@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
-
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -53,6 +52,7 @@ public class wildexperiment extends LinearOpMode {
     private boolean aPressedLast = false; // gamepad1 A reset latch
 
     private boolean isFarMode = false;
+    private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
 
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.12;
@@ -172,7 +172,8 @@ public class wildexperiment extends LinearOpMode {
         // Initial positions
         gateController.setGateClosed(true); // gate open => red on, green off, rn made it so that gate is closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
-        telemetry.addData("/nTurret IMU", imuUsed);
+        telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
+        telemetry.addData("\nTurret IMU", imuUsed);
 
         telemetry.update();
 
@@ -239,6 +240,7 @@ public class wildexperiment extends LinearOpMode {
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
+                // Hood automatically adjusts based on mode
                 hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
             }
             touchpadPressedLast = touchpadNow;
@@ -287,6 +289,14 @@ public class wildexperiment extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
+            // Check if PIDF mode changed and update hood accordingly
+            boolean currentPidfMode = flywheel.isUsingFarCoefficients();
+            if (currentPidfMode != lastPidfMode) {
+                // PIDF mode switched, auto-adjust hood to match
+                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                lastPidfMode = currentPidfMode;
+            }
+
             // shooter2 now driven by FlywheelController; no manual mirroring needed
 
             // Rumble when at target
@@ -332,15 +342,20 @@ public class wildexperiment extends LinearOpMode {
             if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
-            // Telemetry: flywheel & gate
+            // Telemetry: flywheel & gate with PIDF mode info
+            String pidfModeStr = flywheel.isUsingFarCoefficients() ? "FAR" : "CLOSE";
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-//            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.4f (dyn)",
-//                    FlywheelController.kP, FlywheelController.kI,
-//                    FlywheelController.kD, FlywheelController.kF);
+            telemetry.addData("PIDF Mode", "%s (threshold: %.0f RPM)",
+                    pidfModeStr, FlywheelController.RPM_SWITCH_THRESHOLD);
+            telemetry.addData("PIDF Coefficients", "kP=%.5f kI=%.5f kD=%.6f kF=%.2f",
+                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kP : FlywheelController.CLOSE_kP,
+                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kI : FlywheelController.CLOSE_kI,
+                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kD : FlywheelController.CLOSE_kD,
+                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kF : FlywheelController.CLOSE_kF);
+            telemetry.addData("Target Mode", isFarMode ? "FAR" : "CLOSE");
             telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
             telemetry.update();
-
         }
 
         turretController.disable();
@@ -368,7 +383,7 @@ public class wildexperiment extends LinearOpMode {
             } else if (imu != null) {
                 imu.initialize(imuParams);
             }
-        } catch (Exception ignored) {}//even if ignored we are resetting the limits atleast
+        } catch (Exception ignored) {} // even if ignored we are resetting the limits at least
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turretController.captureReferences();
