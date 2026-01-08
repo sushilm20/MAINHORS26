@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "A Wild Experiment 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "??? HORS??? ")
+@Autonomous(name = "A Wild Experiment 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
 public class ExperimentalBluePedroAuto3 extends OpMode {
 
@@ -81,7 +81,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double TIMED_INTAKE_SECONDS = 1.0;
 
     @Sorter(sort = 2)
-    public static long CLAW_CLOSE_MS = 200L;
+    public static long CLAW_CLOSE_MS = 190L;
 
     @Sorter(sort = 3)
     public static double PRE_ACTION_WAIT_SECONDS = 0.2;
@@ -96,7 +96,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.67;
+    public static double INTAKE_ON_POWER = -0.70;
 
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;

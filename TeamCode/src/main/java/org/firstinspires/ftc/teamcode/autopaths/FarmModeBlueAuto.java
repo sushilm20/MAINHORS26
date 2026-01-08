@@ -31,7 +31,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
  * Keep verifying hardware names: "shooter", "intakeMotor", "leftCompressionServo",
  * "rightCompressionServo", "clawServo".
  */
-@Autonomous(name = "FARMODE BLUE 🔷", group = "Autonomous",preselectTeleOp = "???HORS???")
+@Autonomous(name = "FARMODE BLUE 🔷", group = "Autonomous",preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
 public class FarmModeBlueAuto extends OpMode {
 
