@@ -429,7 +429,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
-            panelsTelemetry.debug("Fly AtTarget", flywheel.isAtTarget());
+//            panelsTelemetry.debug("Fly AtTarget", flywheel.isAtTarget());
         }
         if (turretMotor != null && turretController != null) {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
