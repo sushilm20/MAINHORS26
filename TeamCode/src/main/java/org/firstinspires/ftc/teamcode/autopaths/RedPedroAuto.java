@@ -79,8 +79,7 @@ public class RedPedroAuto extends OpMode {
     private static final double CLOSED_INTAKE_TOLERANCE_IN = 12.0; // start pre-spin within 12"
 
     // Compression servos no longer used in the intake sequence
-    private static final double LEFT_COMPRESSION_OFF = 0.5;
-    private static final double RIGHT_COMPRESSION_OFF = 0.5;
+
 
     private int intakeSegmentEnd = -1;
 
@@ -216,8 +215,7 @@ public class RedPedroAuto extends OpMode {
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
             intakeMotor.setPower(0.0);
-            if (leftCompressionServo != null) leftCompressionServo.setPosition(LEFT_COMPRESSION_OFF);
-            if (rightCompressionServo != null) rightCompressionServo.setPosition(RIGHT_COMPRESSION_OFF);
+
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake/compression mapping failed: " + e.getMessage());
         }
