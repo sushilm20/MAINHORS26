@@ -30,7 +30,7 @@ public class FlywheelController {
     @Sorter(sort = 2) public static double RPM_SWITCH_THRESHOLD = 3000.0;
 
     // --- CLOSE PIDF coefficients (for target RPM below threshold) ---
-    @Sorter(sort = 3) public static double CLOSE_kP = 0.00145;
+    @Sorter(sort = 3) public static double CLOSE_kP = 0.00146;
     @Sorter(sort = 4) public static double CLOSE_kI = 0.0027;
     @Sorter(sort = 5) public static double CLOSE_kD = 0.00002;
     @Sorter(sort = 6) public static double CLOSE_kF = 1.72;
@@ -376,7 +376,7 @@ public class FlywheelController {
         if (leftTriggerNow && !leftTriggerLast) {
             savedTargetBeforeTrigger = targetRpm;
             savedShooterOnBeforeTrigger = shooterOn;
-            setTargetRpm(40.0);
+            setTargetRpm(closeRPM);
             shooterOn = true;
         } else if (!leftTriggerNow && leftTriggerLast) {
             if (savedTargetBeforeTrigger >= 0.0) {
