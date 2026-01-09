@@ -156,13 +156,13 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double SHOOT_HEADING_INITIAL = 180.0;
 
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 180.0;
+    public static double SHOOT_FIRST3_HEADING = 180.0;
 
     @Sorter(sort = 114)
-    public static double SHOOT_HEADING_SECOND3 = 180.0;
+    public static double SHOOT_SECOND3_HEADING = 180.0;
 
     @Sorter(sort = 115)
-    public static double SHOOT_HEADING_FINAL = 180.0;
+    public static double SHOOT_FINAL_HEADING = 180.0;
 
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
@@ -778,7 +778,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(GATE_CLEAR_HEADING),
-                            Math.toRadians(SHOOT_HEADING_FIRST3))
+                            Math.toRadians(SHOOT_FIRST3_HEADING))
                     .build();
 
             // Path 6: Shoot -> Align for second 3
@@ -788,7 +788,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(SHOOT_HEADING_FIRST3),
+                            Math.toRadians(SHOOT_FIRST3_HEADING),
                             Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 
@@ -811,7 +811,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(COLLECT_SECOND3_HEADING),
-                            Math.toRadians(SHOOT_HEADING_SECOND3))
+                            Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
             // Path 9: Shoot -> Align for third 3
@@ -821,7 +821,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(SHOOT_HEADING_SECOND3),
+                            Math.toRadians(SHOOT_SECOND3_HEADING),
                             Math.toRadians(ALIGN_THIRD3_HEADING))
                     .build();
 
@@ -844,7 +844,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(COLLECT_THIRD3_HEADING),
-                            Math.toRadians(SHOOT_HEADING_FINAL))
+                            Math.toRadians(SHOOT_FINAL_HEADING))
                     .build();
 
             // Path 12: Shoot -> Move for RP
@@ -854,7 +854,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(MOVE_RP_X, MOVE_RP_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(SHOOT_HEADING_FINAL),
+                            Math.toRadians(SHOOT_FINAL_HEADING),
                             Math.toRadians(MOVE_RP_HEADING))
                     .build();
         }
