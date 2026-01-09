@@ -156,7 +156,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double SHOOT_HEADING_INITIAL = 180.0;
 
     @Sorter(sort = 113)
-    public static double SHOOT_FIRST3_HEADING = 180.0;
+    public static double SHOOT_HEADING_FIRST3 = 180.0;
 
     @Sorter(sort = 114)
     public static double SHOOT_SECOND3_HEADING = 180.0;
@@ -180,10 +180,10 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
     @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 16.0;
+    public static double GATE_ALIGN_X = 25.0;
 
     @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 79.0;
+    public static double GATE_ALIGN_Y = 75.0;
 
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 120.0;
@@ -195,7 +195,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double GATE_CLEAR_X = 14.0;
 
     @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 78.0;
+    public static double GATE_CLEAR_Y = 75.0;
 
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 75.0;
@@ -778,7 +778,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(GATE_CLEAR_HEADING),
-                            Math.toRadians(SHOOT_FIRST3_HEADING))
+                            Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
             // Path 6: Shoot -> Align for second 3
@@ -788,7 +788,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(SHOOT_FIRST3_HEADING),
+                            Math.toRadians(SHOOT_HEADING_FIRST3),
                             Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 

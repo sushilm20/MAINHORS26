@@ -159,7 +159,7 @@ public class thirdexperimentalHORS extends LinearOpMode {
         // PedroPathing follower for localization (driving still handled by DriveController)
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(40.000, 85.000, Math.toRadians(135)));  // Default starting pose (adjust as needed)
+            follower.setStartingPose(new Pose(22, 120, Math.toRadians(135)));  // Default starting pose (adjust as needed)
             follower.update();
         } catch (Exception e) {
             follower = null; // fail gracefully
