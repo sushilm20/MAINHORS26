@@ -55,7 +55,7 @@ public class wildexperiment extends LinearOpMode {
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
 
     // Hood presets
-    private static final double RIGHT_HOOD_CLOSE = 0.12;
+    private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
     // Gate/Intake constants

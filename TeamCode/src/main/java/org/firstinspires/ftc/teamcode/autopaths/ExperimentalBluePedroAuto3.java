@@ -28,7 +28,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public Follower follower;
     private Paths paths;
 
-    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, FINISHED }
+    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, WAIT_GATE_CLEAR, FINISHED }
     private AutoState state = AutoState.IDLE;
 
     private int currentPathIndex = 0;
@@ -42,6 +42,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private Timer preActionTimer;
     private Timer poseWaitTimer;
+    private Timer gateClearWaitTimer;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
@@ -63,6 +64,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     private DcMotor intakeMotor;
 
     private Servo clawServo;
+    private Servo rightHoodServo;
 
     private int intakeSegmentEnd = -1;
 
@@ -130,6 +132,9 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     @Sorter(sort = 34)
     public static double GATE_ALIGN_WAIT_SECONDS = 0.35;
+
+    @Sorter(sort = 35)
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
 
     // ========================================
     // PATH POSES - START POSITION
@@ -278,6 +283,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         preActionTimer = new Timer();
         poseWaitTimer = new Timer();
         gateAlignWaitTimer = new Timer();
+        gateClearWaitTimer = new Timer();
         nextPathIndex = -1;
         intakeSegmentEnd = -1;
         preActionTimerStarted = false;
@@ -373,6 +379,16 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
+        }
+
+        try {
+            rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
+            if (rightHoodServo != null) {
+                rightHoodServo.setPosition(0.16);
+                panelsTelemetry.debug("Init", "Right hood servo initialized to 0.16");
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("Init", "Right hood servo mapping failed: " + e.getMessage());
         }
 
         try {
@@ -594,6 +610,13 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
                         break;
                     }
 
+                    if (finished == 4) {
+                        gateClearWaitTimer.resetTimer();
+                        nextPathIndex = 5;
+                        state = AutoState.WAIT_GATE_CLEAR;
+                        break;
+                    }
+
                     if (endsAtShoot(finished)) {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
@@ -612,6 +635,17 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
             case WAIT_GATE_ALIGN:
                 if (gateAlignWaitTimer.getElapsedTimeSeconds() >= GATE_ALIGN_WAIT_SECONDS) {
+                    if (nextPathIndex > 0) {
+                        startPath(nextPathIndex);
+                        nextPathIndex = -1;
+                    } else {
+                        state = AutoState.FINISHED;
+                    }
+                }
+                break;
+
+            case WAIT_GATE_CLEAR:
+                if (gateClearWaitTimer.getElapsedTimeSeconds() >= WAIT_AFTER_GATE_CLEAR_SECONDS) {
                     if (nextPathIndex > 0) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
