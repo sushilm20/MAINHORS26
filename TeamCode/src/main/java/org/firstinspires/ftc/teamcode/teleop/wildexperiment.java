@@ -177,7 +177,7 @@ public class wildexperiment extends LinearOpMode {
 
         telemetry.update();
 
-        // Prepare subsystems
+        // Prepare subsystems - just capture current state, don't reset anything yet
         turretController.captureReferences();
         turretController.resetPidState();
 
@@ -187,6 +187,7 @@ public class wildexperiment extends LinearOpMode {
             return;
         }
 
+        // After start: re-zero with Option A (no IMU reset, just capture current state)
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
 
@@ -202,35 +203,19 @@ public class wildexperiment extends LinearOpMode {
             // Touchpad reset (gamepad2)
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
-                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                if (pinpoint != null) {
-                    try { pinpoint.resetPosAndIMU(); } catch (Exception ignored) {}
-                } else if (imu != null) {
-                    try { imu.initialize(imuParams); } catch (Exception ignored) {}
-                }
-                turretController.captureReferences();
-                turretController.resetPidState();
+                reZeroHeadingAndTurret(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Heading ref and turret encoder zeroed");
+                telemetry.addData("Reset", "Turret reference captured at current position");
                 telemetry.update();
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1) — mirrors touchpad reset
+            // A button reset (gamepad1)
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                if (pinpoint != null) {
-                    try { pinpoint.resetPosAndIMU(); } catch (Exception ignored) {}
-                } else if (imu != null) {
-                    try { imu.initialize(imuParams); } catch (Exception ignored) {}
-                }
-                turretController.captureReferences();
-                turretController.resetPidState();
+                reZeroHeadingAndTurret(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Heading ref and turret encoder zeroed (gp1 A)");
+                telemetry.addData("Reset", "Turret reference captured at current position (gp1 A)");
                 telemetry.update();
             }
             aPressedLast = aNow;
@@ -240,7 +225,6 @@ public class wildexperiment extends LinearOpMode {
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
-                // Hood automatically adjusts based on mode
                 hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
             }
             touchpadPressedLast = touchpadNow;
@@ -292,12 +276,9 @@ public class wildexperiment extends LinearOpMode {
             // Check if PIDF mode changed and update hood accordingly
             boolean currentPidfMode = flywheel.isUsingFarCoefficients();
             if (currentPidfMode != lastPidfMode) {
-                // PIDF mode switched, auto-adjust hood to match
                 hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
                 lastPidfMode = currentPidfMode;
             }
-
-            // shooter2 now driven by FlywheelController; no manual mirroring needed
 
             // Rumble when at target
             if (flywheel.isAtTarget()) {
@@ -343,17 +324,8 @@ public class wildexperiment extends LinearOpMode {
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
             // Telemetry: flywheel & gate with PIDF mode info
-            String pidfModeStr = flywheel.isUsingFarCoefficients() ? "FAR" : "CLOSE";
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("PIDF Mode", "%s (threshold: %.0f RPM)",
-                    pidfModeStr, FlywheelController.RPM_SWITCH_THRESHOLD);
-            telemetry.addData("PIDF Coefficients", "kP=%.5f kI=%.5f kD=%.6f kF=%.2f",
-                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kP : FlywheelController.CLOSE_kP,
-                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kI : FlywheelController.CLOSE_kI,
-                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kD : FlywheelController.CLOSE_kD,
-                    flywheel.isUsingFarCoefficients() ? FlywheelController.FAR_kF : FlywheelController.CLOSE_kF);
-            telemetry.addData("Target Mode", isFarMode ? "FAR" : "CLOSE");
             telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
             telemetry.update();
         }
@@ -371,21 +343,18 @@ public class wildexperiment extends LinearOpMode {
         catch (Exception ignored) { return null; }
     }
 
+    /**
+     * Option A: No Movement on Start
+     *
+     * Capture current heading and turret position as the new reference.
+     */
     private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
-        try {
-            turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            turretController.captureReferences();
-            turretController.resetPidState();
+        // Update pinpoint if present
+        if (pinpoint != null) {
+            try { pinpoint.update(); } catch (Exception ignored) {}
+        }
 
-            if (pinpoint != null) {
-                pinpoint.resetPosAndIMU();
-            } else if (imu != null) {
-                imu.initialize(imuParams);
-            }
-        } catch (Exception ignored) {} // even if ignored we are resetting the limits at least
-        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // Capture references: current heading + current position (no encoder reset needed)
         turretController.captureReferences();
         turretController.resetPidState();
     }

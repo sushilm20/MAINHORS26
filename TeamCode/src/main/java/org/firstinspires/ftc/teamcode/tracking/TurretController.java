@@ -52,7 +52,7 @@ public class TurretController {
     @Sorter(sort = 2)
     public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
-    // PID liek config
+    // PID like config
     @Sorter(sort = 3)
     public static double TURRET_KP = 1.2;
 
@@ -77,10 +77,10 @@ public class TurretController {
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 4; //every 4 ticks change required
+    public static int SMALL_DEADBAND_TICKS = 4; // every 4 ticks change required
 
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 50.0; //not used at all
+    public static double INTEGRAL_CLAMP = 50.0; // not used at all
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -93,6 +93,9 @@ public class TurretController {
     private double headingReferenceRad = 0.0;
     private double lastHeadingRad = 0.0;
     private int turretEncoderReference = 0;
+
+    // Encoder offset for "virtual" zero after captureReferences
+    private int encoderOffset = 0;
 
     // state for manual->auto transition detection
     private boolean manualActiveLast = false;
@@ -124,13 +127,23 @@ public class TurretController {
     }
 
     /**
+     * Get the current encoder position in "virtual" space (offset-adjusted).
+     */
+    private int getVirtualEncoderPosition() {
+        return turretMotor.getCurrentPosition() - encoderOffset;
+    }
+
+    /**
      * Capture the current heading and turret encoder as the reference points.
-     * Call this when you want to (re)zero the turret's mapping to robot heading (e.g., after manual control).
+     * This recenters the "virtual" encoder space so that the current position becomes 0.
      */
     public void captureReferences() {
         headingReferenceRad = getHeadingRadians();
         lastHeadingRad = headingReferenceRad;
-        turretEncoderReference = turretMotor.getCurrentPosition();
+
+        // Offset so current raw position becomes virtual 0
+        encoderOffset = turretMotor.getCurrentPosition();
+        turretEncoderReference = 0; // virtual reference is zero
     }
 
     /**
@@ -183,20 +196,22 @@ public class TurretController {
         int deadbandCfg = SMALL_DEADBAND_TICKS;
         double integralClampCfg = INTEGRAL_CLAMP;
 
-        // Derived mapping (recomputed so changes to limits/scale take effect)
+        // Derived mapping
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
+
+        // Current virtual encoder position
+        int currentVirtualTicks = getVirtualEncoderPosition();
 
         // detect transitions
         if (manualNow) {
-            // Manual: apply manual power but enforce encoder hard limits
-            applyManualPower(manualPower, minPosCfg, maxPosCfg);
-            // Reset PID state so no integral/derivative carryover when returning to auto
+            // Manual: apply manual power but enforce virtual hard limits
+            applyManualPower(manualPower, minPosCfg, maxPosCfg, currentVirtualTicks);
+            // Reset PID state
             turretIntegral = 0.0;
             lastErrorTicks = 0;
             lastTimeMs = nowMs;
             lastDerivative = 0.0;
             manualActiveLast = true;
-            // publish telemetry if present
             publishTelemetry();
             return;
         }
@@ -204,7 +219,7 @@ public class TurretController {
         // If we just transitioned from manual to auto, re-capture references
         if (manualActiveLast && !manualNow) {
             captureReferences();
-            // reset timing so derivative doesn't blow up
+            currentVirtualTicks = 0;
             lastTimeMs = nowMs;
             lastDerivative = 0.0;
             lastAppliedPower = 0.0;
@@ -215,7 +230,7 @@ public class TurretController {
         double currentHeadingRad = getHeadingRadians();
         double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
 
-        // Compute angular velocity (for feedforward)
+        // Angular velocity (for feedforward)
         double angularVel = 0.0;
         if (lastTimeMs > 0) {
             double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
@@ -223,34 +238,31 @@ public class TurretController {
             angularVel = headingDeltaSinceLast / dtHeading;
         }
 
-        // Save last heading for next iteration
+        // Save last heading
         lastHeadingRad = currentHeadingRad;
 
-        // Desired encoder ticks corresponding to heading change:
+        // Desired ticks in virtual space
         double desiredTicksDouble = turretEncoderReference - headingDelta * ticksPerRad;
-        int desiredTicks = (int) Math.round(desiredTicksDouble);
+        int desiredVirtualTicks = (int) Math.round(desiredTicksDouble);
 
-        // Clamp desired ticks to encoder physical limits
-        if (desiredTicks > maxPosCfg) desiredTicks = maxPosCfg;
-        if (desiredTicks < minPosCfg) desiredTicks = minPosCfg;
+        // Clamp desired to limits
+        if (desiredVirtualTicks > maxPosCfg) desiredVirtualTicks = maxPosCfg;
+        if (desiredVirtualTicks < minPosCfg) desiredVirtualTicks = minPosCfg;
 
-        int currentTicks = turretMotor.getCurrentPosition();
-        int errorTicks = desiredTicks - currentTicks;
+        int errorTicks = desiredVirtualTicks - currentVirtualTicks;
 
-        // Timing for PID
+        // Timing
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
         double dt = dtMs / 1000.0;
         lastTimeMs = nowMs;
 
-        // Integral gating: only integrate when error is outside small deadband
+        // Integral gating
         if (Math.abs(errorTicks) > deadbandCfg) {
-            // If the sign changed, reduce integral to avoid "holding" overshoot
             if (lastErrorTicks != 0 && ((errorTicks > 0 && lastErrorTicks < 0) || (errorTicks < 0 && lastErrorTicks > 0))) {
                 turretIntegral *= 0.5;
             }
             turretIntegral += errorTicks * dt;
         } else {
-            // gentle decay while inside deadband
             turretIntegral *= 0.90;
         }
 
@@ -262,10 +274,10 @@ public class TurretController {
         double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
-        // PID output (note Ki multiplies integral sum)
+        // PID output
         double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
-        // Feedforward: turret should oppose robot yaw rate (angularVel)
+        // Feedforward: oppose robot yaw rate
         double ff = -angularVel * ffGainCfg;
 
         double cmdPower = pidOut + ff;
@@ -279,24 +291,24 @@ public class TurretController {
         if (cmdPower > maxPowerCfg) cmdPower = maxPowerCfg;
         if (cmdPower < -maxPowerCfg) cmdPower = -maxPowerCfg;
 
-        // Smooth applied power (exponential smoothing)
+        // Smooth applied power
         double applied = powerSmoothCfg * lastAppliedPower + (1.0 - powerSmoothCfg) * cmdPower;
 
-        // If at hard stop, block the command that would push further
-        if ((currentTicks >= maxPosCfg && applied > 0.0) || (currentTicks <= minPosCfg && applied < 0.0)) {
+        // If at hard stop, block further
+        if ((currentVirtualTicks >= maxPosCfg && applied > 0.0) || (currentVirtualTicks <= minPosCfg && applied < 0.0)) {
             applied = 0.0;
         }
 
         // Apply to motor
         turretMotor.setPower(applied);
 
-        // Update states for next loop
+        // Update states
         lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
-        // Save telemetry values for external reading or logging
-        lastDesiredTicks = desiredTicks;
+        // Telemetry values
+        lastDesiredTicks = desiredVirtualTicks;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
@@ -304,23 +316,18 @@ public class TurretController {
         publishTelemetry();
     }
 
-    private void applyManualPower(double manualPower, int minPosCfg, int maxPosCfg) {
-        int currentTicks = turretMotor.getCurrentPosition();
-
-        // Enforce physical limits: if at limit, block further motion into the stop
+    private void applyManualPower(double manualPower, int minPosCfg, int maxPosCfg, int currentVirtualTicks) {
         double requested = manualPower;
-        if ((currentTicks >= maxPosCfg && requested > 0.0) || (currentTicks <= minPosCfg && requested < 0.0)) {
+        if ((currentVirtualTicks >= maxPosCfg && requested > 0.0) || (currentVirtualTicks <= minPosCfg && requested < 0.0)) {
             requested = 0.0;
         }
 
-        // clamp to motor safe range
         if (requested > 1.0) requested = 1.0;
         if (requested < -1.0) requested = -1.0;
 
         turretMotor.setPower(requested);
-        // reflect telemetry values
         lastDesiredTicks = turretEncoderReference;
-        lastErrorReported = lastDesiredTicks - currentTicks;
+        lastErrorReported = lastDesiredTicks - currentVirtualTicks;
         lastPidOut = 0.0;
         lastFf = 0.0;
     }
@@ -353,13 +360,19 @@ public class TurretController {
     public double getLastPidOut() { return lastPidOut; }
     public double getLastFf() { return lastFf; }
     public double getLastAppliedPower() { return lastAppliedPower; }
+    public int getEncoderOffset() { return encoderOffset; }
+    public int getVirtualPosition() { return getVirtualEncoderPosition(); }
+    public int getRawPosition() { return turretMotor.getCurrentPosition(); }
 
     private void publishTelemetry() {
         if (telemetry == null) return;
-//        telemetry.addData("turret.desired", lastDesiredTicks);
-//        telemetry.addData("turret.error", lastErrorReported);
-//        telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
-//        telemetry.addData("turret.ff", String.format("%.4f", lastFf));
-//        telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
+        // Uncomment for debugging:
+        // telemetry.addData("turret.desired", lastDesiredTicks);
+         telemetry.addData("\n turret.error", lastErrorReported);
+        // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
+        // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
+        // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
+        // telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
+         telemetry.addData("\n turret.offset", encoderOffset);
     }
 }
