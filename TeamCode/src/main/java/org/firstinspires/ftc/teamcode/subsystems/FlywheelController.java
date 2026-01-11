@@ -1,10 +1,10 @@
 package org.firstinspires.ftc.teamcode. subsystems;
 
 import com.bylazar.configurables.annotations.Configurable;
-import com.bylazar.configurables. annotations. Sorter;
+import com.bylazar.configurables.annotations. Sorter;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com. qualcomm.robotcore.hardware. VoltageSensor;
+import com. qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm. robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external. Telemetry;
 
