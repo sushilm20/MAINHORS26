@@ -59,7 +59,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
+    private static final double AUTO_SHOOTER_RPM = 2690;
 
     private DcMotor intakeMotor;
 
@@ -72,6 +72,10 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private Servo gateServo;
     private boolean gateClosed = false;
+
+    // Timing/telemetry helpers
+    private long autoStartMs = -1;       // track when start() is called
+    private boolean shutdownDone = false; // ensure we stop actuators once
 
     // ========================================
     // TIMING PARAMETERS
@@ -89,10 +93,10 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double PRE_ACTION_WAIT_SECONDS = 0.2;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.4;
 
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1000L;
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -265,8 +269,6 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 135.0;
 
-
-
     public ExperimentalBluePedroAuto3() {}
 
     @Override
@@ -417,6 +419,8 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     @Override
     public void start() {
+        autoStartMs = System.currentTimeMillis();   // start timing
+
         if (flywheel != null) {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
@@ -449,6 +453,11 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
         updateGate();
 
+        // Elapsed time telemetry
+        double elapsedSec = (autoStartMs > 0) ? (nowMs - autoStartMs) / 1000.0 : 0.0;
+        panelsTelemetry.debug("Elapsed(s)", String.format("%.2f", elapsedSec));
+
+        // Existing telemetry
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         panelsTelemetry.debug("X", follower.getPose().getX());
@@ -484,26 +493,46 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
         }
 
         panelsTelemetry.update(telemetry);
+
+        // Auto shutdown when finished
+        if (state == AutoState.FINISHED && !shutdownDone) {
+            resetToInitState();
+            shutdownDone = true;
+        }
     }
 
-    @Override
-    public void stop() {
+    // New helper: put mechanisms back to init/safe and power everything down
+    private void resetToInitState() {
+        // Shooter off
         if (flywheel != null) {
             flywheel.setShooterOn(false);
+            flywheel.setTargetRPM(0.0);
             flywheel.update(System.currentTimeMillis(), false);
         }
-        if (turretController != null) {
-            turretController.update(false, 0.0);
-        }
-
+        // Intake off
         stopIntake();
-        if (clawServo != null) clawServo.setPosition(0.63);
-
+        // Gate closed
         if (gateServo != null) {
             gateServo.setPosition(GATE_CLOSED);
             gateClosed = true;
         }
+        // Claw to init
+        if (clawServo != null) {
+            clawServo.setPosition(0.63);
+        }
+        // Hood to init
+        if (rightHoodServo != null) {
+            rightHoodServo.setPosition(0.16);
+        }
+        // Turret safe (power 0)
+        if (turretMotor != null) {
+            try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
+        }
+    }
 
+    @Override
+    public void stop() {
+        resetToInitState();
         state = AutoState.FINISHED;
     }
 

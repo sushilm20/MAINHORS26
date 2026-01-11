@@ -372,7 +372,7 @@ public class TurretController {
         // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
         // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
         // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-        // telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
-         telemetry.addData("\n turret.offset", encoderOffset);
+         telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
+         //telemetry.addData("\n turret.offset", encoderOffset);
     }
 }
