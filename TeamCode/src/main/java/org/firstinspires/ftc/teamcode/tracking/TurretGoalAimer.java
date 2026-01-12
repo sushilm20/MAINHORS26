@@ -25,14 +25,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * 4) Else:
  *    a) bearing = atan2(target.y - robot.y, target.x - robot.x)   // field-centric
  *       (lineX = target.x - START.x, lineY = target.y - START.y; robotX/Y = robot - START)
- *    b) lateralError = (lineX * robotY - lineY * robotX) / distance(START, target)  // signed perpendicular distance via 2D cross
+ *    b) lateralError = (lineX * robotY - lineY * robotX) / distance(START, target)  // signed perpendicular distance via 2D cross-product formula
  *    c) offset = clamp(-lateralError * OFFSET_GAIN, +/- OFFSET_CLAMP) // keeps same point despite drift
  *    d) if aimReference not captured yet (first valid pose): aimReference = normalize(bearing - heading - offset)
  *    e) targetAngleRad = normalize(bearing - heading - offset - aimReference)
  *    f) desiredTicks = clamp(turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN, min, max)
  *    g) error = desiredTicks - currentTicks
  *    h) pid = KP * error + KI * (integral of error) + KD * d(error) / dt
- *    i) ff = -angularVel * FF_GAIN                 // angularVel = robot yaw rate from IMU/odometry; oppose it
+ *    i) ff = -angularVel * FF_GAIN                 // oppose robot spin to keep turret fixed on target (counter drift)
  *    j) power = clamp(pid + ff, +/- MAX_POWER) with deadband and soft smoothing; zero if at hard stops
  *    k) set turret motor power = power
  */
