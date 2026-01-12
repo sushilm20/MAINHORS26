@@ -24,14 +24,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * 3) If robotPose missing -> heading-hold: desiredAngle = -(heading - headingReference).
  * 4) Else:
  *    a) bearing = atan2(target.y - robot.y, target.x - robot.x)   // field-centric
- *    b) lateralError = (lineX*robotY - lineY*robotX) / |START->target|  // 2D cross of START->target vs START->robot
+ *    b) lateralError = (lineX*robotY - lineY*robotX) / |START->target|  // signed perpendicular distance via 2D cross
  *    c) offset = clamp(-lateralError * OFFSET_GAIN, +/-OFFSET_CLAMP) // keeps same point despite drift
  *    d) if aimReference not captured yet: aimReference = normalize(bearing - heading - offset)
  *    e) targetAngleRad = normalize(bearing - heading - offset - aimReference)
  *    f) desiredTicks = turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN (clamp to min/max)
  *    g) error = desiredTicks - currentTicks
  *    h) pid = KP*error + KI*(integral of error) + KD*d(error)/dt
- *    i) ff = -angularVel * FF_GAIN                // oppose robot heading changes already measured
+ *    i) ff = -angularVel * FF_GAIN                // angularVel = robot yaw rate from IMU/odometry; oppose it
  *    j) power = clamp(pid + ff, +/-MAX_POWER) with deadband and soft smoothing; zero if at hard stops
  *    k) set turret motor power = power
  */
