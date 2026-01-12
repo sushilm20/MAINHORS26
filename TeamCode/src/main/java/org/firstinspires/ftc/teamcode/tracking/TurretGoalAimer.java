@@ -20,16 +20,16 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * Pseudocode for point tracking with Pedro pathing + heading offsets (blue goal):
  * 1) Inputs: robotPose (Pedro Pose), targetPose (blue goal), current heading (from heading adjust system),
  *    turret encoder reference, turret encoder limits.
- * 2) If manual control requested -> apply manual power, bail.
+ * 2) If manual control requested -> apply manual power, exit.
  * 3) If robotPose missing -> heading-hold: desiredAngle = -(heading - headingReference).
  * 4) Else:
  *    a) bearing = atan2(target.y - robot.y, target.x - robot.x)   // field-centric
  *       (lineX = target.x - START.x, lineY = target.y - START.y; robotX/Y = robot - START)
- *    b) lateralError = (lineX * robotY - lineY * robotX) / |START->target|  // signed perpendicular distance via 2D cross
+ *    b) lateralError = (lineX * robotY - lineY * robotX) / distance(START, target)  // signed perpendicular distance via 2D cross
  *    c) offset = clamp(-lateralError * OFFSET_GAIN, +/- OFFSET_CLAMP) // keeps same point despite drift
  *    d) if aimReference not captured yet (first valid pose): aimReference = normalize(bearing - heading - offset)
  *    e) targetAngleRad = normalize(bearing - heading - offset - aimReference)
- *    f) desiredTicks = turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN (clamp to min/max)
+ *    f) desiredTicks = clamp(turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN, min, max)
  *    g) error = desiredTicks - currentTicks
  *    h) pid = KP * error + KI * (integral of error) + KD * d(error) / dt
  *    i) ff = -angularVel * FF_GAIN                 // angularVel = robot yaw rate from IMU/odometry; oppose it
