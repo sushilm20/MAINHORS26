@@ -16,6 +16,24 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
  * - Uses robot pose + IMU heading.
  * - Adds lateral-offset correction (side of line from start->goal).
  * - Manual override is respected.
+ *
+ * Pseudocode for point tracking with Pedro pathing + heading offsets (blue goal):
+ * 1) Inputs: robotPose (Pedro Pose), targetPose (blue goal), current heading (from heading adjust system),
+ *    turret encoder reference, turret encoder limits.
+ * 2) If manual control requested -> apply manual power, bail.
+ * 3) If robotPose missing -> heading-hold: desiredAngle = -(heading - headingReference).
+ * 4) Else:
+ *    a) bearing = atan2(target.y - robot.y, target.x - robot.x)   // field-centric
+ *    b) lateralError = signedCross(START→target, START→robot) / |START→target|
+ *    c) offset = clamp(-lateralError * OFFSET_GAIN, ±OFFSET_CLAMP) // keeps same point despite drift
+ *    d) if aimReference not captured yet: aimReference = normalize(bearing - heading - offset)
+ *    e) desiredAngle = normalize(bearing - heading - offset - aimReference)
+ *    f) desiredTicks = turretEncoderReference + desiredAngle * TICKS_PER_RADIAN (clamp to min/max)
+ *    g) error = desiredTicks - currentTicks
+ *    h) pid = KP*error + KI*∫error + KD*d(error)/dt
+ *    i) ff = -headingRate * FF_GAIN               // oppose robot heading changes already measured
+ *    j) power = clamp(pid + ff, ±MAX_POWER) with deadband and soft smoothing; zero if at hard stops
+ *    k) set turret motor power = power
  */
 public class TurretGoalAimer {
 
