@@ -50,9 +50,14 @@ public class wildexperiment extends LinearOpMode {
     private boolean touchpadPressedLast = false;
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false; // gamepad1 A reset latch
+    private boolean dpadUpLast = false;
 
     private boolean isFarMode = false;
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
+
+    // Turret move-to-target state
+    private boolean moveToPositionActive = false;
+    private static final int turretPosition = -607;
 
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;
@@ -170,7 +175,7 @@ public class wildexperiment extends LinearOpMode {
         );
 
         // Initial positions
-        gateController.setGateClosed(true); // gate open => red on, green off, rn made it so that gate is closed at init
+        gateController.setGateClosed(true); // gate closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
         telemetry.addData("\nTurret IMU", imuUsed);
@@ -200,22 +205,22 @@ public class wildexperiment extends LinearOpMode {
                 try { pinpoint.update(); } catch (Exception ignored) {}
             }
 
-            // Touchpad reset (gamepad2)
+            // Touchpad reset (gamepad2) -> reset encoder + references
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
-                reZeroHeadingAndTurret(imuParams);
+                resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Turret reference captured at current position");
+                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp2 touchpad)");
                 telemetry.update();
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1)
+            // A button reset (gamepad1) -> reset encoder + references
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                reZeroHeadingAndTurret(imuParams);
+                resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Turret reference captured at current position (gp1 A)");
+                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp1 A)");
                 telemetry.update();
             }
             aPressedLast = aNow;
@@ -287,15 +292,32 @@ public class wildexperiment extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret manual
-            boolean manualNow = false;
-            double manualPower = 0.0;
-            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
-                manualNow = true; manualPower = 0.25;
-            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
-                manualNow = true; manualPower = -0.25;
+            // Turret control
+            boolean dpadUpNow = gamepad1.dpad_up;
+            if (dpadUpNow && !dpadUpLast) {
+                moveToPositionActive = true; // initiate move-to-370
             }
-            turretController.update(manualNow, manualPower);
+            dpadUpLast = dpadUpNow;
+
+            if (moveToPositionActive) {
+                // Drive toward 370; when reached, lock by capturing references
+                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
+                if (atTarget) {
+                    moveToPositionActive = false;
+                    turretController.captureReferences(); // lock new position as reference
+                    turretController.resetPidState();
+                }
+            } else {
+                // Turret manual
+                boolean manualNow = false;
+                double manualPower = 0.0;
+                if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
+                    manualNow = true; manualPower = 0.25;
+                } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
+                    manualNow = true; manualPower = -0.25;
+                }
+                turretController.update(manualNow, manualPower);
+            }
 
             // Intake manual (only if gate not busy)
             if (!gateController.isBusy()) {
@@ -349,12 +371,24 @@ public class wildexperiment extends LinearOpMode {
      * Capture current heading and turret position as the new reference.
      */
     private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
-        // Update pinpoint if present
         if (pinpoint != null) {
             try { pinpoint.update(); } catch (Exception ignored) {}
         }
+        turretController.captureReferences();
+        turretController.resetPidState();
+    }
 
-        // Capture references: current heading + current position (no encoder reset needed)
+    /**
+     * Reset turret encoder and capture references (used on gp1 A and gp2 touchpad).
+     */
+    private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
+        try {
+            turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        } catch (Exception ignored) {}
+        if (pinpoint != null) {
+            try { pinpoint.update(); } catch (Exception ignored) {}
+        }
         turretController.captureReferences();
         turretController.resetPidState();
     }

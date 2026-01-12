@@ -172,6 +172,24 @@ public class TurretController {
     }
 
     /**
+     * Simple utility to drive toward a raw encoder target.
+     * Returns true if within deadband and motor is stopped.
+     */
+    public boolean driveToPosition(int targetTicks, int deadbandTicks, double powerMag) {
+        int current = turretMotor.getCurrentPosition();
+        double power = 0.0;
+        if (current < targetTicks - deadbandTicks) {
+            power = Math.abs(powerMag);
+        } else if (current > targetTicks + deadbandTicks) {
+            power = -Math.abs(powerMag);
+        } else {
+            power = 0.0;
+        }
+        turretMotor.setPower(power);
+        return power == 0.0;
+    }
+
+    /**
      * Main update method. Call from OpMode loop.
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
      * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
@@ -368,12 +386,12 @@ public class TurretController {
         if (telemetry == null) return;
         // Uncomment for debugging:
         // telemetry.addData("turret.desired", lastDesiredTicks);
-         telemetry.addData("\n turret.error", lastErrorReported);
+        telemetry.addData("\n turret.error", lastErrorReported);
         // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
         // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
         // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-//         telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
-         telemetry.addData("Turret Encoder: ",  getRawPosition());
-         //telemetry.addData("\n turret.offset", encoderOffset);
+        // telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
+        telemetry.addData("\n Turret Encoder: ", getRawPosition());
+        // telemetry.addData("\n turret.offset", encoderOffset);
     }
 }
