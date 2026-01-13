@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Red 12 Ball Gate 🔴", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "Red 12 Ball 🔴", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
 public class RedPedroAuto extends OpMode {
 
@@ -59,7 +59,7 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_CLOSE;
+    private static final double AUTO_SHOOTER_RPM = 2640;
 
     private DcMotor intakeMotor;
 
@@ -73,11 +73,15 @@ public class RedPedroAuto extends OpMode {
     private Servo gateServo;
     private boolean gateClosed = false;
 
+    // Timing/telemetry helpers
+    private long autoStartMs = -1;       // track when start() is called
+    private boolean shutdownDone = false; // ensure we stop actuators once
+
     // ========================================
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.6;
+    public static double INTAKE_RUN_SECONDS = 0.7;
 
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
@@ -89,31 +93,31 @@ public class RedPedroAuto extends OpMode {
     public static double PRE_ACTION_WAIT_SECONDS = 0.2;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.5;
 
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1000L;
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
     // ========================================
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.70;
+    public static double INTAKE_ON_POWER = -0.75;
 
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
 
     @Sorter(sort = 12)
-    public static double CLOSED_INTAKE_POWER = 0.0;
+    public static double CLOSED_INTAKE_POWER = -0.67;
 
     @Sorter(sort = 13)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0;
+    public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
 
     // ========================================
     // TOLERANCE SETTINGS
     // ========================================
     @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 6.0;
+    public static double START_POSE_TOLERANCE_IN = 5.0;
 
     // ========================================
     // GATE SETTINGS
@@ -122,22 +126,22 @@ public class RedPedroAuto extends OpMode {
     public static double GATE_OPEN = 0.67;
 
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.5;
+    public static double GATE_CLOSED = 0.51;
 
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 9.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.35;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
 
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
 
     // ========================================
-    // PATH POSES - START POSITION (RED)
+    // PATH POSES - START POSITION
     // ========================================
     @Sorter(sort = 100)
     public static double START_X = 124.0;
@@ -152,10 +156,10 @@ public class RedPedroAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 80.0;
+    public static double SHOOT_POSE_X = 98.0;
 
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 80.0;
+    public static double SHOOT_POSE_Y = 88.0;
 
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 0.0;
@@ -172,38 +176,20 @@ public class RedPedroAuto extends OpMode {
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
     // ========================================
-    @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 124.0;
-
-    @Sorter(sort = 121)
-    public static double COLLECT_FIRST3_Y = 80.0;
-
-    @Sorter(sort = 122)
-    public static double COLLECT_FIRST3_HEADING = 0.0;
+    @Sorter(sort = 120) public static double COLLECT_FIRST3_X = 126.0;
+    @Sorter(sort = 121) public static double COLLECT_FIRST3_Y = 84.0;
+    @Sorter(sort = 122) public static double COLLECT_FIRST3_HEADING = 0.0;
 
     // ========================================
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
-    @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 119.0;
+    @Sorter(sort = 125) public static double GATE_ALIGN_X = 126.0;
+    @Sorter(sort = 126) public static double GATE_ALIGN_Y = 78.0;
+    @Sorter(sort = 127) public static double GATE_ALIGN_HEADING = 0.0;
 
-    @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 75.0;
-
-    @Sorter(sort = 127)
-    public static double GATE_ALIGN_HEADING = 45.0;
-
-    // ========================================
-    // PATH POSES - GATE CLEAR POSITION
-    // ========================================
-    @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 130.0;
-
-    @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 75.0;
-
-    @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 90.0;
+    @Sorter(sort = 130) public static double GATE_CLEAR_X = 133.0;
+    @Sorter(sort = 131) public static double GATE_CLEAR_Y = 78.0;
+    @Sorter(sort = 132) public static double GATE_CLEAR_HEADING = 0.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION
@@ -212,7 +198,7 @@ public class RedPedroAuto extends OpMode {
     public static double ALIGN_SECOND3_X = 98.0;
 
     @Sorter(sort = 141)
-    public static double ALIGN_SECOND3_Y = 57.0;
+    public static double ALIGN_SECOND3_Y = 62.0;
 
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = 0.0;
@@ -221,10 +207,10 @@ public class RedPedroAuto extends OpMode {
     // PATH POSES - COLLECT SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 130.0;
+    public static double COLLECT_SECOND3_X = 138.0;
 
     @Sorter(sort = 151)
-    public static double COLLECT_SECOND3_Y = 57.0;
+    public static double COLLECT_SECOND3_Y = 62.0;
 
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = 0.0;
@@ -236,7 +222,7 @@ public class RedPedroAuto extends OpMode {
     public static double ALIGN_THIRD3_X = 97.0;
 
     @Sorter(sort = 161)
-    public static double ALIGN_THIRD3_Y = 33.0;
+    public static double ALIGN_THIRD3_Y = 36.0;
 
     @Sorter(sort = 162)
     public static double ALIGN_THIRD3_HEADING = 0.0;
@@ -245,10 +231,10 @@ public class RedPedroAuto extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 129.0;
+    public static double COLLECT_THIRD3_X = 138.0;
 
     @Sorter(sort = 171)
-    public static double COLLECT_THIRD3_Y = 33.0;
+    public static double COLLECT_THIRD3_Y = 36.0;
 
     @Sorter(sort = 172)
     public static double COLLECT_THIRD3_HEADING = 0.0;
@@ -415,6 +401,8 @@ public class RedPedroAuto extends OpMode {
 
     @Override
     public void start() {
+        autoStartMs = System.currentTimeMillis();   // start timing
+
         if (flywheel != null) {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
@@ -447,6 +435,11 @@ public class RedPedroAuto extends OpMode {
 
         updateGate();
 
+        // Elapsed time telemetry
+        double elapsedSec = (autoStartMs > 0) ? (nowMs - autoStartMs) / 1000.0 : 0.0;
+        panelsTelemetry.debug("Elapsed(s)", String.format("%.2f", elapsedSec));
+
+        // Existing telemetry
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         panelsTelemetry.debug("X", follower.getPose().getX());
@@ -482,26 +475,46 @@ public class RedPedroAuto extends OpMode {
         }
 
         panelsTelemetry.update(telemetry);
+
+        // Auto shutdown when finished
+        if (state == AutoState.FINISHED && !shutdownDone) {
+            resetToInitState();
+            shutdownDone = true;
+        }
     }
 
-    @Override
-    public void stop() {
+    // New helper: put mechanisms back to init/safe and power everything down
+    private void resetToInitState() {
+        // Shooter off
         if (flywheel != null) {
             flywheel.setShooterOn(false);
+            flywheel.setTargetRPM(0.0);
             flywheel.update(System.currentTimeMillis(), false);
         }
-        if (turretController != null) {
-            turretController.update(false, 0.0);
-        }
-
+        // Intake off
         stopIntake();
-        if (clawServo != null) clawServo.setPosition(0.63);
-
+        // Gate closed
         if (gateServo != null) {
             gateServo.setPosition(GATE_CLOSED);
             gateClosed = true;
         }
+        // Claw to init
+        if (clawServo != null) {
+            clawServo.setPosition(0.63);
+        }
+        // Hood to init
+        if (rightHoodServo != null) {
+            rightHoodServo.setPosition(0.16);
+        }
+        // Turret safe (power 0)
+        if (turretMotor != null) {
+            try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
+        }
+    }
 
+    @Override
+    public void stop() {
+        resetToInitState();
         state = AutoState.FINISHED;
     }
 
