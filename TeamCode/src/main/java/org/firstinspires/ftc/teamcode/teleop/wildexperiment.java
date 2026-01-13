@@ -66,8 +66,8 @@ public class wildexperiment extends LinearOpMode {
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
     private static final double GATE_CLOSED = 0.5;
-    private static final long INTAKE_DURATION_MS = 1000;
-    private static final long CLAW_TRIGGER_BEFORE_END_MS = 200;
+    private static final long INTAKE_DURATION_MS = 1050;
+    private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
     private static final double INTAKE_SEQUENCE_POWER = 1.0;
 
     // Claw constants
