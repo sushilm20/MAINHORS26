@@ -57,7 +57,7 @@ public class wildexperiment extends LinearOpMode {
 
     // Turret move-to-target state
     private boolean moveToPositionActive = false;
-    private static final int turretPosition = -607;
+    private static final int turretPosition = -560;
 
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;

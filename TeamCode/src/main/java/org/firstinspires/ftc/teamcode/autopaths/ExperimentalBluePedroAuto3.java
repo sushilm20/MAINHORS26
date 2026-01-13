@@ -59,7 +59,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2690;
+    private static final double AUTO_SHOOTER_RPM = 2710;
 
     private DcMotor intakeMotor;
 
@@ -102,7 +102,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.70;
+    public static double INTAKE_ON_POWER = -0.75;
 
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
@@ -189,25 +189,25 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
     @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 25.0;
+    public static double GATE_ALIGN_X = 24.0;
 
     @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 75.0;
+    public static double GATE_ALIGN_Y = 74.0;
 
     @Sorter(sort = 127)
-    public static double GATE_ALIGN_HEADING = 120.0;
+    public static double GATE_ALIGN_HEADING = 179.0;
 
     // ========================================
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 12.0;
+    public static double GATE_CLEAR_X = 18.5    ;
 
     @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 75.0;
+    public static double GATE_CLEAR_Y = 74.0;
 
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 75.0;
+    public static double GATE_CLEAR_HEADING = 179.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION

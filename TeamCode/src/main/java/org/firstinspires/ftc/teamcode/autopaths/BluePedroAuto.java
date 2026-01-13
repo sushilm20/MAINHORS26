@@ -189,25 +189,25 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
     @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 25.0;
+    public static double GATE_ALIGN_X = 24.0;
 
     @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 75.0;
+    public static double GATE_ALIGN_Y = 74.0;
 
     @Sorter(sort = 127)
-    public static double GATE_ALIGN_HEADING = 120.0;
+    public static double GATE_ALIGN_HEADING = 179.0;
 
     // ========================================
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 12.0;
+    public static double GATE_CLEAR_X = 17.8;
 
     @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 75.0;
+    public static double GATE_CLEAR_Y = 74.0;
 
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 75.0;
+    public static double GATE_CLEAR_HEADING = 179.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION

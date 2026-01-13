@@ -48,8 +48,8 @@ public class FlywheelController {
     @Sorter(sort = 16) public static double FAR_kD = 0.00001;
     @Sorter(sort = 17) public static double FAR_kF = 1.92;
     @Sorter(sort = 18) public static double FAR_integralLimit = 50;
-    @Sorter(sort = 19) public static double FAR_derivativeAlpha = 0.9;
-    @Sorter(sort = 20) public static double FAR_rpmFilterAlpha = 0.72;
+    @Sorter(sort = 19) public static double FAR_derivativeAlpha = 0.72;
+    @Sorter(sort = 20) public static double FAR_rpmFilterAlpha = 0.9;
     @Sorter(sort = 21) public static double FAR_powerSmoothingAlpha = 0.5;
     @Sorter(sort = 22) public static double FAR_ffReferenceVoltage = 13.2;
     @Sorter(sort = 23) public static double FAR_ffReferenceMaxTicksPerSec = 4930;
@@ -57,7 +57,7 @@ public class FlywheelController {
 
     // --- Target RPM presets ---
     @Sorter(sort = 25) public static double closeRPM = 2600;
-    @Sorter(sort = 26) public static double farRPM = 3500.0;
+    @Sorter(sort = 26) public static double farRPM = 3350;
 
     // Legacy compatibility variables (kept for backward compatibility)
     @Sorter(sort = 27) public static double kP = 0.00145;
