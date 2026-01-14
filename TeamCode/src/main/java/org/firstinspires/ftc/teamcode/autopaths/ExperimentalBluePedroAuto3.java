@@ -59,7 +59,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2710;
+    private static final double AUTO_SHOOTER_RPM = 2670;
 
     private DcMotor intakeMotor;
 
@@ -81,7 +81,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.6;
+    public static double INTAKE_RUN_SECONDS = 0.7;
 
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
@@ -93,7 +93,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double PRE_ACTION_WAIT_SECONDS = 0.2;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.4;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.5;
 
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
@@ -108,16 +108,16 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
 
     @Sorter(sort = 12)
-    public static double CLOSED_INTAKE_POWER = 0.0;
+    public static double CLOSED_INTAKE_POWER = -0.67;
 
     @Sorter(sort = 13)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0;
+    public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
 
     // ========================================
     // TOLERANCE SETTINGS
     // ========================================
     @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 6.0;
+    public static double START_POSE_TOLERANCE_IN = 5.0;
 
     // ========================================
     // GATE SETTINGS
@@ -126,19 +126,19 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double GATE_OPEN = 0.67;
 
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.5;
+    public static double GATE_CLOSED = 0.51;
 
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 9.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.35;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
 
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
 
     // ========================================
     // PATH POSES - START POSITION
