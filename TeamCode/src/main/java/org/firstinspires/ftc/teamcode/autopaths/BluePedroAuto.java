@@ -42,6 +42,7 @@ public class BluePedroAuto extends OpMode {
 
     private Timer preActionTimer;
     private Timer poseWaitTimer;
+
     private Timer gateClearWaitTimer;
 
     private boolean preActionTimerStarted = false;
@@ -108,7 +109,7 @@ public class BluePedroAuto extends OpMode {
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
 
     @Sorter(sort = 12)
-    public static double CLOSED_INTAKE_POWER = 0.0;
+    public static double CLOSED_INTAKE_POWER = 0.5;
 
     @Sorter(sort = 13)
     public static double CLOSED_INTAKE_TOLERANCE_IN = 12.0;
