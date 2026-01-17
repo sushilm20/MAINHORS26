@@ -167,13 +167,13 @@ public class adaptiveRPM extends LinearOpMode {
 
         // FlywheelVersatile setup with calibration samples and RPM bounds
         List<CalibrationPoint> calibrationPoints = Arrays.asList(
-                new CalibrationPoint(new Pose(48, 96, 135), 2350),
-                new CalibrationPoint(new Pose(60, 125, 135), 2450),
-                new CalibrationPoint(new Pose(60, 82, 135), 2540),
-                new CalibrationPoint(new Pose(72, 72, 135), 2690),
-                new CalibrationPoint(new Pose(72, 120, 167), 2600),
-                new CalibrationPoint(new Pose(95, 120, 135), 2900),
-                new CalibrationPoint(new Pose(52, 14, 135), 3800)
+                new CalibrationPoint(new Pose(48, 96, 135), 2300),
+                new CalibrationPoint(new Pose(60, 125, 135), 2400),
+                new CalibrationPoint(new Pose(60, 82, 135), 2500),
+                new CalibrationPoint(new Pose(72, 72, 135), 2650),
+                new CalibrationPoint(new Pose(72, 120, 167), 2550),
+                new CalibrationPoint(new Pose(95, 120, 135), 2850),
+                new CalibrationPoint(new Pose(52, 14, 135), 3750)
         );
         flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 2400, 4000);
 
