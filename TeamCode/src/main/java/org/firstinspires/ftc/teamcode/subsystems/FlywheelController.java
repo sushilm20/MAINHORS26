@@ -35,7 +35,7 @@ public class FlywheelController {
     @Sorter(sort = 5) public static double CLOSE_kD = 0.000015;
     @Sorter(sort = 6) public static double CLOSE_kF = 1.72;
     @Sorter(sort = 7) public static double CLOSE_integralLimit = 50;
-    @Sorter(sort = 8) public static double CLOSE_derivativeAlpha = 0.8;
+    @Sorter(sort = 8) public static double CLOSE_derivativeAlpha = 0.8;//bru
     @Sorter(sort = 9) public static double CLOSE_rpmFilterAlpha = 0.8;
     @Sorter(sort = 10) public static double CLOSE_powerSmoothingAlpha = 0.5;
     @Sorter(sort = 11) public static double CLOSE_ffReferenceVoltage = 12.4;
