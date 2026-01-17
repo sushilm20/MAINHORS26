@@ -84,17 +84,16 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double INTAKE_RUN_SECONDS = 0.7;
 
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.0;
+    public static double TIMED_INTAKE_SECONDS = 1.1;
 
     @Sorter(sort = 2)
     public static long CLAW_CLOSE_MS = 190L;
 
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.2;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.4;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.5;
-
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -111,7 +110,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double CLOSED_INTAKE_POWER = -0.67;
 
     @Sorter(sort = 13)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
+    public static double CLOSED_INTAKE_TOLERANCE_IN = 9.0;
 
     // ========================================
     // TOLERANCE SETTINGS
@@ -177,7 +176,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - COLLECT FIRST 3 POSITION
     // ========================================
     @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 20.0;
+    public static double COLLECT_FIRST3_X = 21.0;
 
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 80.0;
@@ -189,7 +188,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
     @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 24.0;
+    public static double GATE_ALIGN_X = 30.0;
 
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
@@ -201,7 +200,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 18.5    ;
+    public static double GATE_CLEAR_X = 21.0    ;
 
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;

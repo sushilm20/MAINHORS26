@@ -70,7 +70,7 @@ public class TurretController {
     public static double FF_GAIN = 5.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.94;
+    public static double POWER_SMOOTH_ALPHA = 0.945;
 
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 1.0;

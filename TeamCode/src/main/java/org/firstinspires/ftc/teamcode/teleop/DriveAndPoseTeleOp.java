@@ -17,7 +17,7 @@ public class DriveAndPoseTeleOp extends OpMode {
         try {
             // Initialize PedroPathing follower for pose tracking and drivetrain control
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(124, 122, Math.toRadians(45)));  // Default starting pose (adjust as needed)
+            follower.setStartingPose(new Pose(20, 122, Math.toRadians(45)));  // Default starting pose (adjust as needed)
         } catch (Exception e) {
             telemetry.addData("Error", "Follower initialization failed!");
             follower = null;
