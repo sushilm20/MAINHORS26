@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
-
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -9,6 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
+@TeleOp(name="HORS OFFICIAL ⭐ ", group="Linear OpMode")
 public class experimentalHORS extends LinearOpMode {
 
     // Drive + subsystems
@@ -50,23 +50,29 @@ public class experimentalHORS extends LinearOpMode {
     private boolean touchpadPressedLast = false;
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false; // gamepad1 A reset latch
+    private boolean dpadUpLast = false;
 
     private boolean isFarMode = false;
+    private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
+
+    // Turret move-to-target state
+    private boolean moveToPositionActive = false;
+    private static final int turretPosition = -560;
 
     // Hood presets
-    private static final double RIGHT_HOOD_CLOSE = 0.12;
+    private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
     private static final double GATE_CLOSED = 0.5;
-    private static final long INTAKE_DURATION_MS = 1600;
-    private static final long CLAW_TRIGGER_BEFORE_END_MS = 500;
-    private static final double INTAKE_SEQUENCE_POWER = 0.6;
+    private static final long INTAKE_DURATION_MS = 1050;
+    private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
+    private static final double INTAKE_SEQUENCE_POWER = 1.0;
 
     // Claw constants
     private static final double CLAW_OPEN = 0.63;
-    private static final double CLAW_CLOSED = 0.2;
+    private static final double CLAW_CLOSED = 0.2;//like that
     private static final long CLAW_CLOSE_MS = 500L;
 
     // Hood constants
@@ -107,6 +113,12 @@ public class experimentalHORS extends LinearOpMode {
         LED led2Red = getLedSafe("led_2_red");
         LED led2Green = getLedSafe("led_2_green");
 
+        // Voltage sensor (first available)
+        VoltageSensor batterySensor = null;
+        try {
+            batterySensor = hardwareMap.voltageSensor.iterator().next();
+        } catch (Exception ignored) {}
+
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -142,7 +154,7 @@ public class experimentalHORS extends LinearOpMode {
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new FlywheelController(shooter, shooter2, telemetry); // pass both motors
+        flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor); // pass voltage sensor
         flywheel.setShooterOn(false);
 
         gateController = new GateController(
@@ -163,13 +175,14 @@ public class experimentalHORS extends LinearOpMode {
         );
 
         // Initial positions
-        gateController.setGateClosed(true); // gate open => red on, green off, rn made it so that gate is closed at init
+        gateController.setGateClosed(true); // gate closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
-        telemetry.addData("/nTurret IMU", imuUsed);
+        telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
+        telemetry.addData("\nTurret IMU", imuUsed);
 
         telemetry.update();
 
-        // Prepare subsystems
+        // Prepare subsystems - just capture current state, don't reset anything yet
         turretController.captureReferences();
         turretController.resetPidState();
 
@@ -179,6 +192,7 @@ public class experimentalHORS extends LinearOpMode {
             return;
         }
 
+        // After start: re-zero with Option A (no IMU reset, just capture current state)
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
 
@@ -191,38 +205,22 @@ public class experimentalHORS extends LinearOpMode {
                 try { pinpoint.update(); } catch (Exception ignored) {}
             }
 
-            // Touchpad reset (gamepad2)
+            // Touchpad reset (gamepad2) -> reset encoder + references
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
-                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                if (pinpoint != null) {
-                    try { pinpoint.resetPosAndIMU(); } catch (Exception ignored) {}
-                } else if (imu != null) {
-                    try { imu.initialize(imuParams); } catch (Exception ignored) {}
-                }
-                turretController.captureReferences();
-                turretController.resetPidState();
+                resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Heading ref and turret encoder zeroed");
+                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp2 touchpad)");
                 telemetry.update();
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1) — mirrors touchpad reset
+            // A button reset (gamepad1) -> reset encoder + references
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                if (pinpoint != null) {
-                    try { pinpoint.resetPosAndIMU(); } catch (Exception ignored) {}
-                } else if (imu != null) {
-                    try { imu.initialize(imuParams); } catch (Exception ignored) {}
-                }
-                turretController.captureReferences();
-                turretController.resetPidState();
+                resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Heading ref and turret encoder zeroed (gp1 A)");
+                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp1 A)");
                 telemetry.update();
             }
             aPressedLast = aNow;
@@ -280,7 +278,12 @@ public class experimentalHORS extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // shooter2 now driven by FlywheelController; no manual mirroring needed
+            // Check if PIDF mode changed and update hood accordingly
+            boolean currentPidfMode = flywheel.isUsingFarCoefficients();
+            if (currentPidfMode != lastPidfMode) {
+                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                lastPidfMode = currentPidfMode;
+            }
 
             // Rumble when at target
             if (flywheel.isAtTarget()) {
@@ -289,15 +292,32 @@ public class experimentalHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret manual
-            boolean manualNow = false;
-            double manualPower = 0.0;
-            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
-                manualNow = true; manualPower = 0.25;
-            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
-                manualNow = true; manualPower = -0.25;
+            // Turret control
+            boolean dpadUpNow = gamepad1.dpad_up;
+            if (dpadUpNow && !dpadUpLast) {
+                moveToPositionActive = true; // initiate move-to-370
             }
-            turretController.update(manualNow, manualPower);
+            dpadUpLast = dpadUpNow;
+
+            if (moveToPositionActive) {
+                // Drive toward 370; when reached, lock by capturing references
+                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
+                if (atTarget) {
+                    moveToPositionActive = false;
+                    turretController.captureReferences(); // lock new position as reference
+                    turretController.resetPidState();
+                }
+            } else {
+                // Turret manual
+                boolean manualNow = false;
+                double manualPower = 0.0;
+                if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
+                    manualNow = true; manualPower = 0.25;
+                } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
+                    manualNow = true; manualPower = -0.25;
+                }
+                turretController.update(manualNow, manualPower);
+            }
 
             // Intake manual (only if gate not busy)
             if (!gateController.isBusy()) {
@@ -325,15 +345,11 @@ public class experimentalHORS extends LinearOpMode {
             if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
             else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
-            // Telemetry: flywheel & gate
+            // Telemetry: flywheel & gate with PIDF mode info
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("\nFly PIDF", "P: %.4f I: %.4f D: %.4f F: %.6f",
-                    FlywheelController.kP, FlywheelController.kI,
-                    FlywheelController.kD, FlywheelController.kF);
             telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
             telemetry.update();
-
         }
 
         turretController.disable();
@@ -349,21 +365,30 @@ public class experimentalHORS extends LinearOpMode {
         catch (Exception ignored) { return null; }
     }
 
+    /**
+     * Option A: No Movement on Start
+     *
+     * Capture current heading and turret position as the new reference.
+     */
     private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
+        if (pinpoint != null) {
+            try { pinpoint.update(); } catch (Exception ignored) {}
+        }
+        turretController.captureReferences();
+        turretController.resetPidState();
+    }
+
+    /**
+     * Reset turret encoder and capture references (used on gp1 A and gp2 touchpad).
+     */
+    private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
         try {
             turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            turretController.captureReferences();
-            turretController.resetPidState();
-
-            if (pinpoint != null) {
-                pinpoint.resetPosAndIMU();
-            } else if (imu != null) {
-                imu.initialize(imuParams);
-            }
-        } catch (Exception ignored) {}//even if ignored we are resetting the limits atleast
-        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        } catch (Exception ignored) {}
+        if (pinpoint != null) {
+            try { pinpoint.update(); } catch (Exception ignored) {}
+        }
         turretController.captureReferences();
         turretController.resetPidState();
     }
