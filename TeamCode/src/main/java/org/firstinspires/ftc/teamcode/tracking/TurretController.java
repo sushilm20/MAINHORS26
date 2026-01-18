@@ -45,30 +45,30 @@ public class TurretController {
     public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.1;
+    public static double TURRET_KP = 1.0;
     @Sorter(sort = 4)
-    public static double TURRET_KI = 3;
+    public static double TURRET_KI = 0;
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.22;
+    public static double TURRET_KD = 0.2;
 
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
     // Feedforward, smoothing, filtering
     @Sorter(sort = 7)
-    public static double FF_GAIN = 7.0;
+    public static double FF_GAIN = 15.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.93;
+    public static double POWER_SMOOTH_ALPHA = 0.92;
 
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 1.0;
 
     // Deadband/anti-windup
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 4;
+    public static int SMALL_DEADBAND_TICKS = 6;
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 5.0;
+    public static double INTEGRAL_CLAMP = 0.0;
 
     /** NEW: Ignore heading changes less than this threshold (in radians). Default = ~2deg = 0.0349 rad **/
     @Sorter (sort = 12)
