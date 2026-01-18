@@ -9,6 +9,9 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
@@ -86,6 +89,10 @@ public class wildexperiment extends LinearOpMode {
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
 
+    //Pose tracking
+    private Follower follower;
+    private Pose currentPose = new Pose();  // Robot pose, updated each loop
+
     @Override
     public void runOpMode() {
 
@@ -149,6 +156,15 @@ public class wildexperiment extends LinearOpMode {
             try { imu.initialize(imuParams); } catch (Exception ignored) {}
         }
 
+        try { //Follower
+            // Initialize PedroPathing follower for pose tracking and drivetrain control
+            follower = Constants.createFollower(hardwareMap);
+            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));  // Default starting pose (adjust as needed)
+        } catch (Exception e) {
+            telemetry.addData("Error", "Follower initialization failed!");
+            follower = null;
+        }
+
         String imuUsed = (pinpoint != null) ? "pinpoint" : (imu != null) ? "imu (expansion hub)" : "none";
 
         // Create controllers
@@ -205,6 +221,11 @@ public class wildexperiment extends LinearOpMode {
                 try { pinpoint.update(); } catch (Exception ignored) {}
             }
 
+            if (follower != null) {
+                follower.update();  // Update pose and drivetrain
+                currentPose = follower.getPose();  // Retrieve current robot pose
+            }
+
             // Touchpad reset (gamepad2) -> reset encoder + references
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
@@ -235,9 +256,9 @@ public class wildexperiment extends LinearOpMode {
             touchpadPressedLast = touchpadNow;
 
             // Drive
-            double axial = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw = -gamepad1.right_stick_x;
+            double axial = -gamepad1.left_stick_y;//up down
+            double lateral = gamepad1.left_stick_x; // strafe
+            double yaw = gamepad1.right_stick_x; //heading
             driveController.setDrive(axial, lateral, yaw, 1.0);
 
             // Flywheel toggles (DPAD)
@@ -348,7 +369,11 @@ public class wildexperiment extends LinearOpMode {
             // Telemetry: flywheel & gate with PIDF mode info
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+            //telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+
+            telemetry.addData("Pose", currentPose != null
+                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
+                    : "N/A");
             telemetry.update();
         }
 
