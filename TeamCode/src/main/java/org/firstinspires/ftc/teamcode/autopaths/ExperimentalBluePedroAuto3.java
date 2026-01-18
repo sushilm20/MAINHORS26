@@ -212,10 +212,10 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - ALIGN SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 140)
-    public static double ALIGN_SECOND3_X = 46.0;
+    public static double ALIGN_SECOND3_X = 50.0;
 
     @Sorter(sort = 141)
-    public static double ALIGN_SECOND3_Y = 57.0;
+    public static double ALIGN_SECOND3_Y = 58.0;
 
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = -175.0;
@@ -227,7 +227,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double COLLECT_SECOND3_X = 14.0;
 
     @Sorter(sort = 151)
-    public static double COLLECT_SECOND3_Y = 56.0;
+    public static double COLLECT_SECOND3_Y = 58.0;
 
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = -180.0;
@@ -236,10 +236,10 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     // PATH POSES - ALIGN THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 160)
-    public static double ALIGN_THIRD3_X = 47.0;
+    public static double ALIGN_THIRD3_X = 50.0;
 
     @Sorter(sort = 161)
-    public static double ALIGN_THIRD3_Y = 33.0;
+    public static double ALIGN_THIRD3_Y = 35.0;
 
     @Sorter(sort = 162)
     public static double ALIGN_THIRD3_HEADING = -180.0;
@@ -251,7 +251,7 @@ public class ExperimentalBluePedroAuto3 extends OpMode {
     public static double COLLECT_THIRD3_X = 14.0;
 
     @Sorter(sort = 171)
-    public static double COLLECT_THIRD3_Y = 33.0;
+    public static double COLLECT_THIRD3_Y = 35.0;
 
     @Sorter(sort = 172)
     public static double COLLECT_THIRD3_HEADING = 180.0;
