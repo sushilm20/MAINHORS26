@@ -13,6 +13,7 @@ package org.firstinspires.ftc.teamcode.tracking;
       TARGET_ENCODER = referenceEncoder - (currentHeading - referenceHeading) * ticksPerRadian
   - This means that returning to referenceHeading always means returning to referenceEncoder.
   - Eliminates drift, perfectly matches human intuition!
+  - NEW: Ignores heading changes within ±2° (deadzone).
 */
 
 import com.bylazar.configurables.annotations.Configurable;
@@ -69,6 +70,10 @@ public class TurretController {
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 5.0;
 
+    /** NEW: Ignore heading changes less than this threshold (in radians). Default = ~2deg = 0.0349 rad **/
+    @Sorter (sort = 12)
+    public static double MIN_HEADING_CHANGE_RAD = Math.toRadians(2.0);
+
     // PID/internal state
     private double turretIntegral = 0.0;
     private int lastErrorTicks = 0;
@@ -95,9 +100,6 @@ public class TurretController {
     private double headingReferenceRad = 0.0;
     private int turretEncoderReference = 0;
 
-    /**
-     * Preferred constructor: allows supplying a Pinpoint plus a fallback IMU.
-     */
     public TurretController(DcMotor turretMotor, BNO055IMU imu, GoBildaPinpointDriver pinpoint, Telemetry telemetry) {
         this.turretMotor = turretMotor;
         this.imu = imu;
@@ -108,9 +110,6 @@ public class TurretController {
         resetPidState();
     }
 
-    /**
-     * Backward-compatible constructor (no Pinpoint provided).
-     */
     public TurretController(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
         this(turretMotor, imu, null, telemetry);
     }
@@ -188,7 +187,7 @@ public class TurretController {
 
         int currentEncoderPos = turretMotor.getCurrentPosition();
 
-        // detect manual mode transitions
+        // Manual mode
         if (manualNow) {
             applyManualPower(manualPower, TURRET_MIN_POS, TURRET_MAX_POS, currentEncoderPos - referenceEncoderPos);
             turretIntegral = 0.0;
@@ -200,7 +199,7 @@ public class TurretController {
             return;
         }
 
-        // If just transitioned from manual to auto, also recapture
+        // Transition from manual to auto
         if (manualActiveLast && !manualNow) {
             captureReferences();
             currentEncoderPos = turretMotor.getCurrentPosition();
@@ -210,12 +209,17 @@ public class TurretController {
         }
         manualActiveLast = false;
 
-        // Always compute desired (referenceEncoder - (heading - referenceHeading) * ticksPerRad)
+        // Main logic: driftless + heading deadzone
         double currentHeadingRad = getHeadingRadians();
         double headingDelta = normalizeAngle(currentHeadingRad - referenceHeadingRad);
 
-        double desiredEncoderPosDouble = referenceEncoderPos - headingDelta * ticksPerRad;
-        int desiredEncoderPos = (int) Math.round(desiredEncoderPosDouble);
+        int desiredEncoderPos;
+        if (Math.abs(headingDelta) < MIN_HEADING_CHANGE_RAD) {
+            // Ignore small heading changes!
+            desiredEncoderPos = currentEncoderPos;
+        } else {
+            desiredEncoderPos = (int) Math.round(referenceEncoderPos - headingDelta * ticksPerRad);
+        }
 
         // Clamp to hard limits
         if (desiredEncoderPos > TURRET_MAX_POS) desiredEncoderPos = TURRET_MAX_POS;
@@ -260,8 +264,8 @@ public class TurretController {
 
         double cmdPower = pidOut + ff;
 
-        // Deadband out
-        if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS) {
+        // Disable tiny moves for deadzone or within encoder deadband
+        if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS || Math.abs(headingDelta) < MIN_HEADING_CHANGE_RAD) {
             cmdPower = 0.0;
         }
 
@@ -272,7 +276,7 @@ public class TurretController {
         // Smoothing
         double applied = POWER_SMOOTH_ALPHA * lastAppliedPower + (1.0 - POWER_SMOOTH_ALPHA) * cmdPower;
 
-        // Clamp if at hard stops
+        // Clamp at hard stops
         if ((currentEncoderPos >= TURRET_MAX_POS && applied > 0.0) || (currentEncoderPos <= TURRET_MIN_POS && applied < 0.0)) {
             applied = 0.0;
         }
@@ -283,7 +287,6 @@ public class TurretController {
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
-        // Telemetry vars; reported as offset relative to reference
         lastDesiredTicks = desiredEncoderPos - referenceEncoderPos;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
@@ -298,7 +301,6 @@ public class TurretController {
         if ((currentVirtualTicks >= maxPosCfg && requested > 0.0) || (currentVirtualTicks <= minPosCfg && requested < 0.0)) {
             requested = 0.0;
         }
-
         if (requested > 1.0) requested = 1.0;
         if (requested < -1.0) requested = -1.0;
 
