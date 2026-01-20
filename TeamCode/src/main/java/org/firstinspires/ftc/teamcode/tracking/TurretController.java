@@ -4,16 +4,23 @@ package org.firstinspires.ftc.teamcode.tracking;
   TurretController.java
   ---------------------
   Encapsulates all turret rotation / tracking logic (PID + IMU feedforward + encoder mapping).
-  Now: reference drift eliminated—"home" heading always lines up with "home" encoder reliably!
-  If you return to the reference heading, the turret will always try to use the reference encoder.
+  Moved out of the OpMode to declutter secondexperimentalHORS.
 
-  Main logic:
-  - At reference moment, we store both heading and encoder.
-  - The turret always aims for:
-      TARGET_ENCODER = referenceEncoder - (currentHeading - referenceHeading) * ticksPerRadian
-  - This means that returning to referenceHeading always means returning to referenceEncoder.
-  - Eliminates drift, perfectly matches human intuition!
-  - NEW: Ignores heading changes within ±2° (deadzone).
+  Summary of important behavior / tuning (matches the values you provided):
+  - Encoder hard limits: TURRET_MIN_POS = -900, TURRET_MAX_POS = 900
+  - TICKS_PER_RADIAN computed from encoder span:
+      TICKS_PER_RADIAN = (TURRET_MAX_POS - TURRET_MIN_POS) / (2 * Math.PI) * TICKS_PER_RADIAN_SCALE
+    (maps full encoder span to 360°; if your turret travel is not full 360°, replace denominator
+    with the real travel radians)
+  - PID: KP = 1.15, KI = 0.0, KD = 0.22
+  - FF_GAIN = 5.0
+  - POWER smoothing ALPHA = 0.935
+  - DERIV_FILTER_ALPHA = 1.25
+  - SMALL_DEADBAND_TICKS = 14
+  - INTEGRAL_CLAMP = 50.0
+  - Integral accumulation is gated by deadband, derivative is filtered, and applied power is smoothed.
+  - Manual control is handled inside this class; the OpMode should call update(manualNow, manualPower).
+  - The class exposes telemetry getters so the OpMode can display useful tuning data.
 */
 
 import com.bylazar.configurables.annotations.Configurable;
@@ -30,76 +37,75 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 @Configurable
 public class TurretController {
 
-    // Hardware refs
+    // Hardware references
     private final DcMotor turretMotor;
-    private final BNO055IMU imu;
-    private final GoBildaPinpointDriver pinpoint;
-    private final Telemetry telemetry;
+    private final BNO055IMU imu;                    // Expansion Hub IMU fallback
+    private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
+    private final Telemetry telemetry; // optional, may be null
 
-    // Configurable limits/tuning
+    // Turret encoder hard limits (configurable)
     @Sorter(sort = 0)
     public static int TURRET_MIN_POS = -1000;
+
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 1000;
     @Sorter(sort = 2)
-    public static double TICKS_PER_RADIAN_SCALE = 0.92;
+    public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
+    // PID liek config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.0;
+    public static double TURRET_KP = 1.2;
+
     @Sorter(sort = 4)
-    public static double TURRET_KI = 0;
+    public static double TURRET_KI = 0.0;
+
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.2;
+    public static double TURRET_KD = 0.25;
 
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
-    // Feedforward, smoothing, filtering
+    // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
-    public static double FF_GAIN = 15.0;
+    public static double FF_GAIN = 5.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.92;
+    public static double POWER_SMOOTH_ALPHA = 0.94;
 
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 1.0;
 
-    // Deadband/anti-windup
+    // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 6;
+    public static int SMALL_DEADBAND_TICKS = 4; //every 4 ticks change required
+
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 0.0;
+    public static double INTEGRAL_CLAMP = 50.0; //not used at all
 
-    /** NEW: Ignore heading changes less than this threshold (in radians). Default = ~2deg = 0.0349 rad **/
-    @Sorter (sort = 12)
-    public static double MIN_HEADING_CHANGE_RAD = Math.toRadians(2.0);
-
-    // PID/internal state
+    // Internal state
     private double turretIntegral = 0.0;
     private int lastErrorTicks = 0;
     private long lastTimeMs = -1L;
     private double lastAppliedPower = 0.0;
     private double lastDerivative = 0.0;
 
-    // Driftless reference snapshot
-    private double referenceHeadingRad = 0.0;     // heading (rads) at reference
-    private int referenceEncoderPos = 0;          // encoder ticks at reference
-
-    // Used for angular velocity/FF
+    // Heading / encoder reference (used to compute desired ticks from IMU)
+    private double headingReferenceRad = 0.0;
     private double lastHeadingRad = 0.0;
+    private int turretEncoderReference = 0;
+
+    // state for manual->auto transition detection
     private boolean manualActiveLast = false;
 
-    // Telemetry variables
+    // telemetry values (readable by the OpMode)
     private int lastDesiredTicks = 0;
     private int lastErrorReported = 0;
     private double lastPidOut = 0.0;
     private double lastFf = 0.0;
 
-    // To preserve legacy vars for external callers (not strictly necessary now)
-    private int encoderOffset = 0;
-    private double headingReferenceRad = 0.0;
-    private int turretEncoderReference = 0;
-
+    /**
+     * Preferred constructor: allows supplying a Pinpoint plus a fallback IMU.
+     */
     public TurretController(DcMotor turretMotor, BNO055IMU imu, GoBildaPinpointDriver pinpoint, Telemetry telemetry) {
         this.turretMotor = turretMotor;
         this.imu = imu;
@@ -110,22 +116,21 @@ public class TurretController {
         resetPidState();
     }
 
+    /**
+     * Backward-compatible constructor (no Pinpoint provided).
+     */
     public TurretController(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
         this(turretMotor, imu, null, telemetry);
     }
 
     /**
      * Capture the current heading and turret encoder as the reference points.
-     * This also updates legacy fields for API/telemetry compat.
+     * Call this when you want to (re)zero the turret's mapping to robot heading (e.g., after manual control).
      */
     public void captureReferences() {
-        referenceHeadingRad = getHeadingRadians();
-        referenceEncoderPos = turretMotor.getCurrentPosition();
-        // for compatible usage with old fields:
-        headingReferenceRad = referenceHeadingRad;
-        lastHeadingRad = referenceHeadingRad;
-        encoderOffset = referenceEncoderPos;
-        turretEncoderReference = 0; // always virtualized to 0
+        headingReferenceRad = getHeadingRadians();
+        lastHeadingRad = headingReferenceRad;
+        turretEncoderReference = turretMotor.getCurrentPosition();
     }
 
     /**
@@ -154,27 +159,9 @@ public class TurretController {
     }
 
     /**
-     * Simple utility to drive toward a raw encoder target.
-     * Returns true if within deadband and motor is stopped.
-     */
-    public boolean driveToPosition(int targetTicks, int deadbandTicks, double powerMag) {
-        int current = turretMotor.getCurrentPosition();
-        double power = 0.0;
-        if (current < targetTicks - deadbandTicks) {
-            power = Math.abs(powerMag);
-        } else if (current > targetTicks + deadbandTicks) {
-            power = -Math.abs(powerMag);
-        } else {
-            power = 0.0;
-        }
-        turretMotor.setPower(power);
-        return power == 0.0;
-    }
-
-    /**
      * Main update method. Call from OpMode loop.
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
-     * - If manualNow is false: the controller will run automatic tracking using reference heading/encoder.
+     * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
      *
      * @param manualNow whether operator control is active
      * @param manualPower requested manual power in [-1, 1] (only used if manualNow)
@@ -182,112 +169,134 @@ public class TurretController {
     public void update(boolean manualNow, double manualPower) {
         long nowMs = System.currentTimeMillis();
 
-        // Derived mapping
-        double ticksPerRad = ((TURRET_MAX_POS - TURRET_MIN_POS) / (2.0 * Math.PI)) * TICKS_PER_RADIAN_SCALE;
+        // Pull latest config each loop so UI changes apply live
+        int minPosCfg = TURRET_MIN_POS;
+        int maxPosCfg = TURRET_MAX_POS;
+        double ticksPerRadScaleCfg = TICKS_PER_RADIAN_SCALE;
+        double kpCfg = TURRET_KP;
+        double kiCfg = TURRET_KI;
+        double kdCfg = TURRET_KD;
+        double maxPowerCfg = TURRET_MAX_POWER;
+        double ffGainCfg = FF_GAIN;
+        double powerSmoothCfg = POWER_SMOOTH_ALPHA;
+        double derivFilterCfg = DERIV_FILTER_ALPHA;
+        int deadbandCfg = SMALL_DEADBAND_TICKS;
+        double integralClampCfg = INTEGRAL_CLAMP;
 
-        int currentEncoderPos = turretMotor.getCurrentPosition();
+        // Derived mapping (recomputed so changes to limits/scale take effect)
+        double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
 
-        // Manual mode
+        // detect transitions
         if (manualNow) {
-            applyManualPower(manualPower, TURRET_MIN_POS, TURRET_MAX_POS, currentEncoderPos - referenceEncoderPos);
+            // Manual: apply manual power but enforce encoder hard limits
+            applyManualPower(manualPower, minPosCfg, maxPosCfg);
+            // Reset PID state so no integral/derivative carryover when returning to auto
             turretIntegral = 0.0;
             lastErrorTicks = 0;
             lastTimeMs = nowMs;
             lastDerivative = 0.0;
             manualActiveLast = true;
+            // publish telemetry if present
             publishTelemetry();
             return;
         }
 
-        // Transition from manual to auto
+        // If we just transitioned from manual to auto, re-capture references
         if (manualActiveLast && !manualNow) {
             captureReferences();
-            currentEncoderPos = turretMotor.getCurrentPosition();
+            // reset timing so derivative doesn't blow up
             lastTimeMs = nowMs;
             lastDerivative = 0.0;
             lastAppliedPower = 0.0;
         }
         manualActiveLast = false;
 
-        // Main logic: driftless + heading deadzone
+        // Auto control: compute desired ticks from heading delta
         double currentHeadingRad = getHeadingRadians();
-        double headingDelta = normalizeAngle(currentHeadingRad - referenceHeadingRad);
+        double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
 
-        int desiredEncoderPos;
-        if (Math.abs(headingDelta) < MIN_HEADING_CHANGE_RAD) {
-            // Ignore small heading changes!
-            desiredEncoderPos = currentEncoderPos;
-        } else {
-            desiredEncoderPos = (int) Math.round(referenceEncoderPos - headingDelta * ticksPerRad);
+        // Compute angular velocity (for feedforward)
+        double angularVel = 0.0;
+        if (lastTimeMs > 0) {
+            double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
+            double headingDeltaSinceLast = normalizeAngle(currentHeadingRad - lastHeadingRad);
+            angularVel = headingDeltaSinceLast / dtHeading;
         }
 
-        // Clamp to hard limits
-        if (desiredEncoderPos > TURRET_MAX_POS) desiredEncoderPos = TURRET_MAX_POS;
-        if (desiredEncoderPos < TURRET_MIN_POS) desiredEncoderPos = TURRET_MIN_POS;
+        // Save last heading for next iteration
+        lastHeadingRad = currentHeadingRad;
 
-        int errorTicks = desiredEncoderPos - currentEncoderPos;
+        // Desired encoder ticks corresponding to heading change:
+        double desiredTicksDouble = turretEncoderReference - headingDelta * ticksPerRad;
+        int desiredTicks = (int) Math.round(desiredTicksDouble);
 
-        // Timing
+        // Clamp desired ticks to encoder physical limits
+        if (desiredTicks > maxPosCfg) desiredTicks = maxPosCfg;
+        if (desiredTicks < minPosCfg) desiredTicks = minPosCfg;
+
+        int currentTicks = turretMotor.getCurrentPosition();
+        int errorTicks = desiredTicks - currentTicks;
+
+        // Timing for PID
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
         double dt = dtMs / 1000.0;
         lastTimeMs = nowMs;
 
-        // Angular velocity (for FF)
-        double angularVel = 0.0;
-        if (lastTimeMs > 0) {
-            double dtHeading = Math.max(0.0001, dt);
-            double headingDeltaSinceLast = normalizeAngle(currentHeadingRad - lastHeadingRad);
-            angularVel = headingDeltaSinceLast / dtHeading;
-        }
-        lastHeadingRad = currentHeadingRad;
-
-        // PID state logic
-        if (Math.abs(errorTicks) > SMALL_DEADBAND_TICKS) {
+        // Integral gating: only integrate when error is outside small deadband
+        if (Math.abs(errorTicks) > deadbandCfg) {
+            // If the sign changed, reduce integral to avoid "holding" overshoot
             if (lastErrorTicks != 0 && ((errorTicks > 0 && lastErrorTicks < 0) || (errorTicks < 0 && lastErrorTicks > 0))) {
                 turretIntegral *= 0.5;
             }
             turretIntegral += errorTicks * dt;
         } else {
+            // gentle decay while inside deadband
             turretIntegral *= 0.90;
         }
 
         // Clamp integral
-        if (turretIntegral > INTEGRAL_CLAMP) turretIntegral = INTEGRAL_CLAMP;
-        if (turretIntegral < -INTEGRAL_CLAMP) turretIntegral = -INTEGRAL_CLAMP;
+        if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
+        if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
         // Derivative (filtered)
         double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
-        double derivativeFiltered = DERIV_FILTER_ALPHA * rawDerivative + (1.0 - DERIV_FILTER_ALPHA) * lastDerivative;
+        double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
-        double pidOut = TURRET_KP * errorTicks + TURRET_KI * turretIntegral + TURRET_KD * derivativeFiltered;
-        double ff = -angularVel * FF_GAIN;
+        // PID output (note Ki multiplies integral sum)
+        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+
+        // Feedforward: turret should oppose robot yaw rate (angularVel)
+        double ff = -angularVel * ffGainCfg;
 
         double cmdPower = pidOut + ff;
 
-        // Disable tiny moves for deadzone or within encoder deadband
-        if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS || Math.abs(headingDelta) < MIN_HEADING_CHANGE_RAD) {
+        // Deadband to avoid tiny jittering moves
+        if (Math.abs(errorTicks) <= deadbandCfg) {
             cmdPower = 0.0;
         }
 
-        // Clamp to max power
-        if (cmdPower > TURRET_MAX_POWER) cmdPower = TURRET_MAX_POWER;
-        if (cmdPower < -TURRET_MAX_POWER) cmdPower = -TURRET_MAX_POWER;
+        // Clamp command to motor power limits
+        if (cmdPower > maxPowerCfg) cmdPower = maxPowerCfg;
+        if (cmdPower < -maxPowerCfg) cmdPower = -maxPowerCfg;
 
-        // Smoothing
-        double applied = POWER_SMOOTH_ALPHA * lastAppliedPower + (1.0 - POWER_SMOOTH_ALPHA) * cmdPower;
+        // Smooth applied power (exponential smoothing)
+        double applied = powerSmoothCfg * lastAppliedPower + (1.0 - powerSmoothCfg) * cmdPower;
 
-        // Clamp at hard stops
-        if ((currentEncoderPos >= TURRET_MAX_POS && applied > 0.0) || (currentEncoderPos <= TURRET_MIN_POS && applied < 0.0)) {
+        // If at hard stop, block the command that would push further
+        if ((currentTicks >= maxPosCfg && applied > 0.0) || (currentTicks <= minPosCfg && applied < 0.0)) {
             applied = 0.0;
         }
 
+        // Apply to motor
         turretMotor.setPower(applied);
 
+        // Update states for next loop
         lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
-        lastDesiredTicks = desiredEncoderPos - referenceEncoderPos;
+        // Save telemetry values for external reading or logging
+        lastDesiredTicks = desiredTicks;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
@@ -295,18 +304,23 @@ public class TurretController {
         publishTelemetry();
     }
 
-    private void applyManualPower(double manualPower, int minPosCfg, int maxPosCfg, int tickDeltaFromRef) {
+    private void applyManualPower(double manualPower, int minPosCfg, int maxPosCfg) {
+        int currentTicks = turretMotor.getCurrentPosition();
+
+        // Enforce physical limits: if at limit, block further motion into the stop
         double requested = manualPower;
-        int currentVirtualTicks = tickDeltaFromRef;
-        if ((currentVirtualTicks >= maxPosCfg && requested > 0.0) || (currentVirtualTicks <= minPosCfg && requested < 0.0)) {
+        if ((currentTicks >= maxPosCfg && requested > 0.0) || (currentTicks <= minPosCfg && requested < 0.0)) {
             requested = 0.0;
         }
+
+        // clamp to motor safe range
         if (requested > 1.0) requested = 1.0;
         if (requested < -1.0) requested = -1.0;
 
         turretMotor.setPower(requested);
+        // reflect telemetry values
         lastDesiredTicks = turretEncoderReference;
-        lastErrorReported = lastDesiredTicks - currentVirtualTicks;
+        lastErrorReported = lastDesiredTicks - currentTicks;
         lastPidOut = 0.0;
         lastFf = 0.0;
     }
@@ -319,7 +333,8 @@ public class TurretController {
         if (pinpoint != null) {
             try {
                 return -pinpoint.getHeading(AngleUnit.RADIANS); // invert to match prior BNO IMU convention
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         if (imu == null) return 0.0;
         Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
@@ -338,13 +353,13 @@ public class TurretController {
     public double getLastPidOut() { return lastPidOut; }
     public double getLastFf() { return lastFf; }
     public double getLastAppliedPower() { return lastAppliedPower; }
-    public int getEncoderOffset() { return encoderOffset; }
-    public int getVirtualPosition() { return turretMotor.getCurrentPosition() - referenceEncoderPos; }
-    public int getRawPosition() { return turretMotor.getCurrentPosition(); }
 
     private void publishTelemetry() {
         if (telemetry == null) return;
-        telemetry.addData("\n turret.error", lastErrorReported);
-        telemetry.addData("\n Turret Encoder: ", getRawPosition());
+//        telemetry.addData("turret.desired", lastDesiredTicks);
+//        telemetry.addData("turret.error", lastErrorReported);
+//        telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
+//        telemetry.addData("turret.ff", String.format("%.4f", lastFf));
+//        telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
     }
 }

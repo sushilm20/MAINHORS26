@@ -300,13 +300,13 @@ public class experimentalHORS extends LinearOpMode {
             dpadUpLast = dpadUpNow;
 
             if (moveToPositionActive) {
-                // Drive toward 370; when reached, lock by capturing references
-                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
-                if (atTarget) {
-                    moveToPositionActive = false;
-                    turretController.captureReferences(); // lock new position as reference
-                    turretController.resetPidState();
-                }
+//                // Drive toward 370; when reached, lock by capturing references
+////                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
+////                if (atTarget) {
+//                    moveToPositionActive = false;
+//                    turretController.captureReferences(); // lock new position as reference
+//                    turretController.resetPidState();
+//                }
             } else {
                 // Turret manual
                 boolean manualNow = false;
