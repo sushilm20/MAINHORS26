@@ -82,6 +82,11 @@ public class TurretController {
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0; // not used at all
 
+    // Right-side asymmetry control (configurable)
+    // 0.0 = no effect. 0.2 = reduce rightward response by 20% near center.
+    @Sorter(sort = 12)
+    public static double RIGHTWARD_ENCODER_DAMP = 0.15;
+
     // Internal state
     private double turretIntegral = 0.0;
     private int lastErrorTicks = 0;
@@ -213,6 +218,7 @@ public class TurretController {
         double derivFilterCfg = DERIV_FILTER_ALPHA;
         int deadbandCfg = SMALL_DEADBAND_TICKS;
         double integralClampCfg = INTEGRAL_CLAMP;
+        double rightDampCfg = RIGHTWARD_ENCODER_DAMP;
 
         // Derived mapping
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
@@ -288,12 +294,22 @@ public class TurretController {
         if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
         if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
-        // Derivative (filtered)
-        double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
+        // ---- Rightward asymmetry for center hold (near zero yaw rate) ----
+        // Only apply when turret is commanded near zero and robot is not rotating.
+        int dampedError = errorTicks;
+        boolean nearCenter = Math.abs(desiredVirtualTicks) <= deadbandCfg * 2;
+        boolean yawNearlyZero = Math.abs(angularVel) < 0.10; // rad/s threshold
+        if (nearCenter && yawNearlyZero && errorTicks > 0) {
+            double scale = Math.max(0.0, 1.0 - rightDampCfg);
+            dampedError = (int) Math.round(errorTicks * scale);
+        }
+
+        // Derivative (filtered) uses the damped error to avoid right bias at center
+        double rawDerivative = (dampedError - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
         // PID output
-        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+        double pidOut = kpCfg * dampedError + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
         // Feedforward: oppose robot yaw rate
         double ff = -angularVel * ffGainCfg;
@@ -321,7 +337,7 @@ public class TurretController {
         turretMotor.setPower(applied);
 
         // Update states
-        lastErrorTicks = errorTicks;
+        lastErrorTicks = dampedError;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
