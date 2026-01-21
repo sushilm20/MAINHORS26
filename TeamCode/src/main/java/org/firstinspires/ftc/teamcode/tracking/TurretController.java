@@ -17,8 +17,8 @@ package org.firstinspires.ftc.teamcode.tracking;
   - POWER smoothing ALPHA = 0.94
   - DERIV_FILTER_ALPHA = 1.0
   - SMALL_DEADBAND_TICKS increased to 12 to ignore tiny jitter
-  - HEADING_DEADBAND_RAD (~0.8°) to ignore tiny heading noise before mapping to ticks
-  - ANG_VEL_DEADBAND_RADPS to ignore tiny angular velocity spikes in feedforward
+  - HEADING_DEADBAND_DEG (~0.8°) to ignore tiny heading noise before mapping to ticks
+  - ANG_VEL_DEADBAND_DPS (~12.6°/s) to ignore tiny angular velocity spikes in feedforward
   - Integral accumulation is gated by deadband, derivative is filtered, and applied power is smoothed.
   - Manual control is handled inside this class; the OpMode should call update(manualNow, manualPower).
   - The class exposes telemetry getters so the OpMode can display useful tuning data.
@@ -84,12 +84,12 @@ public class TurretController {
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0; // not used at all
 
-    // Heading/FF deadbands (configurable)
+    // Heading/FF deadbands (configurable) — entered in degrees for dashboard convenience
     @Sorter(sort = 12)
-    public static double HEADING_DEADBAND_RAD = 0.15; // ~0.8 degrees
+    public static double HEADING_DEADBAND_DEG = 0.8; // instead of radians
 
     @Sorter(sort = 13)
-    public static double ANG_VEL_DEADBAND_RADPS = 0.22; // ignore tiny angular velocity spikes
+    public static double ANG_VEL_DEADBAND_DPS = 12.6; // instead of rad/s
 
     // Right-turn encoder dampener (only affects positive/“rightward” desired ticks)
     @Sorter(sort = 14)
@@ -195,8 +195,10 @@ public class TurretController {
         double derivFilterCfg = DERIV_FILTER_ALPHA;
         int deadbandCfg = SMALL_DEADBAND_TICKS;
         double integralClampCfg = INTEGRAL_CLAMP;
-        double headingDeadbandCfg = HEADING_DEADBAND_RAD;
-        double angVelDeadbandCfg = ANG_VEL_DEADBAND_RADPS;
+
+        // Convert UI-friendly degrees to radians each loop
+        double headingDeadbandCfg = Math.toRadians(HEADING_DEADBAND_DEG);
+        double angVelDeadbandCfg = Math.toRadians(ANG_VEL_DEADBAND_DPS);
 
         // Derived mapping (recomputed so changes to limits/scale take effect)
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
