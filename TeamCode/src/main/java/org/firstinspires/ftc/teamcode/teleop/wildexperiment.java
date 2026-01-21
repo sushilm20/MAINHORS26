@@ -58,10 +58,6 @@ public class wildexperiment extends LinearOpMode {
     private boolean isFarMode = false;
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
 
-    // Turret move-to-target state
-    private boolean moveToPositionActive = false;
-    private static final int turretPosition = -560;
-
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
@@ -313,32 +309,25 @@ public class wildexperiment extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret control
+            // Turret control (manual only; drive-to-position removed)
+            boolean manualNow = false;
+            double manualPower = 0.0;
+
+            // D-pad up can be used as a low-speed forward nudge if desired
             boolean dpadUpNow = gamepad1.dpad_up;
             if (dpadUpNow && !dpadUpLast) {
-                moveToPositionActive = true; // initiate move-to-370
+                manualNow = true;
+                manualPower = 0.2;
             }
             dpadUpLast = dpadUpNow;
 
-            if (moveToPositionActive) {
-                // Drive toward 370; when reached, lock by capturing references
-                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
-                if (atTarget) {
-                    moveToPositionActive = false;
-                    turretController.captureReferences(); // lock new position as reference
-                    turretController.resetPidState();
-                }
-            } else {
-                // Turret manual
-                boolean manualNow = false;
-                double manualPower = 0.0;
-                if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
-                    manualNow = true; manualPower = 0.25;
-                } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
-                    manualNow = true; manualPower = -0.25;
-                }
-                turretController.update(manualNow, manualPower);
+            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
+                manualNow = true; manualPower = 0.25;
+            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
+                manualNow = true; manualPower = -0.25;
             }
+
+            turretController.update(manualNow, manualPower);
 
             // Intake manual (only if gate not busy)
             if (!gateController.isBusy()) {

@@ -6,18 +6,19 @@ package org.firstinspires.ftc.teamcode.tracking;
   Encapsulates all turret rotation / tracking logic (PID + IMU feedforward + encoder mapping).
   Moved out of the OpMode to declutter secondexperimentalHORS.
 
-  Summary of important behavior / tuning (matches the values you provided):
-  - Encoder hard limits: TURRET_MIN_POS = -900, TURRET_MAX_POS = 900
+  Summary of important behavior / tuning:
+  - Encoder hard limits: TURRET_MIN_POS / TURRET_MAX_POS
   - TICKS_PER_RADIAN computed from encoder span:
       TICKS_PER_RADIAN = (TURRET_MAX_POS - TURRET_MIN_POS) / (2 * Math.PI) * TICKS_PER_RADIAN_SCALE
     (maps full encoder span to 360°; if your turret travel is not full 360°, replace denominator
     with the real travel radians)
-  - PID: KP = 1.15, KI = 0.0, KD = 0.22
-  - FF_GAIN = 5.0
-  - POWER smoothing ALPHA = 0.935
-  - DERIV_FILTER_ALPHA = 1.25
-  - SMALL_DEADBAND_TICKS = 14
-  - INTEGRAL_CLAMP = 50.0
+  - PID defaults: KP = 1.2, KI = 0.0, KD = 0.25
+  - FF_GAIN = 5.0 (can be reduced)
+  - POWER smoothing ALPHA = 0.94
+  - DERIV_FILTER_ALPHA = 1.0
+  - SMALL_DEADBAND_TICKS increased to 12 to ignore tiny jitter
+  - HEADING_DEADBAND_RAD (~0.8°) to ignore tiny heading noise before mapping to ticks
+  - ANG_VEL_DEADBAND_RADPS to ignore tiny angular velocity spikes in feedforward
   - Integral accumulation is gated by deadband, derivative is filtered, and applied power is smoothed.
   - Manual control is handled inside this class; the OpMode should call update(manualNow, manualPower).
   - The class exposes telemetry getters so the OpMode can display useful tuning data.
@@ -28,11 +29,11 @@ import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
-import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 @Configurable
 public class TurretController {
@@ -49,10 +50,11 @@ public class TurretController {
 
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 1000;
+
     @Sorter(sort = 2)
     public static double TICKS_PER_RADIAN_SCALE = 0.9;
 
-    // PID liek config
+    // PID-like config
     @Sorter(sort = 3)
     public static double TURRET_KP = 1.2;
 
@@ -77,10 +79,17 @@ public class TurretController {
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 4; //every 4 ticks change required
+    public static int SMALL_DEADBAND_TICKS = 12; // increased to ignore tiny encoder jitter
 
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 50.0; //not used at all
+    public static double INTEGRAL_CLAMP = 50.0; // not used at all
+
+    // Heading/FF deadbands (configurable)
+    @Sorter(sort = 12)
+    public static double HEADING_DEADBAND_RAD = 0.15; // ~0.8 degrees
+
+    @Sorter(sort = 13)
+    public static double ANG_VEL_DEADBAND_RADPS = 0.22; // ignore tiny angular velocity spikes
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -182,6 +191,8 @@ public class TurretController {
         double derivFilterCfg = DERIV_FILTER_ALPHA;
         int deadbandCfg = SMALL_DEADBAND_TICKS;
         double integralClampCfg = INTEGRAL_CLAMP;
+        double headingDeadbandCfg = HEADING_DEADBAND_RAD;
+        double angVelDeadbandCfg = ANG_VEL_DEADBAND_RADPS;
 
         // Derived mapping (recomputed so changes to limits/scale take effect)
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
@@ -214,6 +225,11 @@ public class TurretController {
         // Auto control: compute desired ticks from heading delta
         double currentHeadingRad = getHeadingRadians();
         double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
+
+        // Heading deadband to ignore tiny IMU jitter
+        if (Math.abs(headingDelta) < headingDeadbandCfg) {
+            headingDelta = 0.0;
+        }
 
         // Compute angular velocity (for feedforward)
         double angularVel = 0.0;
@@ -267,6 +283,10 @@ public class TurretController {
 
         // Feedforward: turret should oppose robot yaw rate (angularVel)
         double ff = -angularVel * ffGainCfg;
+        // Angular velocity deadband to ignore tiny spikes
+        if (Math.abs(angularVel) < angVelDeadbandCfg) {
+            ff = 0.0;
+        }
 
         double cmdPower = pidOut + ff;
 
