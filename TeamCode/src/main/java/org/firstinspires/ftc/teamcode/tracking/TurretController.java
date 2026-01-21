@@ -40,7 +40,7 @@ public class TurretController {
 
     // Hardware references
     private final DcMotor turretMotor;
-    private final BNO055IMU imu;                    // Expansion Hub IMU fallback
+    private final BNO055IMU imu;                    // kept for ctor compatibility; not used
     private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
     private final Telemetry telemetry; // optional, may be null
 
@@ -90,6 +90,10 @@ public class TurretController {
 
     @Sorter(sort = 13)
     public static double ANG_VEL_DEADBAND_RADPS = 0.22; // ignore tiny angular velocity spikes
+
+    // Right-turn encoder dampener (only affects positive/“rightward” desired ticks)
+    @Sorter(sort = 14)
+    public static double RIGHTWARD_ENCODER_DAMP = 0.97;
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -231,19 +235,15 @@ public class TurretController {
             headingDelta = 0.0;
         }
 
-        // Compute angular velocity (for feedforward)
-        double angularVel = 0.0;
-        if (lastTimeMs > 0) {
-            double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
-            double headingDeltaSinceLast = normalizeAngle(currentHeadingRad - lastHeadingRad);
-            angularVel = headingDeltaSinceLast / dtHeading;
+        // Compute desired ticks from heading
+        double desiredTicksDouble = turretEncoderReference - headingDelta * ticksPerRad;
+
+        // Apply rightward encoder dampener (only if desired is to the right of reference)
+        if (desiredTicksDouble > turretEncoderReference) {
+            desiredTicksDouble = turretEncoderReference +
+                    (desiredTicksDouble - turretEncoderReference) * RIGHTWARD_ENCODER_DAMP;
         }
 
-        // Save last heading for next iteration
-        lastHeadingRad = currentHeadingRad;
-
-        // Desired encoder ticks corresponding to heading change:
-        double desiredTicksDouble = turretEncoderReference - headingDelta * ticksPerRad;
         int desiredTicks = (int) Math.round(desiredTicksDouble);
 
         // Clamp desired ticks to encoder physical limits
@@ -281,6 +281,14 @@ public class TurretController {
         // PID output (note Ki multiplies integral sum)
         double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
+        // Compute angular velocity (for feedforward)
+        double angularVel = 0.0;
+        if (lastTimeMs > 0) {
+            double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
+            double headingDeltaSinceLast = normalizeAngle(currentHeadingRad - lastHeadingRad);
+            angularVel = headingDeltaSinceLast / dtHeading;
+        }
+
         // Feedforward: turret should oppose robot yaw rate (angularVel)
         double ff = -angularVel * ffGainCfg;
         // Angular velocity deadband to ignore tiny spikes
@@ -309,6 +317,9 @@ public class TurretController {
 
         // Apply to motor
         turretMotor.setPower(applied);
+
+        // Save last heading for next iteration
+        lastHeadingRad = currentHeadingRad;
 
         // Update states for next loop
         lastErrorTicks = errorTicks;
@@ -346,7 +357,7 @@ public class TurretController {
     }
 
     /**
-     * Return current heading (Z) in radians. Prefer Pinpoint; fall back to BNO IMU; else 0.
+     * Return current heading (Z) in radians. Prefer Pinpoint; fallback removed.
      * NOTE: Pinpoint heading is negated to match the previous BNO055 sign convention.
      */
     private double getHeadingRadians() {
@@ -354,11 +365,11 @@ public class TurretController {
             try {
                 return -pinpoint.getHeading(AngleUnit.RADIANS); // invert to match prior BNO IMU convention
             } catch (Exception ignored) {
+                // fall through
             }
         }
-        if (imu == null) return 0.0;
-        Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
-        return -o.firstAngle;
+        // IMU fallback removed: rely solely on Pinpoint; otherwise hold last heading
+        return lastHeadingRad;
     }
 
     private static double normalizeAngle(double angle) {
