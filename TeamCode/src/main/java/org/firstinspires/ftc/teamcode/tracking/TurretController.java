@@ -91,7 +91,7 @@ public class TurretController {
     @Sorter(sort = 13)
     public static double ANG_VEL_DEADBAND_DPS = 12.6; // instead of rad/s
 
-    // Right-turn encoder dampener (only affects positive/“rightward” desired ticks)
+    //lower for more dampening below
     @Sorter(sort = 14)
     public static double RIGHTWARD_ENCODER_DAMP = 0.97;
 
