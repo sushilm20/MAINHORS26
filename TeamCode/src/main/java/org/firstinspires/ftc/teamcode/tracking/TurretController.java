@@ -54,13 +54,13 @@ public class TurretController {
 
     // PID like config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.2;
+    public static double TURRET_KP = 1.15;
 
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
 
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.29;
+    public static double TURRET_KD = 0.22;
 
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
@@ -70,22 +70,26 @@ public class TurretController {
     public static double FF_GAIN = 5.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.94;
+    public static double POWER_SMOOTH_ALPHA = 0.935;
 
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 0.98;
+    public static double DERIV_FILTER_ALPHA = 1.25;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 4; // every 4 ticks change required
+    public static int SMALL_DEADBAND_TICKS = 8; // every 4 ticks change required
 
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0; // not used at all
 
     // Right-side asymmetry control (configurable)
-    // 0.0 = no effect. 0.2 = reduce rightward response by 20% near center.
+    // 0.0 = no effect. 0.2 = reduce small rightward response by 20%.
     @Sorter(sort = 12)
     public static double RIGHTWARD_ENCODER_DAMP = 0.15;
+
+    // Only apply damp when error is small (so normal tracking is unaffected)
+    @Sorter(sort = 13)
+    public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -110,6 +114,9 @@ public class TurretController {
     private int lastErrorReported = 0;
     private double lastPidOut = 0.0;
     private double lastFf = 0.0;
+    private double lastHeadingDelta = 0.0;
+    private double lastAngularVel = 0.0;
+    private int lastDampedError = 0;
 
     /**
      * Preferred constructor: allows supplying a Pinpoint plus a fallback IMU.
@@ -219,6 +226,7 @@ public class TurretController {
         int deadbandCfg = SMALL_DEADBAND_TICKS;
         double integralClampCfg = INTEGRAL_CLAMP;
         double rightDampCfg = RIGHTWARD_ENCODER_DAMP;
+        int rightDampWindowCfg = RIGHTWARD_DAMP_ERROR_WINDOW;
 
         // Derived mapping
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
@@ -294,17 +302,14 @@ public class TurretController {
         if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
         if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
-        // ---- Rightward asymmetry for center hold (near zero yaw rate) ----
-        // Only apply when turret is commanded near zero and robot is not rotating.
+        // ---- Rightward asymmetry (safe + always active near center) ----
         int dampedError = errorTicks;
-        boolean nearCenter = Math.abs(desiredVirtualTicks) <= deadbandCfg * 2;
-        boolean yawNearlyZero = Math.abs(angularVel) < 0.10; // rad/s threshold
-        if (nearCenter && yawNearlyZero && errorTicks > 0) {
+        if (errorTicks > 0 && Math.abs(errorTicks) <= rightDampWindowCfg) {
             double scale = Math.max(0.0, 1.0 - rightDampCfg);
             dampedError = (int) Math.round(errorTicks * scale);
         }
 
-        // Derivative (filtered) uses the damped error to avoid right bias at center
+        // Derivative (filtered) uses damped error
         double rawDerivative = (dampedError - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
@@ -346,6 +351,9 @@ public class TurretController {
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
+        lastHeadingDelta = headingDelta;
+        lastAngularVel = angularVel;
+        lastDampedError = dampedError;
 
         publishTelemetry();
     }
@@ -364,6 +372,9 @@ public class TurretController {
         lastErrorReported = lastDesiredTicks - currentVirtualTicks;
         lastPidOut = 0.0;
         lastFf = 0.0;
+        lastHeadingDelta = 0.0;
+        lastAngularVel = 0.0;
+        lastDampedError = lastErrorReported;
     }
 
     /**
@@ -397,17 +408,22 @@ public class TurretController {
     public int getEncoderOffset() { return encoderOffset; }
     public int getVirtualPosition() { return getVirtualEncoderPosition(); }
     public int getRawPosition() { return turretMotor.getCurrentPosition(); }
+    public double getLastHeadingDelta() { return lastHeadingDelta; }
+    public double getLastAngularVel() { return lastAngularVel; }
+    public int getLastDampedError() { return lastDampedError; }
 
     private void publishTelemetry() {
         if (telemetry == null) return;
-        // Uncomment for debugging:
-        // telemetry.addData("turret.desired", lastDesiredTicks);
-        telemetry.addData("\n turret.error", lastErrorReported);
-        // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
-        // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
-        // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-        // telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
-        telemetry.addData("\n Turret Encoder: ", getRawPosition());
-        // telemetry.addData("\n turret.offset", encoderOffset);
+        telemetry.addData("turret.desired", lastDesiredTicks);
+        telemetry.addData("turret.virtualPos", getVirtualEncoderPosition());
+        telemetry.addData("turret.rawPos", getRawPosition());
+        telemetry.addData("turret.error", lastErrorReported);
+        telemetry.addData("turret.dampedError", lastDampedError);
+//        telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
+//        telemetry.addData("turret.ff", String.format("%.4f", lastFf));
+//        telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
+//        telemetry.addData("turret.headingDelta(rad)", String.format("%.4f", lastHeadingDelta));
+//        telemetry.addData("turret.angularVel(rad/s)", String.format("%.4f", lastAngularVel));
+        telemetry.addData("turret.offset", encoderOffset);
     }
 }
