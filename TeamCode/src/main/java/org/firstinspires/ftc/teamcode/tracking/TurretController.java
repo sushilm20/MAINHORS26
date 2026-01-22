@@ -54,7 +54,7 @@ public class TurretController {
 
     // PID like config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.15;
+    public static double TURRET_KP = 1.2;
 
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
@@ -70,14 +70,14 @@ public class TurretController {
     public static double FF_GAIN = 5.0;
 
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.935;
+    public static double POWER_SMOOTH_ALPHA = 0.912;
 
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 1.25;
+    public static double DERIV_FILTER_ALPHA = 0.6;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 8; // every 4 ticks change required
+    public static int SMALL_DEADBAND_TICKS = 6; // every 6 ticks change required
 
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0; // not used at all
@@ -85,7 +85,7 @@ public class TurretController {
     // Right-side asymmetry control (configurable)
     // 0.0 = no effect. 0.2 = reduce small rightward response by 20%.
     @Sorter(sort = 12)
-    public static double RIGHTWARD_ENCODER_DAMP = 0.15;
+    public static double RIGHTWARD_ENCODER_DAMP = 0.175;
 
     // Only apply damp when error is small (so normal tracking is unaffected)
     @Sorter(sort = 13)
