@@ -85,7 +85,7 @@ public class TurretController {
     // Right-side asymmetry control (configurable)
     // 0.0 = no effect. 0.2 = reduce small rightward response by 20%.
     @Sorter(sort = 12)
-    public static double RIGHTWARD_ENCODER_DAMP = 0.2;
+    public static double RIGHTWARD_ENCODER_DAMP = 0.25;
 
     // Only apply damp when error is small (so normal tracking is unaffected)
     @Sorter(sort = 13)
