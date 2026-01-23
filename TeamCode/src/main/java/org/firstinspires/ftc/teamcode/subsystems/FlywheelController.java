@@ -30,20 +30,16 @@ public class FlywheelController {
     @Sorter(sort = 2) public static double RPM_SWITCH_THRESHOLD = 3000.0;
 
     // --- CLOSE PIDF coefficients (for target RPM below threshold) ---
-    @Sorter(sort = 3) public static double CLOSE_kP = 0.00193;
-    @Sorter(sort = 4) public static double CLOSE_kI = 0.005;
-    @Sorter(sort = 5) public static double CLOSE_kD = 0.0;
-    @Sorter(sort = 6) public static double CLOSE_kF = 1.93;
+    @Sorter(sort = 3) public static double CLOSE_kP = 0.00146;
+    @Sorter(sort = 4) public static double CLOSE_kI = 0.0027;
+    @Sorter(sort = 5) public static double CLOSE_kD = 0.00002;
+    @Sorter(sort = 6) public static double CLOSE_kF = 1.72;
     @Sorter(sort = 7) public static double CLOSE_integralLimit = 50;
-    @Sorter(sort = 8) public static double CLOSE_derivativeAlpha = 0.9;//bru
-
-    //the smoothing below
-    @Sorter(sort = 9) public static double CLOSE_rpmFilterAlpha = 0.8;
-    @Sorter(sort = 10) public static double CLOSE_powerSmoothingAlpha = 0.25;
-
-    //ends here
-    @Sorter(sort = 11) public static double CLOSE_ffReferenceVoltage = 12.8;
-    @Sorter(sort = 12) public static double CLOSE_ffReferenceMaxTicksPerSec = 5050;
+    @Sorter(sort = 8) public static double CLOSE_derivativeAlpha = 0.9;
+    @Sorter(sort = 9) public static double CLOSE_rpmFilterAlpha = 0.72;
+    @Sorter(sort = 10) public static double CLOSE_powerSmoothingAlpha = 0.5;
+    @Sorter(sort = 11) public static double CLOSE_ffReferenceVoltage = 13.0;
+    @Sorter(sort = 12) public static double CLOSE_ffReferenceMaxTicksPerSec = 4930;
     @Sorter(sort = 13) public static double CLOSE_rpmTolerance = 50.0;
 
     // --- FAR PIDF coefficients (for target RPM at or above threshold) ---
