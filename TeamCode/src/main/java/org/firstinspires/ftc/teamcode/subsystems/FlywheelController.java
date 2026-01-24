@@ -52,7 +52,7 @@ public class FlywheelController {
     @Sorter(sort = 20) public static double FAR_rpmFilterAlpha = 0.9;
     @Sorter(sort = 21) public static double FAR_powerSmoothingAlpha = 0.5;
     @Sorter(sort = 22) public static double FAR_ffReferenceVoltage = 13.0;
-    @Sorter(sort = 23) public static double FAR_ffReferenceMaxTicksPerSec = 4930;
+    @Sorter(sort = 23) public static double FAR_ffReferenceMaxTicksPerSec = 4940;
     @Sorter(sort = 24) public static double FAR_rpmTolerance = 50.0;
 
     // --- Target RPM presets ---
