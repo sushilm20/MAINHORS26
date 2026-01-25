@@ -178,7 +178,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT FIRST 3 POSITION
     // ========================================
     @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 20.0;
+    public static double COLLECT_FIRST3_X = 22.0;
 
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 80.0;
@@ -226,7 +226,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 14.0;
+    public static double COLLECT_SECOND3_X = 16.0;
 
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 56.0;
@@ -250,7 +250,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 14.0;
+    public static double COLLECT_THIRD3_X = 16.0;
 
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 33.0;
