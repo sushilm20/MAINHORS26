@@ -94,9 +94,6 @@ public class DriveStreamPoseTeleOp extends OpMode {
         if (follower != null) {
             follower.update();
             currentPose = follower.getPose();
-        }
-
-        if (follower != null) {
             double axial = -gamepad1.left_stick_y;
             double lateral = -gamepad1.left_stick_x;
             double yaw = -gamepad1.right_stick_x;
@@ -122,6 +119,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         if (detections.isEmpty()) {
             telemetry.addData("Tag", "None");
+            telemetry.addData("Last Detection (s ago)", "%.1f", detectionTimer.seconds());
             return;
         }
 
@@ -132,7 +130,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
             telemetry.addData("Bearing (deg)", "%.1f", detection.ftcPose.bearing);
             telemetry.addData("Yaw (deg)", "%.1f", detection.ftcPose.yaw);
         }
-        telemetry.addData("Last Update (s)", "%.1f", detectionTimer.seconds());
+        telemetry.addData("Last Detection (s ago)", "%.1f", detectionTimer.seconds());
         detectionTimer.reset();
     }
 
@@ -158,7 +156,10 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         @Override
         public Object processFrame(Mat frame, long captureTimeNanos) {
-            Bitmap b = Bitmap.createBitmap(frame.width(), frame.height(), Bitmap.Config.RGB_565);
+            Bitmap b = lastFrame.get();
+            if (b.getWidth() != frame.width() || b.getHeight() != frame.height()) {
+                b = Bitmap.createBitmap(frame.width(), frame.height(), Bitmap.Config.RGB_565);
+            }
             Utils.matToBitmap(frame, b);
             lastFrame.set(b);
             return null;
