@@ -41,7 +41,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
     // Dashboard-configurable parameters
 
-    public static double RANGE_SCALE = 1.0; // multiplicative correction
+    public static double RANGE_SCALE = 2.7; // multiplicative correction
     public static double RANGE_BIAS = 0.0;  // additive correction (cm)
     public static int STREAM_FPS = 60;      // desired stream FPS
 
