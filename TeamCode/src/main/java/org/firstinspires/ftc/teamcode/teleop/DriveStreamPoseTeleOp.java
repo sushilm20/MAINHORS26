@@ -6,6 +6,8 @@ import android.graphics.Canvas;
 import androidx.annotation.Nullable;
 
 import com.bylazar.camerastream.PanelsCameraStream;
+import com.bylazar.configurables.annotations.Configurable;
+import com.bylazar.configurables.annotations.Sorter;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -32,8 +34,16 @@ import org.opencv.core.Mat;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+@Configurable
 @TeleOp(name = "DriveStreamPoseTeleOp", group = "TeleOp")
 public class DriveStreamPoseTeleOp extends OpMode {
+
+    // Dashboard-configurable parameters
+
+    public static double RANGE_SCALE = 1.0; // multiplicative correction
+    public static double RANGE_BIAS = 0.0;  // additive correction (cm)
+
+    public static int STREAM_FPS = 60;      // desired stream FPS
 
     private Follower follower;
     private Pose currentPose = new Pose();
@@ -81,7 +91,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
         }
 
         visionPortal = portalBuilder.build();
-        PanelsCameraStream.INSTANCE.startStream(streamProcessor, 60); // pass source + fps
+        PanelsCameraStream.INSTANCE.startStream(streamProcessor,STREAM_FPS);
         detectionTimer.reset();
     }
 
@@ -142,11 +152,18 @@ public class DriveStreamPoseTeleOp extends OpMode {
         AprilTagDetection detection = detections.get(0);
         telemetry.addData("Tag ID", detection.id);
         if (detection.ftcPose != null) {
-            telemetry.addData("Range (cm)", "%.1f", detection.ftcPose.range);
+            double rawRange = detection.ftcPose.range;
+            double adjRange = correctedRange(rawRange);
+            telemetry.addData("Range raw (cm)", "%.1f", rawRange);
+            telemetry.addData("Range adj (cm)", "%.1f", adjRange);
             telemetry.addData("Bearing (deg)", "%.1f", detection.ftcPose.bearing);
             telemetry.addData("Yaw (deg)", "%.1f", detection.ftcPose.yaw);
         }
         telemetry.addData("Last Detection (s ago)", "%.1f", detectionTimer.seconds());
+    }
+
+    private double correctedRange(double raw) {
+        return raw * RANGE_SCALE + RANGE_BIAS;
     }
 
     @Override
