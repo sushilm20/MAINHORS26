@@ -130,13 +130,13 @@ public class BluePedroAuto extends OpMode {
     public static double GATE_CLOSED = 0.5;
 
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 9.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 6.0; //was like 10
 
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.35;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.5;
 
     @Sorter(sort = 35)
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
@@ -262,10 +262,10 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - MOVE FOR RP POSITION
     // ========================================
     @Sorter(sort = 180)
-    public static double MOVE_RP_X = 55.0;
+    public static double MOVE_RP_X = 30.0;
 
     @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 78.0;
+    public static double MOVE_RP_Y = 68.0;
 
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 135.0;
