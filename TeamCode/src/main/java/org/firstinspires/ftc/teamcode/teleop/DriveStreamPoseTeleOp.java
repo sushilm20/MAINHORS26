@@ -62,7 +62,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
     private void initVision(HardwareMap hardwareMap) {
         aprilTagProcessor = new Builder()
-                .setDrawAxis(true)
+                .setDrawAxes(true)
                 .setDrawTagOutline(true)
                 .setDrawCubeProjection(true)
                 .setDrawTagID(true)
@@ -81,8 +81,15 @@ public class DriveStreamPoseTeleOp extends OpMode {
         }
 
         visionPortal = portalBuilder.build();
-        PanelsCameraStream.startStream(streamProcessor);
+        PanelsCameraStream.getInstance().startStream(streamProcessor);
         detectionTimer.reset();
+    }
+
+    /**
+     * Expose VisionPortal for external inspection if needed.
+     */
+    public VisionPortal getVisionPortal() {
+        return visionPortal;
     }
 
     @Override
@@ -104,7 +111,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
         }
 
         telemetry.addData("Pose", currentPose != null
-                ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
+                ? String.format(java.util.Locale.US, "(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
                 : "N/A");
 
         addDetectionTelemetry();
@@ -147,7 +154,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
         if (visionPortal != null) {
             visionPortal.close();
         }
-        PanelsCameraStream.stopStream();
+        PanelsCameraStream.getInstance().stopStream();
     }
 
     /**
