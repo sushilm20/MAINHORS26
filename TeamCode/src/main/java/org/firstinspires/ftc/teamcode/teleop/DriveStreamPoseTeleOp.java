@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.util.Size;
 
 import androidx.annotation.Nullable;
 
@@ -42,7 +43,6 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
     public static double RANGE_SCALE = 1.0; // multiplicative correction
     public static double RANGE_BIAS = 0.0;  // additive correction (cm)
-
     public static int STREAM_FPS = 60;      // desired stream FPS
 
     private Follower follower;
@@ -81,17 +81,18 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         VisionPortal.Builder portalBuilder = new VisionPortal.Builder()
                 .addProcessor(aprilTagProcessor)
-                .addProcessor(streamProcessor);
+                .addProcessor(streamProcessor)
+                .setCameraResolution(new Size(640, 480)); // try 1280x720 for wider FOV
 
         try {
-            portalBuilder.setCamera(hardwareMap.get(WebcamName.class, "webcam1"));
+            portalBuilder.setCamera(hardwareMap.get(WebcamName.class, "webcam1")); // adjust name to match config
         } catch (IllegalArgumentException e) {
             telemetry.addData("Camera", "Webcam 1 not found, using phone back camera");
             portalBuilder.setCamera(BuiltinCameraDirection.BACK);
         }
 
         visionPortal = portalBuilder.build();
-        PanelsCameraStream.INSTANCE.startStream(streamProcessor,STREAM_FPS);
+        PanelsCameraStream.INSTANCE.startStream(streamProcessor, STREAM_FPS);
         detectionTimer.reset();
     }
 
