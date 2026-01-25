@@ -18,6 +18,7 @@ import org.firstinspires.ftc.robotcore.external.function.Continuation;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.stream.CameraStreamSource;
 import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -41,6 +42,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
     private AprilTagProcessor aprilTagProcessor;
     private final StreamProcessor streamProcessor = new StreamProcessor();
     private final ElapsedTime detectionTimer = new ElapsedTime();
+    private boolean sawDetectionLastLoop = false;
 
     @Override
     public void init() {
@@ -73,8 +75,9 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         try {
             portalBuilder.setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"));
-        } catch (Exception ignored) {
-            portalBuilder.setCamera(VisionPortal.CameraMode.WEBCAM);
+        } catch (IllegalArgumentException e) {
+            telemetry.addData("Camera", "Webcam 1 not found, using phone back camera");
+            portalBuilder.setCamera(BuiltinCameraDirection.BACK);
         }
 
         visionPortal = portalBuilder.build();
@@ -120,8 +123,14 @@ public class DriveStreamPoseTeleOp extends OpMode {
         if (detections.isEmpty()) {
             telemetry.addData("Tag", "None");
             telemetry.addData("Last Detection (s ago)", "%.1f", detectionTimer.seconds());
+            sawDetectionLastLoop = false;
             return;
         }
+
+        if (!sawDetectionLastLoop) {
+            detectionTimer.reset();
+        }
+        sawDetectionLastLoop = true;
 
         AprilTagDetection detection = detections.get(0);
         telemetry.addData("Tag ID", detection.id);
@@ -131,7 +140,6 @@ public class DriveStreamPoseTeleOp extends OpMode {
             telemetry.addData("Yaw (deg)", "%.1f", detection.ftcPose.yaw);
         }
         telemetry.addData("Last Detection (s ago)", "%.1f", detectionTimer.seconds());
-        detectionTimer.reset();
     }
 
     @Override
@@ -146,8 +154,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
      * Minimal processor that copies frames to a bitmap for Panels streaming.
      */
     private static class StreamProcessor implements VisionProcessor, CameraStreamSource {
-        private final AtomicReference<Bitmap> lastFrame =
-                new AtomicReference<>(Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565));
+        private final AtomicReference<Bitmap> lastFrame = new AtomicReference<>(null);
 
         @Override
         public void init(int width, int height, @Nullable CameraCalibration calibration) {
@@ -156,12 +163,16 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         @Override
         public Object processFrame(Mat frame, long captureTimeNanos) {
-            Bitmap b = lastFrame.get();
-            if (b.getWidth() != frame.width() || b.getHeight() != frame.height()) {
-                b = Bitmap.createBitmap(frame.width(), frame.height(), Bitmap.Config.RGB_565);
+            Bitmap current = lastFrame.get();
+            if (current == null || current.getWidth() != frame.width() || current.getHeight() != frame.height()) {
+                if (current != null) {
+                    current.recycle();
+                }
+                Bitmap resized = Bitmap.createBitmap(frame.width(), frame.height(), Bitmap.Config.RGB_565);
+                lastFrame.set(resized);
+                current = resized;
             }
-            Utils.matToBitmap(frame, b);
-            lastFrame.set(b);
+            Utils.matToBitmap(frame, current);
             return null;
         }
 
@@ -172,7 +183,13 @@ public class DriveStreamPoseTeleOp extends OpMode {
 
         @Override
         public void getFrameBitmap(Continuation<? extends Consumer<Bitmap>> continuation) {
-            continuation.dispatch(bitmapConsumer -> bitmapConsumer.accept(lastFrame.get()));
+            continuation.dispatch(bitmapConsumer -> {
+                Bitmap frame = lastFrame.get();
+                if (frame == null) {
+                    frame = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565);
+                }
+                bitmapConsumer.accept(frame);
+            });
         }
     }
 }
