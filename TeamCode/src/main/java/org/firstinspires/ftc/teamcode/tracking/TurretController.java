@@ -73,7 +73,7 @@ public class TurretController {
     public static double POWER_SMOOTH_ALPHA = 0.912;
 
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 0.6;
+    public static double DERIV_FILTER_ALPHA = 0.8;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
@@ -85,7 +85,7 @@ public class TurretController {
     // Right-side asymmetry control (configurable)
     // 0.0 = no effect. 0.2 = reduce small rightward response by 20%.
     @Sorter(sort = 12)
-    public static double RIGHTWARD_ENCODER_DAMP = 0.25;
+    public static double RIGHTWARD_ENCODER_DAMP = 0.4;
 
     // Only apply damp when error is small (so normal tracking is unaffected)
     @Sorter(sort = 13)
