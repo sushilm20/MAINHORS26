@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @Autonomous(name = "UV Gate Clear", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
-public class ExperimentalUVGate extends OpMode {
+public class ExperimentalUVGateBlue extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -185,7 +185,7 @@ public class ExperimentalUVGate extends OpMode {
     public static double COLLECT_FIRST3_HEADING = 175.0;
 
     // ========================================
-    // PATH POSES - GATE ALIGN POSITION
+    // PATH POSES - GATE ALIGN POSITION (First)
     // ========================================
     @Sorter(sort = 125)
     public static double GATE_ALIGN_X = 30.0;
@@ -197,7 +197,7 @@ public class ExperimentalUVGate extends OpMode {
     public static double GATE_ALIGN_HEADING = 179.0;
 
     // ========================================
-    // PATH POSES - GATE CLEAR POSITION
+    // PATH POSES - GATE CLEAR POSITION (First)
     // ========================================
     @Sorter(sort = 130)
     public static double GATE_CLEAR_X = 21.0    ;
@@ -233,42 +233,39 @@ public class ExperimentalUVGate extends OpMode {
     public static double COLLECT_SECOND3_HEADING = -180.0;
 
     // ========================================
-    // PATH POSES - ALIGN THIRD 3 POSITION
+    // PATH POSES - SECOND/THIRD GATE ALIGN/CLEAR
     // ========================================
     @Sorter(sort = 160)
-    public static double ALIGN_THIRD3_X = 50.0;
+    public static double SECOND_GATE_ALIGN_X = 30.0;
 
     @Sorter(sort = 161)
-    public static double ALIGN_THIRD3_Y = 35.0;
+    public static double SECOND_GATE_ALIGN_Y = 67.0;
 
     @Sorter(sort = 162)
-    public static double ALIGN_THIRD3_HEADING = -180.0;
+    public static double SECOND_GATE_ALIGN_HEADING = 180.0;
+
+    @Sorter(sort = 163)
+    public static double SECOND_GATE_CLEAR_X = 21.0;
+
+    @Sorter(sort = 164)
+    public static double SECOND_GATE_CLEAR_Y = 67.0;
+
+    @Sorter(sort = 165)
+    public static double SECOND_GATE_CLEAR_HEADING = 180.0;
 
     // ========================================
-    // PATH POSES - COLLECT THIRD 3 POSITION
+    // PATH POSES - END POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 14.0;
+    public static double END_X = 35.0;
 
     @Sorter(sort = 171)
-    public static double COLLECT_THIRD3_Y = 35.0;
+    public static double END_Y = 72.0;
 
     @Sorter(sort = 172)
-    public static double COLLECT_THIRD3_HEADING = 180.0;
+    public static double END_HEADING = 135.0;
 
-    // ========================================
-    // PATH POSES - MOVE FOR RP POSITION
-    // ========================================
-    @Sorter(sort = 180)
-    public static double MOVE_RP_X = 55.0;
-
-    @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 78.0;
-
-    @Sorter(sort = 182)
-    public static double MOVE_RP_HEADING = 135.0;
-
-    public ExperimentalUVGate() {}
+    public ExperimentalUVGateBlue() {}
 
     @Override
     public void init() {
@@ -556,7 +553,7 @@ public class ExperimentalUVGate extends OpMode {
     }
 
     private boolean endsAtShoot(int pathIndex) {
-        return pathIndex == 1 || pathIndex == 5 || pathIndex == 8 || pathIndex == 11;
+        return pathIndex == 1 || pathIndex == 5 || pathIndex == 10;
     }
 
     private double distanceToShootPose() {
@@ -571,15 +568,19 @@ public class ExperimentalUVGate extends OpMode {
     }
 
     private void startPath(int idx) {
-        if (idx < 1 || idx > 12) {
+        if (idx < 1 || idx > 13) {
             currentPathIndex = 0;
             state = AutoState.FINISHED;
             return;
         }
 
-        startIntake(INTAKE_ON_POWER);
+        if (idx == 11 || idx == 12) {
+            stopIntake();
+        } else {
+            startIntake(INTAKE_ON_POWER);
+        }
 
-        if (idx == 5 || idx == 8 || idx == 11) {
+        if (idx == 5 || idx == 10) {
             timedIntakeTimer.resetTimer();
             timedIntakeActive = true;
             panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
@@ -593,11 +594,12 @@ public class ExperimentalUVGate extends OpMode {
             case 5: follower.followPath(paths.backToShootFirst3); break;
             case 6: follower.followPath(paths.alignToCollectSecond3); break;
             case 7: follower.followPath(paths.collectSecond3); break;
-            case 8: follower.followPath(paths.backToShootSecond3); break;
-            case 9: follower.followPath(paths.alignToCollectThird3); break;
-            case 10: follower.followPath(paths.collectThird3); break;
-            case 11: follower.followPath(paths.backToShootThird3); break;
-            case 12: follower.followPath(paths.moveForRP); break;
+            case 8: follower.followPath(paths.secondGateAlign); break;
+            case 9: follower.followPath(paths.secondGateClear); break;
+            case 10: follower.followPath(paths.backToShootSecond3); break;
+            case 11: follower.followPath(paths.thirdGateAlign); break;
+            case 12: follower.followPath(paths.thirdGateClear); break;
+            case 13: follower.followPath(paths.moveToEnd); break;
             default: break;
         }
 
@@ -631,16 +633,16 @@ public class ExperimentalUVGate extends OpMode {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
-                    if (finished == 3) {
+                    if (finished == 3 || finished == 8 || finished == 11) {
                         gateAlignWaitTimer.resetTimer();
-                        nextPathIndex = 4;
+                        nextPathIndex = finished + 1;
                         state = AutoState.WAIT_GATE_ALIGN;
                         break;
                     }
 
-                    if (finished == 4) {
+                    if (finished == 4 || finished == 9 || finished == 12) {
                         gateClearWaitTimer.resetTimer();
-                        nextPathIndex = 5;
+                        nextPathIndex = finished + 1;
                         state = AutoState.WAIT_GATE_CLEAR;
                         break;
                     }
@@ -652,7 +654,7 @@ public class ExperimentalUVGate extends OpMode {
                         state = AutoState.CLOSED_INTAKE_SEQUENCE;
                     } else {
                         int next = finished + 1;
-                        if (next > 12) {
+                        if (next > 13) {
                             state = AutoState.FINISHED;
                         } else {
                             startPath(next);
@@ -736,7 +738,7 @@ public class ExperimentalUVGate extends OpMode {
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
                     if (clawServo != null) clawServo.setPosition(0.63);
-                    if (nextPathIndex > 0 && nextPathIndex <= 12) {
+                    if (nextPathIndex > 0 && nextPathIndex <= 13) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
                     } else {
@@ -781,19 +783,22 @@ public class ExperimentalUVGate extends OpMode {
         public PathChain backToShootFirst3;
         public PathChain alignToCollectSecond3;
         public PathChain collectSecond3;
+        public PathChain secondGateAlign;
+        public PathChain secondGateClear;
         public PathChain backToShootSecond3;
-        public PathChain alignToCollectThird3;
-        public PathChain collectThird3;
-        public PathChain backToShootThird3;
-        public PathChain moveForRP;
+        public PathChain thirdGateAlign;
+        public PathChain thirdGateClear;
+        public PathChain moveToEnd;
 
         public Paths(Follower follower) {
             // Path 1: Start -> Primary shoot pose
             startToShoot = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(START_X, START_Y),
-                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                            new Pose(START_X, START_Y).mirror(),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y).mirror()
+                            )
+                    )
                     .setLinearHeadingInterpolation(
                             Math.toRadians(START_HEADING),
                             Math.toRadians(SHOOT_HEADING_INITIAL))
@@ -865,59 +870,70 @@ public class ExperimentalUVGate extends OpMode {
                             Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
-            // Path 8: Collect second 3 -> Shoot (angled for second 3)
-            backToShootSecond3 = follower
+            // Path 8: Collect second 3 -> Second gate align
+            secondGateAlign = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
-                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                            new Pose(SECOND_GATE_ALIGN_X, SECOND_GATE_ALIGN_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(COLLECT_SECOND3_HEADING),
+                            Math.toRadians(SECOND_GATE_ALIGN_HEADING))
+                    .build();
+
+            // Path 9: Second gate align -> Second gate clear
+            secondGateClear = follower
+                    .pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(SECOND_GATE_ALIGN_X, SECOND_GATE_ALIGN_Y),
+                            new Pose(SECOND_GATE_CLEAR_X, SECOND_GATE_CLEAR_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SECOND_GATE_ALIGN_HEADING),
+                            Math.toRadians(SECOND_GATE_CLEAR_HEADING))
+                    .build();
+
+            // Path 10: Second gate clear -> Shoot
+            backToShootSecond3 = follower
+                    .pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(SECOND_GATE_CLEAR_X, SECOND_GATE_CLEAR_Y),
+                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                    .setLinearHeadingInterpolation(
+                            Math.toRadians(SECOND_GATE_CLEAR_HEADING),
                             Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
-            // Path 9: Shoot -> Align for third 3
-            alignToCollectThird3 = follower
+            // Path 11: Shoot -> Third gate align (same as second)
+            thirdGateAlign = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
-                            new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y)))
+                            new Pose(SECOND_GATE_ALIGN_X, SECOND_GATE_ALIGN_Y)))
                     .setLinearHeadingInterpolation(
                             Math.toRadians(SHOOT_SECOND3_HEADING),
-                            Math.toRadians(ALIGN_THIRD3_HEADING))
+                            Math.toRadians(SECOND_GATE_ALIGN_HEADING))
                     .build();
 
-            // Path 10: Align -> Collect third 3
-            collectThird3 = follower
+            // Path 12: Third gate align -> Third gate clear (same as second)
+            thirdGateClear = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y),
-                            new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y)))
+                            new Pose(SECOND_GATE_ALIGN_X, SECOND_GATE_ALIGN_Y),
+                            new Pose(SECOND_GATE_CLEAR_X, SECOND_GATE_CLEAR_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(ALIGN_THIRD3_HEADING),
-                            Math.toRadians(COLLECT_THIRD3_HEADING))
+                            Math.toRadians(SECOND_GATE_ALIGN_HEADING),
+                            Math.toRadians(SECOND_GATE_CLEAR_HEADING))
                     .build();
 
-            // Path 11: Collect third 3 -> Shoot (final)
-            backToShootThird3 = follower
+            // Path 13: Third gate clear -> End
+            moveToEnd = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
-                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
+                            new Pose(SECOND_GATE_CLEAR_X, SECOND_GATE_CLEAR_Y),
+                            new Pose(END_X, END_Y)))
                     .setLinearHeadingInterpolation(
-                            Math.toRadians(COLLECT_THIRD3_HEADING),
-                            Math.toRadians(SHOOT_FINAL_HEADING))
-                    .build();
-
-            // Path 12: Shoot -> Move for RP
-            moveForRP = follower
-                    .pathBuilder()
-                    .addPath(new BezierLine(
-                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
-                            new Pose(MOVE_RP_X, MOVE_RP_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(SHOOT_FINAL_HEADING),
-                            Math.toRadians(MOVE_RP_HEADING))
+                            Math.toRadians(SECOND_GATE_CLEAR_HEADING),
+                            Math.toRadians(END_HEADING))
                     .build();
         }
     }
