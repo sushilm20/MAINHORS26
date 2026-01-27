@@ -175,7 +175,7 @@ public class wildexperiment extends LinearOpMode {
 
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
-        // Hook the limit switch to auto-reset the encoder & virtual zero whenever the switch is pressed
+        // Hook the limit switch to homing reset (manual sweep only)
         if (turretLimitSwitch != null) {
             // Active-low REV mag/touch: getState() == false when pressed
             turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
@@ -326,18 +326,14 @@ public class wildexperiment extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret control (manual only; drive-to-position removed)
+            // Turret control: manual homing sweep + manual jog
+            // Press dpad_up to start the homing oscillation; it will reset when the mag switch is hit.
+            turretController.commandHomingSweep(gamepad1.dpad_up);
+
             boolean manualNow = false;
             double manualPower = 0.0;
 
-            // D-pad up can be used as a low-speed forward nudge if desired
-            boolean dpadUpNow = gamepad1.dpad_up;
-            if (dpadUpNow && !dpadUpLast) {
-                manualNow = true;
-                manualPower = 0.2;
-            }
-            dpadUpLast = dpadUpNow;
-
+            // Manual jog (bumper / stick). Removed dpad_up manual power so it can trigger homing instead.
             if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
                 manualNow = true; manualPower = 0.25;
             } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {

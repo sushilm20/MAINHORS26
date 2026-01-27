@@ -1,15 +1,5 @@
 package org.firstinspires.ftc.teamcode.tracking;
 
-/*
-  TurretController.java
-  ---------------------
-  Encapsulates all turret rotation / tracking logic (PID + IMU feedforward + encoder mapping).
-  Modified to support manual homing sweep:
-  - Press a button (e.g., dpad_up) to command a homing oscillation between -300 and +300 ticks.
-  - During the sweep, if the magnetic limit switch triggers, reset encoder & references once, then resume normal control.
-  - No automatic resets during normal teleop/auto—only in the homing sweep.
-*/
-
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.hardware.bosch.BNO055IMU;
@@ -20,6 +10,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import java.util.function.BooleanSupplier;
 
 @Configurable
@@ -29,15 +20,14 @@ public class TurretController {
     private final DcMotor turretMotor;
     private final BNO055IMU imu;                    // Expansion Hub IMU fallback
     private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
-    private final Telemetry telemetry; // optional, may be null
+    private final Telemetry telemetry;              // optional, may be null
 
-    // Optional reset trigger (e.g., magnetic limit switch). If null, no resets occur.
+    // Optional reset trigger (e.g., magnetic limit switch). Used only when homing sweep is active.
     private BooleanSupplier encoderResetTrigger = null;
 
     // Turret encoder hard limits (configurable)
     @Sorter(sort = 0)
     public static int TURRET_MIN_POS = -1000;
-
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 1000;
     @Sorter(sort = 2)
@@ -46,49 +36,39 @@ public class TurretController {
     // PID like config
     @Sorter(sort = 3)
     public static double TURRET_KP = 1.2;
-
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
-
     @Sorter(sort = 5)
     public static double TURRET_KD = 0.22;
-
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
     // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
     public static double FF_GAIN = 5.0;
-
     @Sorter(sort = 8)
     public static double POWER_SMOOTH_ALPHA = 0.92;
-
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 0.8;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 6; // every 6 ticks change required
-
+    public static int SMALL_DEADBAND_TICKS = 6;
     @Sorter(sort = 11)
-    public static double INTEGRAL_CLAMP = 50.0; // not used at all
+    public static double INTEGRAL_CLAMP = 50.0;
 
-    // Right-side asymmetry control (configurable)
-    // 0.0 = no effect. 0.2 = reduce small rightward response by 20%.
+    // Rightward asymmetry control (biases target instead of slowing PID output)
+    // 0.0 = no effect. 0.4 = scale rightward target step by 60% when near center.
     @Sorter(sort = 12)
     public static double RIGHTWARD_ENCODER_DAMP = 0.4;
-
-    // Only apply damp when error is small (so normal tracking is unaffected)
     @Sorter(sort = 13)
     public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
 
     // Homing sweep configuration (manual reset)
     @Sorter(sort = 14)
     public static int HOMING_AMPLITUDE_TICKS = 300;
-
     @Sorter(sort = 15)
     public static double HOMING_POWER = 0.35;
-
     @Sorter(sort = 16)
     public static int HOMING_TARGET_DEADBAND = 10;
 
@@ -232,7 +212,7 @@ public class TurretController {
      */
     public boolean driveToPosition(int targetTicks, int deadbandTicks, double powerMag) {
         int current = turretMotor.getCurrentPosition();
-        double power = 0.0;
+        double power;
         if (current < targetTicks - deadbandTicks) {
             power = Math.abs(powerMag);
         } else if (current > targetTicks + deadbandTicks) {
@@ -335,7 +315,20 @@ public class TurretController {
         if (desiredVirtualTicks > maxPosCfg) desiredVirtualTicks = maxPosCfg;
         if (desiredVirtualTicks < minPosCfg) desiredVirtualTicks = minPosCfg;
 
-        int errorTicks = desiredVirtualTicks - currentVirtualTicks;
+        // ---- Rightward asymmetry by biasing the target itself (offset logic) ----
+        int delta = desiredVirtualTicks - currentVirtualTicks;
+        int desiredBiased = desiredVirtualTicks;
+        boolean rightDampActive = delta > 0 && Math.abs(delta) <= rightDampWindowCfg;
+        if (rightDampActive) {
+            double scale = Math.max(0.0, 1.0 - rightDampCfg); // e.g., 0.6 if RIGHTWARD_ENCODER_DAMP=0.4
+            desiredBiased = currentVirtualTicks + (int) Math.round(delta * scale);
+        }
+
+        // Clamp biased desired to limits
+        if (desiredBiased > maxPosCfg) desiredBiased = maxPosCfg;
+        if (desiredBiased < minPosCfg) desiredBiased = minPosCfg;
+
+        int errorTicks = desiredBiased - currentVirtualTicks;
 
         // Timing
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
@@ -356,19 +349,12 @@ public class TurretController {
         if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
         if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
-        // ---- Rightward asymmetry (safe + always active near center) ----
-        int dampedError = errorTicks;
-        if (errorTicks > 0 && Math.abs(errorTicks) <= rightDampWindowCfg) {
-            double scale = Math.max(0.0, 1.0 - rightDampCfg);
-            dampedError = (int) Math.round(errorTicks * scale);
-        }
-
-        // Derivative (filtered) uses damped error
-        double rawDerivative = (dampedError - lastErrorTicks) / Math.max(1e-4, dt);
+        // Derivative (filtered)
+        double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
         // PID output
-        double pidOut = kpCfg * dampedError + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
         // Feedforward: oppose robot yaw rate
         double ff = -angularVel * ffGainCfg;
@@ -396,18 +382,18 @@ public class TurretController {
         turretMotor.setPower(applied);
 
         // Update states
-        lastErrorTicks = dampedError;
+        lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
         // Telemetry values
-        lastDesiredTicks = desiredVirtualTicks;
+        lastDesiredTicks = desiredBiased;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
         lastHeadingDelta = headingDelta;
         lastAngularVel = angularVel;
-        lastDampedError = dampedError;
+        lastDampedError = errorTicks;
 
         publishTelemetry();
     }
