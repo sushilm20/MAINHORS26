@@ -4,7 +4,10 @@ package org.firstinspires.ftc.teamcode.tracking;
   TurretController.java
   ---------------------
   Encapsulates all turret rotation / tracking logic (PID + IMU feedforward + encoder mapping).
-  Moved out of the OpMode to declutter secondexperimentalHORS.
+  Modified to support manual homing sweep:
+  - Press a button (e.g., dpad_up) to command a homing oscillation between -300 and +300 ticks.
+  - During the sweep, if the magnetic limit switch triggers, reset encoder & references once, then resume normal control.
+  - No automatic resets during normal teleop/auto—only in the homing sweep.
 */
 
 import com.bylazar.configurables.annotations.Configurable;
@@ -28,7 +31,7 @@ public class TurretController {
     private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
     private final Telemetry telemetry; // optional, may be null
 
-    // Optional reset trigger (e.g., limit switch). If null, no resets occur.
+    // Optional reset trigger (e.g., magnetic limit switch). If null, no resets occur.
     private BooleanSupplier encoderResetTrigger = null;
 
     // Turret encoder hard limits (configurable)
@@ -79,6 +82,16 @@ public class TurretController {
     @Sorter(sort = 13)
     public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
 
+    // Homing sweep configuration (manual reset)
+    @Sorter(sort = 14)
+    public static int HOMING_AMPLITUDE_TICKS = 300;
+
+    @Sorter(sort = 15)
+    public static double HOMING_POWER = 0.35;
+
+    @Sorter(sort = 16)
+    public static int HOMING_TARGET_DEADBAND = 10;
+
     // Internal state
     private double turretIntegral = 0.0;
     private int lastErrorTicks = 0;
@@ -96,6 +109,15 @@ public class TurretController {
 
     // state for manual->auto transition detection
     private boolean manualActiveLast = false;
+
+    // reset edge detection (used only during homing sweep)
+    private boolean resetPrev = false;
+
+    // Homing sweep state
+    private boolean homingMode = false;
+    private boolean homingCommandPrev = false;
+    private boolean homingDirectionPos = true;
+    private int homingTarget = HOMING_AMPLITUDE_TICKS;
 
     // telemetry values (readable by the OpMode)
     private int lastDesiredTicks = 0;
@@ -133,6 +155,30 @@ public class TurretController {
      */
     public void setEncoderResetTrigger(BooleanSupplier trigger) {
         this.encoderResetTrigger = trigger;
+    }
+
+    /**
+     * Command a manual homing sweep (oscillate between -amp and +amp) using a button.
+     * Call this every loop with the button state (e.g., gamepad1.dpad_up).
+     * Rising edge starts the sweep; it stops automatically after a reset is detected.
+     */
+    public void commandHomingSweep(boolean homingButtonPressed) {
+        if (homingButtonPressed && !homingCommandPrev) {
+            startHomingSweep();
+        }
+        homingCommandPrev = homingButtonPressed;
+    }
+
+    private void startHomingSweep() {
+        homingMode = true;
+        homingDirectionPos = true;
+        homingTarget = HOMING_AMPLITUDE_TICKS;
+        resetPrev = false;
+        // clear PID-related history to avoid stale values
+        turretIntegral = 0.0;
+        lastDerivative = 0.0;
+        lastAppliedPower = 0.0;
+        lastTimeMs = System.currentTimeMillis();
     }
 
     /**
@@ -202,6 +248,7 @@ public class TurretController {
      * Main update method. Call from OpMode loop.
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
      * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
+     * - If homing sweep is active: it overrides both manual/auto until homing completes.
      *
      * @param manualNow whether operator control is active
      * @param manualPower requested manual power in [-1, 1] (only used if manualNow)
@@ -209,13 +256,14 @@ public class TurretController {
     public void update(boolean manualNow, double manualPower) {
         long nowMs = System.currentTimeMillis();
 
-        // Optional: reset encoder when trigger is true (e.g., limit switch closed)
-        if (encoderResetTrigger != null && encoderResetTrigger.getAsBoolean()) {
-            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            captureReferences();   // realign virtual zero
-            resetPidState();       // clear PID state to avoid spikes
-            lastTimeMs = nowMs;    // keep timing coherent for the current loop
+        // --- Homing sweep overrides everything until done ---
+        if (homingMode) {
+            if (runHomingSweep()) {
+                // homing finished this cycle (reset detected); fall through to auto with fresh timing
+                nowMs = System.currentTimeMillis();
+            } else {
+                return; // still homing; skip normal control
+            }
         }
 
         // Pull latest config each loop so UI changes apply live
@@ -287,20 +335,7 @@ public class TurretController {
         if (desiredVirtualTicks > maxPosCfg) desiredVirtualTicks = maxPosCfg;
         if (desiredVirtualTicks < minPosCfg) desiredVirtualTicks = minPosCfg;
 
-        // ---- Rightward asymmetry by biasing the target itself ----
-        int delta = desiredVirtualTicks - currentVirtualTicks;
-        int desiredBiased = desiredVirtualTicks;
-        boolean rightDampActive = delta > 0 && Math.abs(delta) <= rightDampWindowCfg;
-        if (rightDampActive) {
-            double scale = Math.max(0.0, 1.0 - rightDampCfg); // e.g., 0.6 if RIGHTWARD_ENCODER_DAMP=0.4
-            desiredBiased = currentVirtualTicks + (int) Math.round(delta * scale);
-        }
-
-        // Clamp biased desired to limits
-        if (desiredBiased > maxPosCfg) desiredBiased = maxPosCfg;
-        if (desiredBiased < minPosCfg) desiredBiased = minPosCfg;
-
-        int errorTicks = desiredBiased - currentVirtualTicks;
+        int errorTicks = desiredVirtualTicks - currentVirtualTicks;
 
         // Timing
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
@@ -321,12 +356,19 @@ public class TurretController {
         if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
         if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
-        // Derivative (filtered)
-        double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
+        // ---- Rightward asymmetry (safe + always active near center) ----
+        int dampedError = errorTicks;
+        if (errorTicks > 0 && Math.abs(errorTicks) <= rightDampWindowCfg) {
+            double scale = Math.max(0.0, 1.0 - rightDampCfg);
+            dampedError = (int) Math.round(errorTicks * scale);
+        }
+
+        // Derivative (filtered) uses damped error
+        double rawDerivative = (dampedError - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
         // PID output
-        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+        double pidOut = kpCfg * dampedError + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
         // Feedforward: oppose robot yaw rate
         double ff = -angularVel * ffGainCfg;
@@ -354,20 +396,79 @@ public class TurretController {
         turretMotor.setPower(applied);
 
         // Update states
-        lastErrorTicks = errorTicks;
+        lastErrorTicks = dampedError;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
         // Telemetry values
-        lastDesiredTicks = desiredBiased;
+        lastDesiredTicks = desiredVirtualTicks;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
         lastHeadingDelta = headingDelta;
         lastAngularVel = angularVel;
-        lastDampedError = errorTicks;
+        lastDampedError = dampedError;
 
         publishTelemetry();
+    }
+
+    /**
+     * Homing sweep state machine. Returns true if homing finished (reset captured).
+     */
+    private boolean runHomingSweep() {
+        // Read current config
+        int minPosCfg = TURRET_MIN_POS;
+        int maxPosCfg = TURRET_MAX_POS;
+
+        // Rising-edge reset detection ONLY during homing
+        boolean resetNow = encoderResetTrigger != null && encoderResetTrigger.getAsBoolean();
+        if (resetNow && !resetPrev) {
+            try {
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            } catch (Exception ignored) {}
+            captureReferences();   // realign virtual zero & heading reference
+            resetPidState();       // clear PID state
+            lastTimeMs = System.currentTimeMillis();
+            lastAppliedPower = 0.0;
+            lastDerivative = 0.0;
+            homingMode = false;    // exit homing after successful reset
+            resetPrev = resetNow;
+            return true;           // done homing
+        }
+        resetPrev = resetNow;
+
+        int current = getVirtualEncoderPosition();
+
+        // Flip direction when near target
+        if (homingDirectionPos && current >= homingTarget - HOMING_TARGET_DEADBAND) {
+            homingDirectionPos = false;
+            homingTarget = -HOMING_AMPLITUDE_TICKS;
+        } else if (!homingDirectionPos && current <= homingTarget + HOMING_TARGET_DEADBAND) {
+            homingDirectionPos = true;
+            homingTarget = HOMING_AMPLITUDE_TICKS;
+        }
+
+        double power = homingDirectionPos ? HOMING_POWER : -HOMING_POWER;
+
+        // Respect hard limits
+        if ((current >= maxPosCfg && power > 0.0) || (current <= minPosCfg && power < 0.0)) {
+            power = 0.0;
+        }
+
+        turretMotor.setPower(power);
+
+        // Minimal telemetry for homing
+        lastDesiredTicks = homingTarget;
+        lastErrorReported = homingTarget - current;
+        lastPidOut = 0.0;
+        lastFf = 0.0;
+        lastHeadingDelta = 0.0;
+        lastAngularVel = 0.0;
+        lastDampedError = lastErrorReported;
+
+        publishTelemetry();
+        return false; // still homing
     }
 
     private void applyManualPower(double manualPower, int minPosCfg, int maxPosCfg, int currentVirtualTicks) {
@@ -431,11 +532,6 @@ public class TurretController {
         telemetry.addData("turret.rawPos", getRawPosition());
         telemetry.addData("turret.error", lastErrorReported);
         telemetry.addData("turret.dampedError", lastDampedError);
-//        telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
-//        telemetry.addData("turret.ff", String.format("%.4f", lastFf));
-//        telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-//        telemetry.addData("turret.headingDelta(rad)", String.format("%.4f", lastHeadingDelta));
-//        telemetry.addData("turret.angularVel(rad/s)", String.format("%.4f", lastAngularVel));
         telemetry.addData("turret.offset", encoderOffset);
     }
 }
