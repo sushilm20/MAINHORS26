@@ -5,22 +5,6 @@ package org.firstinspires.ftc.teamcode.tracking;
   ---------------------
   Encapsulates all turret rotation / tracking logic (PID + IMU feedforward + encoder mapping).
   Moved out of the OpMode to declutter secondexperimentalHORS.
-
-  Summary of important behavior / tuning (matches the values you provided):
-  - Encoder hard limits: TURRET_MIN_POS = -900, TURRET_MAX_POS = 900
-  - TICKS_PER_RADIAN computed from encoder span:
-      TICKS_PER_RADIAN = (TURRET_MAX_POS - TURRET_MIN_POS) / (2 * Math.PI) * TICKS_PER_RADIAN_SCALE
-    (maps full encoder span to 360°; if your turret travel is not full 360°, replace denominator
-    with the real travel radians)
-  - PID: KP = 1.15, KI = 0.0, KD = 0.22
-  - FF_GAIN = 5.0
-  - POWER smoothing ALPHA = 0.935
-  - DERIV_FILTER_ALPHA = 1.25
-  - SMALL_DEADBAND_TICKS = 14
-  - INTEGRAL_CLAMP = 50.0
-  - Integral accumulation is gated by deadband, derivative is filtered, and applied power is smoothed.
-  - Manual control is handled inside this class; the OpMode should call update(manualNow, manualPower).
-  - The class exposes telemetry getters so the OpMode can display useful tuning data.
 */
 
 import com.bylazar.configurables.annotations.Configurable;
@@ -303,7 +287,20 @@ public class TurretController {
         if (desiredVirtualTicks > maxPosCfg) desiredVirtualTicks = maxPosCfg;
         if (desiredVirtualTicks < minPosCfg) desiredVirtualTicks = minPosCfg;
 
-        int errorTicks = desiredVirtualTicks - currentVirtualTicks;
+        // ---- Rightward asymmetry by biasing the target itself ----
+        int delta = desiredVirtualTicks - currentVirtualTicks;
+        int desiredBiased = desiredVirtualTicks;
+        boolean rightDampActive = delta > 0 && Math.abs(delta) <= rightDampWindowCfg;
+        if (rightDampActive) {
+            double scale = Math.max(0.0, 1.0 - rightDampCfg); // e.g., 0.6 if RIGHTWARD_ENCODER_DAMP=0.4
+            desiredBiased = currentVirtualTicks + (int) Math.round(delta * scale);
+        }
+
+        // Clamp biased desired to limits
+        if (desiredBiased > maxPosCfg) desiredBiased = maxPosCfg;
+        if (desiredBiased < minPosCfg) desiredBiased = minPosCfg;
+
+        int errorTicks = desiredBiased - currentVirtualTicks;
 
         // Timing
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
@@ -324,19 +321,12 @@ public class TurretController {
         if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
         if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
 
-        // ---- Rightward asymmetry (safe + always active near center) ----
-        int dampedError = errorTicks;
-        if (errorTicks > 0 && Math.abs(errorTicks) <= rightDampWindowCfg) {
-            double scale = Math.max(0.0, 1.0 - rightDampCfg);
-            dampedError = (int) Math.round(errorTicks * scale);
-        }
-
-        // Derivative (filtered) uses damped error
-        double rawDerivative = (dampedError - lastErrorTicks) / Math.max(1e-4, dt);
+        // Derivative (filtered)
+        double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
         double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
 
         // PID output
-        double pidOut = kpCfg * dampedError + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
 
         // Feedforward: oppose robot yaw rate
         double ff = -angularVel * ffGainCfg;
@@ -364,18 +354,18 @@ public class TurretController {
         turretMotor.setPower(applied);
 
         // Update states
-        lastErrorTicks = dampedError;
+        lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
 
         // Telemetry values
-        lastDesiredTicks = desiredVirtualTicks;
+        lastDesiredTicks = desiredBiased;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
         lastFf = ff;
         lastHeadingDelta = headingDelta;
         lastAngularVel = angularVel;
-        lastDampedError = dampedError;
+        lastDampedError = errorTicks;
 
         publishTelemetry();
     }

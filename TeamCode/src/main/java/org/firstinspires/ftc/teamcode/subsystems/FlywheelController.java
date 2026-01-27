@@ -314,7 +314,7 @@ public class FlywheelController {
                 if (v > 1e-3) return v;
             }
         } catch (Exception ignored) {}
-        return 12.0; // fallback
+        return 11.0; // fallback
     }
 
     private double getCurrentRpm(double dtSeconds) {
