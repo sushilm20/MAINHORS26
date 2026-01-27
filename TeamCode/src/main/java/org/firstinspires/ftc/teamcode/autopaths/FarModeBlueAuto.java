@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 /**
- * FarmModeBlueAuto — Adapted from BluePedroAuto logic per your instructions.
+ * FarModeBlueAuto — Adapted from BluePedroAuto logic per your instructions.
  *
  * Changes in this version:
  *  - Added WAIT_NO_MOVEMENT state entered immediately after gateClear finishes.
@@ -33,7 +33,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
  */
 @Autonomous(name = "FARMODE BLUE 🔷", group = "Autonomous",preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
-public class FarmModeBlueAuto extends OpMode {
+public class FarModeBlueAuto extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -73,7 +73,7 @@ public class FarmModeBlueAuto extends OpMode {
     private static final long CLAW_CLOSE_MS = 250L;
 
     // WAIT_NO_MOVEMENT duration (configurable)
-    public static double WAIT_TIME_NO_MOVEMENT = 7.0; // seconds (changeable via Panels since class is @Configurable)
+    public static double WAIT_TIME_NO_MOVEMENT = 2.0; // seconds (changeable via Panels since class is @Configurable)
 
     // Shooter + rpm/stability settings
     private DcMotor shooterMotor;
@@ -126,7 +126,7 @@ public class FarmModeBlueAuto extends OpMode {
     private BNO055IMU hubImu = null;
     private BNO055IMU imu = null;
 
-    public FarmModeBlueAuto() {}
+    public FarModeBlueAuto() {}
 
     @Override
     public void init() {

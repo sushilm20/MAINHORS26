@@ -19,27 +19,16 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 /**
- * FarmModeBlueAuto — Adapted from BluePedroAuto logic per your instructions.
- *
- * Changes in this version:
- *  - Added WAIT_NO_MOVEMENT state entered immediately after gateClear finishes.
- *  - WAIT_TIME_NO_MOVEMENT is a configurable variable (default 7.0 seconds).
- *  - During WAIT_NO_MOVEMENT the robot does not start any new path/movement and the flywheel
- *    target RPM is set to the close-mode RPM (or left unchanged if flywheel missing).
- *  - After the wait expires the FSM resumes to the next path.
- *
- * Keep verifying hardware names: "shooter", "intakeMotor", "leftCompressionServo",
- * "rightCompressionServo", "clawServo".
+ * FarModeRedAuto — mirrored from FarModeBlueAuto (Y mirrored, headings negated).
  */
-@Autonomous(name = "FARMODE RED 🔴", group = "Autonomous",preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "FARMODE RED 🔴", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
-public class FarmModeRedAuto extends OpMode {
+public class FarModeRedAuto extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
     private Paths paths;
 
-    // State machine
     private enum AutoState {
         IDLE,
         WAIT_FOR_SHOOTER,
@@ -47,78 +36,64 @@ public class FarmModeRedAuto extends OpMode {
         PRE_ACTION,
         INTAKE_RUN,
         CLAW_ACTION,
-        WAIT_NO_MOVEMENT, // new state
+        WAIT_NO_MOVEMENT,
         FINISHED
     }
     private AutoState state = AutoState.IDLE;
 
-    // current path index being run (1..7). 0 when none.
     private int currentPathIndex = 0;
-    // next path index to run after PRE_ACTION/CLAW sequences
     private int nextPathIndex = -1;
 
-    // Timers
     private Timer intakeTimer;
     private Timer timedIntakeTimer;
     private Timer preActionTimer;
     private Timer poseWaitTimer;
     private Timer shootStableTimer;
-    private Timer waitTimer; // for WAIT_NO_MOVEMENT
+    private Timer waitTimer;
 
-    // Timing constants
     private static final double INTAKE_RUN_SECONDS = 2.5;
     private static final double TIMED_INTAKE_SECONDS = 1.0;
     private static final double PRE_ACTION_WAIT_SECONDS = 0.3;
     private static final double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.3;
     private static final long CLAW_CLOSE_MS = 250L;
 
-    // WAIT_NO_MOVEMENT duration (configurable)
-    public static double WAIT_TIME_NO_MOVEMENT = 7.0; // seconds (changeable via Panels since class is @Configurable)
+    public static double WAIT_TIME_NO_MOVEMENT = 2.0; // seconds
 
-    // Shooter + rpm/stability settings
     private DcMotor shooterMotor;
-    private DcMotor shooterMotor2; // secondary shooter motor (mirrors primary)
+    private DcMotor shooterMotor2;
     private FlywheelController flywheel;
-    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_FAR; // overall auto shooter RPM
-    private static final double RPM_TOLERANCE = 0.05; // 5% tolerance for "stable" detection
-    private static final double REQUIRED_STABLE_SECONDS = 2.0; // run intake for 5s at stable RPM before claw
+    private static final double AUTO_SHOOTER_RPM = FlywheelController.TARGET_RPM_FAR;
+    private static final double RPM_TOLERANCE = 0.05;
+    private static final double REQUIRED_STABLE_SECONDS = 3.0;
 
-    // Intake + compression hardware
     private DcMotor intakeMotor;
     private Servo leftCompressionServo;
     private Servo rightCompressionServo;
 
-    // Claw servo
     private Servo clawServo;
 
-    // Intake/compression values
     private static final double INTAKE_ON_POWER = 1.0;
     private static final double LEFT_COMPRESSION_ON = 1.0;
     private static final double RIGHT_COMPRESSION_ON = 0.0;
     private static final double LEFT_COMPRESSION_OFF = 0.5;
     private static final double RIGHT_COMPRESSION_OFF = 0.5;
 
-    // intake segment tracking
     private int intakeSegmentEnd = -1;
     private boolean timedIntakeActive = false;
 
-    // PRE_ACTION flags
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
-    // shoot-pose intake-specific flags
-    private boolean inShootPoseSequence = false;     // true when INTAKE_RUN originated from PRE_ACTION at shoot pose
-    private boolean waitingForRPMStable = false;     // true when RPM deviated and we stopped intake while at shoot pose
+    private boolean inShootPoseSequence = false;
+    private boolean waitingForRPMStable = false;
 
-    // Shoot pose constants
+    // Mirrored shoot pose (Y mirrored from 14 -> 130)
     private static final double SHOOT_POSE_X = 52.0;
-    private static final double SHOOT_POSE_Y = 14.0;
+    private static final double SHOOT_POSE_Y = 130.0;
     private static final double START_POSE_TOLERANCE_IN = 6.0;
 
-    // claw action timestamp
     private long clawActionStartMs = 0L;
 
-    // shooter wait
     private long shooterWaitStartMs = -1;
     private static final long SHOOTER_WAIT_TIMEOUT_MS = 4000L;
 
@@ -126,15 +101,15 @@ public class FarmModeRedAuto extends OpMode {
     private BNO055IMU hubImu = null;
     private BNO055IMU imu = null;
 
-    public FarmModeRedAuto() {}
+    public FarModeRedAuto() {}
 
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        // Starting pose (adjust if needed)
-        follower.setStartingPose(new Pose(63, 8, Math.toRadians(90)));
+        // Mirrored start pose: (63, 8, 90) -> (63, 136, -90)
+        follower.setStartingPose(new Pose(63, 136, Math.toRadians(-90)));
 
         paths = new Paths(follower);
 
@@ -153,7 +128,6 @@ public class FarmModeRedAuto extends OpMode {
         inShootPoseSequence = false;
         waitingForRPMStable = false;
 
-        // hardware mapping
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
             if (shooterMotor != null) {
@@ -164,11 +138,10 @@ public class FarmModeRedAuto extends OpMode {
             panelsTelemetry.debug("Init", "shooter map failed: " + e.getMessage());
         }
 
-        // Secondary shooter motor (mirrors primary shooter power)
         try {
             shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
             if (shooterMotor2 != null) {
-                shooterMotor2.setDirection(DcMotor.Direction.FORWARD); // mirror of shooter
+                shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
                 shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             }
         } catch (Exception e) {
@@ -177,9 +150,7 @@ public class FarmModeRedAuto extends OpMode {
 
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
-            if (flywheel != null) {
-                flywheel.setShooterOn(false);
-            }
+            if (flywheel != null) flywheel.setShooterOn(false);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "flywheel creation failed: " + e.getMessage());
         }
@@ -239,7 +210,7 @@ public class FarmModeRedAuto extends OpMode {
     @Override
     public void init_loop() {
         if (flywheel != null) {
-//            flywheel.update(System.currentTimeMillis(), false);
+            // flywheel.update(System.currentTimeMillis(), false);
         }
     }
 
@@ -263,7 +234,6 @@ public class FarmModeRedAuto extends OpMode {
             flywheel.update(nowMs, false);
         }
 
-        // Mirror shooter power to secondary motor
         if (shooterMotor != null && shooterMotor2 != null) {
             try {
                 shooterMotor2.setPower(shooterMotor.getPower());
@@ -274,7 +244,6 @@ public class FarmModeRedAuto extends OpMode {
 
         runStateMachine(nowMs);
 
-        // telemetry
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
         try {
@@ -312,7 +281,6 @@ public class FarmModeRedAuto extends OpMode {
         state = AutoState.FINISHED;
     }
 
-    // intake helpers
     private void startIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(INTAKE_ON_POWER);
@@ -333,28 +301,12 @@ public class FarmModeRedAuto extends OpMode {
         }
     }
 
-    // Helper: check which path ends at shoot pose
     private boolean endsAtShoot(int pathIndex) {
-        // per provided Paths: Path1, gateClear, collectSecond3 end at 52,14
         return pathIndex == 1 || pathIndex == 3 || pathIndex == 6;
     }
 
-    // Helper: check which path starts at shoot pose (we want PRE_ACTION also when next path starts at shoot)
     private boolean startsAtShoot(int pathIndex) {
-        // per provided Paths: collectFirst3, backToShootFirst3, backToShootSecond3 start at 52,14
         return pathIndex == 2 || pathIndex == 4 || pathIndex == 7;
-    }
-
-    private boolean isAtPose(double targetX, double targetY, double tolerance) {
-        try {
-            Pose p = follower.getPose();
-            double dx = p.getX() - targetX;
-            double dy = p.getY() - targetY;
-            return Math.hypot(dx, dy) <= tolerance;
-        } catch (Exception e) {
-            panelsTelemetry.debug("isAtPose", "error: " + e.getMessage());
-            return false;
-        }
     }
 
     private double distanceToShootPose() {
@@ -428,17 +380,14 @@ public class FarmModeRedAuto extends OpMode {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
-                    // stop intake for continuous-intake segments
                     if (intakeSegmentEnd == finished) {
                         stopIntake();
                         intakeSegmentEnd = -1;
                     }
 
-                    // NEW: If path 3 just finished, enter WAIT_NO_MOVEMENT state
                     if (finished == 3) {
                         nextPathIndex = finished + 1;
                         waitTimer.resetTimer();
-                        // set flywheel to close-mode RPM during the wait (if available)
                         if (flywheel != null) {
                             flywheel.setTargetRPM(FlywheelController.TARGET_RPM_CLOSE);
                         }
@@ -451,7 +400,6 @@ public class FarmModeRedAuto extends OpMode {
                     if (next > 7) {
                         state = AutoState.FINISHED;
                     } else {
-                        // If finished path ended at shoot OR the next path starts at shoot, enter PRE_ACTION
                         if (endsAtShoot(finished) || startsAtShoot(next)) {
                             nextPathIndex = next;
                             preActionTimerStarted = false;
@@ -487,20 +435,16 @@ public class FarmModeRedAuto extends OpMode {
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        // START shoot-pose intake sequence and go to INTAKE_RUN in shoot mode
                         startIntake();
                         intakeTimer.resetTimer();
-                        // Mark that this INTAKE_RUN originates from a shoot-pose PRE_ACTION
                         inShootPoseSequence = true;
                         waitingForRPMStable = false;
-                        // initialize shootStableTimer depending on current RPM
                         if (flywheel != null && Math.abs(flywheel.getCurrentRPM() - AUTO_SHOOTER_RPM) <= (RPM_TOLERANCE * AUTO_SHOOTER_RPM)) {
                             shootStableTimer.resetTimer();
                         } else {
-                            // not stable yet; we'll wait for it to become stable and start the stable timer then
                             shootStableTimer.resetTimer();
                             waitingForRPMStable = true;
-                            stopIntake(); // stop until RPM returns
+                            stopIntake();
                         }
                         state = AutoState.INTAKE_RUN;
                     }
@@ -542,7 +486,7 @@ public class FarmModeRedAuto extends OpMode {
                                 if (shootStableTimer.getElapsedTimeSeconds() >= REQUIRED_STABLE_SECONDS) {
                                     if (intakeSegmentEnd == -1) stopIntake();
                                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                                    if (clawServo != null) clawServo.setPosition(0.2); // close
+                                    if (clawServo != null) clawServo.setPosition(0.2);
                                     clawActionStartMs = System.currentTimeMillis();
                                     inShootPoseSequence = false;
                                     waitingForRPMStable = false;
@@ -557,7 +501,7 @@ public class FarmModeRedAuto extends OpMode {
                     if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                         if (intakeSegmentEnd == -1) stopIntake();
                         if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                        if (clawServo != null) clawServo.setPosition(0.2); // close
+                        if (clawServo != null) clawServo.setPosition(0.2);
                         clawActionStartMs = System.currentTimeMillis();
                         state = AutoState.CLAW_ACTION;
                     }
@@ -566,7 +510,6 @@ public class FarmModeRedAuto extends OpMode {
 
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    // open claw and continue
                     if (clawServo != null) clawServo.setPosition(0.63);
                     if (nextPathIndex > 0 && nextPathIndex <= 7) {
                         startPath(nextPathIndex);
@@ -578,14 +521,11 @@ public class FarmModeRedAuto extends OpMode {
                 break;
 
             case WAIT_NO_MOVEMENT:
-                // During this state robot should not start new movement. Flywheel is kept at 90 RPM.
                 panelsTelemetry.debug("WAIT_NO_MOVEMENT", String.format("elapsed=%.2fs/%.2fs", waitTimer.getElapsedTimeSeconds(), WAIT_TIME_NO_MOVEMENT));
                 if (waitTimer.getElapsedTimeSeconds() >= WAIT_TIME_NO_MOVEMENT) {
-                    // resume to next path
                     int toStart = nextPathIndex;
                     nextPathIndex = -1;
                     if (toStart > 0 && toStart <= 7) {
-                        // restore autoshooter target to normal auto RPM for subsequent operations
                         if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
                         startPath(toStart);
                     } else {
@@ -595,7 +535,6 @@ public class FarmModeRedAuto extends OpMode {
                 break;
 
             case FINISHED:
-                // idle
                 break;
 
             case IDLE:
@@ -604,7 +543,6 @@ public class FarmModeRedAuto extends OpMode {
         }
     }
 
-    // Paths per your latest coordinates (7 paths)
     public static class Paths {
 
         public PathChain Path1;
@@ -616,60 +554,47 @@ public class FarmModeRedAuto extends OpMode {
         public PathChain Path7;
 
         public Paths(Follower follower) {
+            // Mirrored paths (Y mirrored from blue: y' = 144 - y, headings negated)
             Path1 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(63.000, 8.000), new Pose(52.000, 14.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(109))
+                    .addPath(new BezierLine(new Pose(63.000, 136.000), new Pose(52.000, 130.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-90), Math.toRadians(-109))
                     .build();
 
             Path2 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(52.000, 14.000), new Pose(20.000, 14.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(109), Math.toRadians(180))
+                    .addPath(new BezierLine(new Pose(52.000, 130.000), new Pose(20.000, 130.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-109), Math.toRadians(-180))
                     .build();
 
             Path3 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(20.000, 14.000), new Pose(52.000, 14.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(109))
+                    .addPath(new BezierLine(new Pose(20.000, 130.000), new Pose(52.000, 130.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-109))
                     .build();
 
             Path4 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(52.000, 14.000), new Pose(46.000, 32.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(109), Math.toRadians(180))
+                    .addPath(new BezierLine(new Pose(52.000, 130.000), new Pose(46.000, 112.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-109), Math.toRadians(-180))
                     .build();
 
             Path5 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(46.000, 32.000), new Pose(20.000, 32.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .addPath(new BezierLine(new Pose(46.000, 112.000), new Pose(20.000, 112.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-180))
                     .build();
 
             Path6 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(20.000, 32.000), new Pose(52.000, 14.000))
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(109))
+                    .addPath(new BezierLine(new Pose(20.000, 112.000), new Pose(52.000, 130.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-109))
                     .build();
 
             Path7 = follower
                     .pathBuilder()
-                    .addPath(
-                            new BezierLine(new Pose(52.000, 14.000), new Pose(46.000, 25.000))
-                    )
-                    .setConstantHeadingInterpolation(Math.toRadians(109))
+                    .addPath(new BezierLine(new Pose(52.000, 130.000), new Pose(46.000, 119.000)))
+                    .setConstantHeadingInterpolation(Math.toRadians(-109))
                     .build();
         }
     }
