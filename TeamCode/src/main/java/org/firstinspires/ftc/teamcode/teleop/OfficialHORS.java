@@ -9,6 +9,9 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
@@ -20,8 +23,8 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="HORS OFFICIAL ⭐ ", group="Linear OpMode")
-public class experimentalHORS extends LinearOpMode {
+@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
+public class OfficialHORS extends LinearOpMode {
 
     // Drive + subsystems
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -55,17 +58,13 @@ public class experimentalHORS extends LinearOpMode {
     private boolean isFarMode = false;
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
 
-    // Turret move-to-target state
-    private boolean moveToPositionActive = false;
-    private static final int turretPosition = -560;
-
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
-    private static final double GATE_CLOSED = 0.5;
+    private static final double GATE_CLOSED = 0.50;//gate close code
     private static final long INTAKE_DURATION_MS = 1050;
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
     private static final double INTAKE_SEQUENCE_POWER = 1.0;
@@ -85,6 +84,10 @@ public class experimentalHORS extends LinearOpMode {
     // IMUs
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
+
+    //Pose tracking
+    private Follower follower;
+    private Pose currentPose = new Pose();  // Robot pose, updated each loop
 
     @Override
     public void runOpMode() {
@@ -149,6 +152,15 @@ public class experimentalHORS extends LinearOpMode {
             try { imu.initialize(imuParams); } catch (Exception ignored) {}
         }
 
+        try { //Follower
+            // Initialize PedroPathing follower for pose tracking and drivetrain control
+            follower = Constants.createFollower(hardwareMap);
+            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));  // Default starting pose (adjust as needed)
+        } catch (Exception e) {
+            telemetry.addData("Error", "Follower initialization failed!");
+            follower = null;
+        }
+
         String imuUsed = (pinpoint != null) ? "pinpoint" : (imu != null) ? "imu (expansion hub)" : "none";
 
         // Create controllers
@@ -187,6 +199,8 @@ public class experimentalHORS extends LinearOpMode {
         turretController.resetPidState();
 
         waitForStart();
+
+
         if (isStopRequested()) {
             turretController.disable();
             return;
@@ -203,6 +217,11 @@ public class experimentalHORS extends LinearOpMode {
             // Refresh pinpoint
             if (pinpoint != null) {
                 try { pinpoint.update(); } catch (Exception ignored) {}
+            }
+
+            if (follower != null) {
+                follower.update();  // Update pose and drivetrain
+                currentPose = follower.getPose();  // Retrieve current robot pose
             }
 
             // Touchpad reset (gamepad2) -> reset encoder + references
@@ -235,9 +254,9 @@ public class experimentalHORS extends LinearOpMode {
             touchpadPressedLast = touchpadNow;
 
             // Drive
-            double axial = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw = -gamepad1.right_stick_x;
+            double axial = -gamepad1.left_stick_y;//up down
+            double lateral = gamepad1.left_stick_x; // strafe
+            double yaw = gamepad1.right_stick_x; //heading
             driveController.setDrive(axial, lateral, yaw, 1.0);
 
             // Flywheel toggles (DPAD)
@@ -292,32 +311,25 @@ public class experimentalHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret control
+            // Turret control (manual only; drive-to-position removed)
+            boolean manualNow = false;
+            double manualPower = 0.0;
+
+            // D-pad up can be used as a low-speed forward nudge if desired
             boolean dpadUpNow = gamepad1.dpad_up;
             if (dpadUpNow && !dpadUpLast) {
-                moveToPositionActive = true; // initiate move-to-370
+                manualNow = true;
+                manualPower = 0.2;
             }
             dpadUpLast = dpadUpNow;
 
-            if (moveToPositionActive) {
-//                // Drive toward 370; when reached, lock by capturing references
-////                boolean atTarget = turretController.driveToPosition(turretPosition, 5, 0.65);
-////                if (atTarget) {
-//                    moveToPositionActive = false;
-//                    turretController.captureReferences(); // lock new position as reference
-//                    turretController.resetPidState();
-//                }
-            } else {
-                // Turret manual
-                boolean manualNow = false;
-                double manualPower = 0.0;
-                if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
-                    manualNow = true; manualPower = 0.25;
-                } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
-                    manualNow = true; manualPower = -0.25;
-                }
-                turretController.update(manualNow, manualPower);
+            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
+                manualNow = true; manualPower = 0.25;
+            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
+                manualNow = true; manualPower = -0.25;
             }
+
+            turretController.update(manualNow, manualPower);
 
             // Intake manual (only if gate not busy)
             if (!gateController.isBusy()) {
@@ -348,7 +360,11 @@ public class experimentalHORS extends LinearOpMode {
             // Telemetry: flywheel & gate with PIDF mode info
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+            //telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+
+            telemetry.addData("Pose", currentPose != null
+                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
+                    : "N/A");
             telemetry.update();
         }
 
