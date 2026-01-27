@@ -33,6 +33,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import java.util.function.BooleanSupplier;
 
 @Configurable
 public class TurretController {
@@ -42,6 +43,9 @@ public class TurretController {
     private final BNO055IMU imu;                    // Expansion Hub IMU fallback
     private final GoBildaPinpointDriver pinpoint;   // Preferred heading source
     private final Telemetry telemetry; // optional, may be null
+
+    // Optional reset trigger (e.g., limit switch). If null, no resets occur.
+    private BooleanSupplier encoderResetTrigger = null;
 
     // Turret encoder hard limits (configurable)
     @Sorter(sort = 0)
@@ -139,6 +143,15 @@ public class TurretController {
     }
 
     /**
+     * Allow the OpMode to provide a trigger that resets the turret encoder when true.
+     * Example usage with a REV magnetic limit switch (active-low):
+     *   controller.setEncoderResetTrigger(() -> !limitSwitch.getState());
+     */
+    public void setEncoderResetTrigger(BooleanSupplier trigger) {
+        this.encoderResetTrigger = trigger;
+    }
+
+    /**
      * Get the current encoder position in "virtual" space (offset-adjusted).
      */
     private int getVirtualEncoderPosition() {
@@ -211,6 +224,15 @@ public class TurretController {
      */
     public void update(boolean manualNow, double manualPower) {
         long nowMs = System.currentTimeMillis();
+
+        // Optional: reset encoder when trigger is true (e.g., limit switch closed)
+        if (encoderResetTrigger != null && encoderResetTrigger.getAsBoolean()) {
+            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            captureReferences();   // realign virtual zero
+            resetPidState();       // clear PID state to avoid spikes
+            lastTimeMs = nowMs;    // keep timing coherent for the current loop
+        }
 
         // Pull latest config each loop so UI changes apply live
         int minPosCfg = TURRET_MIN_POS;

@@ -6,6 +6,7 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -32,6 +33,7 @@ public class wildexperiment extends LinearOpMode {
     private Servo clawServo;
     private Servo leftHoodServo, rightHoodServo;
     private Servo gateServo;
+    private DigitalChannel turretLimitSwitch;
 
     private TurretController turretController;
     private DriveController driveController;
@@ -110,6 +112,14 @@ public class wildexperiment extends LinearOpMode {
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
+        // Optional: turret limit switch (active-low example)
+        try {
+            turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
+            turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
+        } catch (Exception e) {
+            turretLimitSwitch = null; // safe fallback if not configured
+        }
+
         // LEDs (per-channel)
         LED led1Red = getLedSafe("led_1_red");
         LED led1Green = getLedSafe("led_1_green");
@@ -165,6 +175,11 @@ public class wildexperiment extends LinearOpMode {
 
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
+        // Hook the limit switch to auto-reset the encoder & virtual zero whenever the switch is pressed
+        if (turretLimitSwitch != null) {
+            // Active-low REV mag/touch: getState() == false when pressed
+            turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
+        }
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor); // pass voltage sensor
         flywheel.setShooterOn(false);
