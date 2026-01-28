@@ -39,7 +39,7 @@ public class TurretController {
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.22;
+    public static double TURRET_KD = 0.18; // lowered to reduce bounce on small errors
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
@@ -47,13 +47,13 @@ public class TurretController {
     @Sorter(sort = 7)
     public static double FF_GAIN = 5.0;
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.92;
+    public static double POWER_SMOOTH_ALPHA = 0.94; // keep at 0.94 per request
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 0.8;
+    public static double DERIV_FILTER_ALPHA = 0.55; // stronger filtering on D
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 6;
+    public static int SMALL_DEADBAND_TICKS = 12; // widened to reduce micro corrections
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0;
 
@@ -71,6 +71,10 @@ public class TurretController {
     public static double HOMING_POWER = 0.35;
     @Sorter(sort = 16)
     public static int HOMING_TARGET_DEADBAND = 10;
+
+    // Optional tiny power deadband to prevent jitter
+    @Sorter(sort = 17)
+    public static double POWER_DEADBAND = 0.05;
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -261,6 +265,7 @@ public class TurretController {
         double integralClampCfg = INTEGRAL_CLAMP;
         double rightDampCfg = RIGHTWARD_ENCODER_DAMP;
         int rightDampWindowCfg = RIGHTWARD_DAMP_ERROR_WINDOW;
+        double powerDeadbandCfg = POWER_DEADBAND;
 
         // Derived mapping
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
@@ -342,7 +347,7 @@ public class TurretController {
             }
             turretIntegral += errorTicks * dt;
         } else {
-            turretIntegral *= 0.90;
+            turretIntegral *= 0.80; // bleed off faster near zero to reduce hunting
         }
 
         // Clamp integral
@@ -363,6 +368,11 @@ public class TurretController {
 
         // Deadband to avoid tiny jittering moves
         if (Math.abs(errorTicks) <= deadbandCfg) {
+            cmdPower = 0.0;
+        }
+
+        // Tiny power deadband to avoid buzz
+        if (Math.abs(cmdPower) < powerDeadbandCfg) {
             cmdPower = 0.0;
         }
 
