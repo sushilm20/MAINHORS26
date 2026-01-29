@@ -137,7 +137,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
 
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
 
     // ========================================
     // PATH POSES - START POSITION
