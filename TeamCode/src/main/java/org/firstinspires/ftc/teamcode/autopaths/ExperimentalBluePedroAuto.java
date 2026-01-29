@@ -90,10 +90,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
     public static long CLAW_CLOSE_MS = 190L;
 
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.4;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.9;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -128,16 +128,16 @@ public class ExperimentalBluePedroAuto extends OpMode {
     public static double GATE_CLOSED = 0.51;
 
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 10.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 6.0; //was like 10
 
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
 
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.5;
 
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
 
     // ========================================
     // PATH POSES - START POSITION
@@ -188,7 +188,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
     @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 30.0;
+    public static double GATE_ALIGN_X = 24.0;
 
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
@@ -200,13 +200,14 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 22.0    ;
+    public static double GATE_CLEAR_X = 17.0;
 
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
 
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 179.0;
+
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION

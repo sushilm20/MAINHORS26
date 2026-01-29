@@ -266,6 +266,7 @@ public class ExperimentalUVGateRed extends OpMode {
     @Sorter(sort = 172)
     public static double END_HEADING = 135.0;
 
+
     public ExperimentalUVGateRed() {}
 
     private static double mirrorHeading(double headingDeg) {
