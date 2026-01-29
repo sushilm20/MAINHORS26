@@ -201,7 +201,7 @@ public class ExperimentalUVGateRed extends OpMode {
     // PATH POSES - GATE CLEAR POSITION (First)
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 21.0;
+    public static double GATE_CLEAR_X = 21.0    ;
 
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
@@ -240,7 +240,7 @@ public class ExperimentalUVGateRed extends OpMode {
     public static double SECOND_GATE_ALIGN_X = 30.0;
 
     @Sorter(sort = 161)
-    public static double SECOND_GATE_ALIGN_Y = 67.0;
+    public static double SECOND_GATE_ALIGN_Y = 65.0;
 
     @Sorter(sort = 162)
     public static double SECOND_GATE_ALIGN_HEADING = 180.0;
@@ -249,7 +249,7 @@ public class ExperimentalUVGateRed extends OpMode {
     public static double SECOND_GATE_CLEAR_X = 21.0;
 
     @Sorter(sort = 164)
-    public static double SECOND_GATE_CLEAR_Y = 67.0;
+    public static double SECOND_GATE_CLEAR_Y = 75.0;
 
     @Sorter(sort = 165)
     public static double SECOND_GATE_CLEAR_HEADING = 180.0;
