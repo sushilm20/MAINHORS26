@@ -76,9 +76,9 @@ public class DriveStreamPoseTeleOp extends OpMode {
         try {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
-            panelsTelemetry.debug("FOLLOWER", "Follower initialized");
+            panelsTelemetry.debug("FOLLOWER", "Follower init");
         } catch (Exception e) {
-            panelsTelemetry.debug("FOLLOWER", "Follower initialization failed!");
+            panelsTelemetry.debug("FOLLOWER", "Follower initialization fail");
             follower = null;
         }
     }

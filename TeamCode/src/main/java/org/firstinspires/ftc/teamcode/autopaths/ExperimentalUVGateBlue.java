@@ -239,7 +239,7 @@ public class ExperimentalUVGateBlue extends OpMode {
     public static double SECOND_GATE_ALIGN_X = 30.0;
 
     @Sorter(sort = 161)
-    public static double SECOND_GATE_ALIGN_Y = 67.0;
+    public static double SECOND_GATE_ALIGN_Y = 65.0;
 
     @Sorter(sort = 162)
     public static double SECOND_GATE_ALIGN_HEADING = 180.0;
@@ -248,7 +248,7 @@ public class ExperimentalUVGateBlue extends OpMode {
     public static double SECOND_GATE_CLEAR_X = 21.0;
 
     @Sorter(sort = 164)
-    public static double SECOND_GATE_CLEAR_Y = 67.0;
+    public static double SECOND_GATE_CLEAR_Y = 75.0;
 
     @Sorter(sort = 165)
     public static double SECOND_GATE_CLEAR_HEADING = 180.0;
@@ -795,8 +795,8 @@ public class ExperimentalUVGateBlue extends OpMode {
             startToShoot = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(START_X, START_Y).mirror(),
-                            new Pose(SHOOT_POSE_X, SHOOT_POSE_Y).mirror()
+                                    new Pose(START_X, START_Y),
+                                    new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)
                             )
                     )
                     .setLinearHeadingInterpolation(

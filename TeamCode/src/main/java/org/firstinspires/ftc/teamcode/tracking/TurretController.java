@@ -35,7 +35,7 @@ public class TurretController {
 
     // PID like config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.2;
+    public static double TURRET_KP = 1.0;
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
     @Sorter(sort = 5)
@@ -47,13 +47,13 @@ public class TurretController {
     @Sorter(sort = 7)
     public static double FF_GAIN = 5.0;
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.92;
+    public static double POWER_SMOOTH_ALPHA = 0.93;
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 0.8;
+    public static double DERIV_FILTER_ALPHA = 1.0;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 6;
+    public static int SMALL_DEADBAND_TICKS = 5;
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0;
 
