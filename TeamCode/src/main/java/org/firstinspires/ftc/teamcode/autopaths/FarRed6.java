@@ -57,7 +57,7 @@ public class FarRed6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = 300;
+    private static final int TURRET_START_POS = -300;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
