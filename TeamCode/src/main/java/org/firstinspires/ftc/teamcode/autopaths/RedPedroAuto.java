@@ -69,6 +69,8 @@ public class RedPedroAuto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     private final boolean turretForceManualNoMove = false;
+    private boolean turretForceHold = true;
+    private int turretHoldTarget = 0; // in virtual ticks
 
     private Servo gateServo;
     private boolean gateClosed = false;
@@ -273,6 +275,7 @@ public class RedPedroAuto extends OpMode {
         preActionTimerStarted = false;
         preActionEntered = false;
         timedIntakeActive = false;
+        turretHoldTarget = 0;
 
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
@@ -394,8 +397,8 @@ public class RedPedroAuto extends OpMode {
         if (flywheel != null) {
             // flywheel.update(System.currentTimeMillis(), false);
         }
-        if (turretController != null) {
-            turretController.update(false, 0.0);
+        if (turretController != null && turretForceHold) {
+            turretController.holdPositionTicks(turretHoldTarget);
         }
     }
 
@@ -411,6 +414,7 @@ public class RedPedroAuto extends OpMode {
             turretController.captureReferences();
             turretController.resetPidState();
         }
+        turretHoldTarget = 0;
 
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;
@@ -427,8 +431,8 @@ public class RedPedroAuto extends OpMode {
             flywheel.update(nowMs, false);
         }
 
-        if (turretController != null) {
-            turretController.update(false, 0.0);
+        if (turretController != null && turretForceHold) {
+            turretController.holdPositionTicks(turretHoldTarget);
         }
 
         runStateMachine(nowMs);
@@ -454,6 +458,7 @@ public class RedPedroAuto extends OpMode {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
             panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
             panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
+            panelsTelemetry.debug("TurretHoldingEncoder", String.valueOf(turretForceHold));
         }
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
@@ -505,6 +510,11 @@ public class RedPedroAuto extends OpMode {
         // Hood to init
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
+        }
+        // Turret hold at zero
+        if (turretController != null && turretForceHold) {
+            turretHoldTarget = 0;
+            turretController.holdPositionTicks(turretHoldTarget);
         }
         // Turret safe (power 0)
         if (turretMotor != null) {
@@ -613,6 +623,11 @@ public class RedPedroAuto extends OpMode {
             case RUNNING_PATH:
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
+
+                    if (finished == 2 && turretForceHold) {
+                        // After first collect3: move turret to -240 ticks (mirrors Blue auto)
+                        turretHoldTarget = -240;
+                    }
 
                     if (finished == 3) {
                         gateAlignWaitTimer.resetTimer();
@@ -729,6 +744,9 @@ public class RedPedroAuto extends OpMode {
                 break;
 
             case FINISHED:
+                if (turretForceHold) {
+                    turretHoldTarget = 0;
+                }
                 break;
 
             case IDLE:
