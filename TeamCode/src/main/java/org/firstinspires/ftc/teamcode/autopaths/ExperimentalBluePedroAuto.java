@@ -90,10 +90,10 @@ public class ExperimentalBluePedroAuto extends OpMode {
     public static long CLAW_CLOSE_MS = 190L;
 
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.9;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.4;
 
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -128,11 +128,12 @@ public class ExperimentalBluePedroAuto extends OpMode {
     public static double GATE_CLOSED = 0.51;
 
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 6.0; //was like 10
+    public static double GATE_OPEN_TOLERANCE_IN = 3.0; //was like 10
 
     @Sorter(sort = 33)
-    public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
+    public static double GATE_CLOSE_TOLERANCE_IN = 7.0;
 
+    //after this is the field gate not on the robot.
     @Sorter(sort = 34)
     public static double GATE_ALIGN_WAIT_SECONDS = 0.5;
 

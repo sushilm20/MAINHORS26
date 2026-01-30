@@ -60,7 +60,7 @@ public class TurretController {
     // Rightward asymmetry control (biases target instead of slowing PID output)
     // 0.0 = no effect. 0.4 = scale rightward target step by 60% when near center.
     @Sorter(sort = 12)
-    public static double RIGHTWARD_ENCODER_DAMP = 0.4;
+    public static double RIGHTWARD_ENCODER_DAMP = 0.8;
     @Sorter(sort = 13)
     public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
 
