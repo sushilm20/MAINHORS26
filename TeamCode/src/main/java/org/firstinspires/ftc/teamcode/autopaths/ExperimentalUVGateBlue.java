@@ -200,7 +200,7 @@ public class ExperimentalUVGateBlue extends OpMode {
     // PATH POSES - GATE CLEAR POSITION (First)
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 21.0    ;
+    public static double GATE_CLEAR_X = 19.0    ;
 
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;

@@ -200,7 +200,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 17.0;
+    public static double GATE_CLEAR_X = 20.0;
 
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
