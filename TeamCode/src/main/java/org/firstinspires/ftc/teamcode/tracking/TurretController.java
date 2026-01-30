@@ -207,7 +207,7 @@ public class TurretController {
     }
 
     /**
-     * Simple utility to drive toward a raw encoder target.
+     * utility to drive toward raw encoder target.
      * Returns true if within deadband and motor is stopped.
      */
     public boolean driveToPosition(int targetTicks, int deadbandTicks, double powerMag) {
@@ -222,6 +222,84 @@ public class TurretController {
         }
         turretMotor.setPower(power);
         return power == 0.0;
+    }
+
+    /**
+     * NEW: Hold a fixed encoder target (virtual ticks) using the same PID loop.
+     * Call this from AUTO to keep the turret locked at a specific encoder value.
+     *
+     * @param targetVirtualTicks target in virtual encoder space (same space as getVirtualPosition()).
+     */
+    public void holdPositionTicks(int targetVirtualTicks) {
+        long nowMs = System.currentTimeMillis();
+
+        int minPosCfg = TURRET_MIN_POS;
+        int maxPosCfg = TURRET_MAX_POS;
+        double kpCfg = TURRET_KP;
+        double kiCfg = TURRET_KI;
+        double kdCfg = TURRET_KD;
+        double maxPowerCfg = TURRET_MAX_POWER;
+        double powerSmoothCfg = POWER_SMOOTH_ALPHA;
+        double derivFilterCfg = DERIV_FILTER_ALPHA;
+        int deadbandCfg = SMALL_DEADBAND_TICKS;
+        double integralClampCfg = INTEGRAL_CLAMP;
+
+        // Clamp target
+        if (targetVirtualTicks > maxPosCfg) targetVirtualTicks = maxPosCfg;
+        if (targetVirtualTicks < minPosCfg) targetVirtualTicks = minPosCfg;
+
+        int currentVirtualTicks = getVirtualEncoderPosition();
+        int errorTicks = targetVirtualTicks - currentVirtualTicks;
+
+        long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
+        double dt = dtMs / 1000.0;
+        lastTimeMs = nowMs;
+
+        if (Math.abs(errorTicks) > deadbandCfg) {
+            if (lastErrorTicks != 0 && ((errorTicks > 0 && lastErrorTicks < 0) || (errorTicks < 0 && lastErrorTicks > 0))) {
+                turretIntegral *= 0.5;
+            }
+            turretIntegral += errorTicks * dt;
+        } else {
+            turretIntegral *= 0.90;
+        }
+
+        if (turretIntegral > integralClampCfg) turretIntegral = integralClampCfg;
+        if (turretIntegral < -integralClampCfg) turretIntegral = -integralClampCfg;
+
+        double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
+        double derivativeFiltered = derivFilterCfg * rawDerivative + (1.0 - derivFilterCfg) * lastDerivative;
+
+        double pidOut = kpCfg * errorTicks + kiCfg * turretIntegral + kdCfg * derivativeFiltered;
+
+        if (Math.abs(errorTicks) <= deadbandCfg) {
+            pidOut = 0.0;
+        }
+
+        if (pidOut > maxPowerCfg) pidOut = maxPowerCfg;
+        if (pidOut < -maxPowerCfg) pidOut = -maxPowerCfg;
+
+        double applied = powerSmoothCfg * lastAppliedPower + (1.0 - powerSmoothCfg) * pidOut;
+
+        if ((currentVirtualTicks >= maxPosCfg && applied > 0.0) || (currentVirtualTicks <= minPosCfg && applied < 0.0)) {
+            applied = 0.0;
+        }
+
+        turretMotor.setPower(applied);
+
+        lastErrorTicks = errorTicks;
+        lastAppliedPower = applied;
+        lastDerivative = derivativeFiltered;
+
+        lastDesiredTicks = targetVirtualTicks;
+        lastErrorReported = errorTicks;
+        lastPidOut = pidOut;
+        lastFf = 0.0;
+        lastHeadingDelta = 0.0;
+        lastAngularVel = 0.0;
+        lastDampedError = errorTicks;
+
+        publishTelemetry();
     }
 
     /**
