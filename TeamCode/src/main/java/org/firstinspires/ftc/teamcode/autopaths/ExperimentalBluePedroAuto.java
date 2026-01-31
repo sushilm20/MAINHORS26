@@ -1,4 +1,3 @@
-// --- File: ExperimentalBluePedroAuto.java ---
 package org.firstinspires.ftc.teamcode.autopaths;
 
 // (all your imports — unchanged)
@@ -71,11 +70,11 @@ public class ExperimentalBluePedroAuto extends OpMode {
     private final boolean turretForceManualNoMove = false;
 
     // Timing/telemetry helpers
-    private long autoStartMs = -1;       // track when start() is called
-    private boolean shutdownDone = false; // ensure we stop actuators once
+    private long autoStartMs = -1;
+    private boolean shutdownDone = false;
 
     // Turret targets for this auto
-    private int turretHoldTarget = 0;      // in virtual ticks
+    private int turretHoldTarget = 0;
     private boolean turretForceHold = true;
 
     // ========================================
@@ -364,7 +363,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     @Override
     public void start() {
-        autoStartMs = System.currentTimeMillis();   // start timing
+        autoStartMs = System.currentTimeMillis();
         if (flywheel != null) {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
@@ -374,9 +373,12 @@ public class ExperimentalBluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
         shooterWaitStartMs = System.currentTimeMillis();
-        state = AutoState.WAIT_FOR_SHOOTER;
-        turretHoldTarget = 0;
+
+        // Turn turret before any paths run
+        turretHoldTarget = 240;   // target position for turret
         turretForceHold = true;
+
+        state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
@@ -535,10 +537,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
             case RUNNING_PATH:
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
-                    if (finished == 2) {
-                        // After first collect3: move turret to 240 ticks
-                        if (turretForceHold) { turretHoldTarget = 240; }
-                    }
+                    // turret turning now happens before paths start; no longer adjust after collectFirst3
                     if (finished == 3) { gateAlignWaitTimer.resetTimer(); nextPathIndex = 4; state = AutoState.WAIT_GATE_ALIGN; break; }
                     if (finished == 4) { gateClearWaitTimer.resetTimer(); nextPathIndex = 5; state = AutoState.WAIT_GATE_CLEAR; break; }
                     if (endsAtShoot(finished)) {
