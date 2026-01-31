@@ -70,6 +70,8 @@ public class RedMirrorAuto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     private final boolean turretForceManualNoMove = false;
+    private boolean turretForceHold = true;
+    private int turretHoldTarget = 0; // in virtual ticks
 
     private Servo gateServo;
     private boolean gateClosed = false;
@@ -273,11 +275,11 @@ public class RedMirrorAuto extends OpMode {
 
     /* Helpers to mirror poses/headings using the Pose.mirror() helper already available on Pose. */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror();
+        return new Pose(x, y).mirror(140);
     }
 
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror();
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(140);
     }
 
     private static double mirrorHeading(double headingDeg) {
@@ -305,6 +307,7 @@ public class RedMirrorAuto extends OpMode {
         preActionTimerStarted = false;
         preActionEntered = false;
         timedIntakeActive = false;
+        turretHoldTarget = 0;
 
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
@@ -426,8 +429,8 @@ public class RedMirrorAuto extends OpMode {
         if (flywheel != null) {
             // flywheel.update(System.currentTimeMillis(), false);
         }
-        if (turretController != null) {
-            turretController.update(false, 0.0);
+        if (turretController != null && turretForceHold) {
+            turretController.holdPositionTicks(turretHoldTarget);
         }
     }
 
@@ -444,6 +447,10 @@ public class RedMirrorAuto extends OpMode {
             turretController.resetPidState();
         }
 
+        // Pre-position turret before any paths (mirrored side: negative)
+        turretHoldTarget = -240;
+        turretForceHold = true;
+
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;
     }
@@ -459,8 +466,8 @@ public class RedMirrorAuto extends OpMode {
             flywheel.update(nowMs, false);
         }
 
-        if (turretController != null) {
-            turretController.update(false, 0.0);
+        if (turretController != null && turretForceHold) {
+            turretController.holdPositionTicks(turretHoldTarget);
         }
 
         runStateMachine(nowMs);
@@ -486,6 +493,7 @@ public class RedMirrorAuto extends OpMode {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
             panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
             panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
+            panelsTelemetry.debug("TurretHoldingEncoder", String.valueOf(turretForceHold));
         }
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
@@ -537,6 +545,11 @@ public class RedMirrorAuto extends OpMode {
         // Hood to init
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
+        }
+        // Turret hold at zero when finished
+        if (turretController != null && turretForceHold) {
+            turretHoldTarget = 0;
+            turretController.holdPositionTicks(turretHoldTarget);
         }
         // Turret safe (power 0)
         if (turretMotor != null) {
@@ -760,6 +773,9 @@ public class RedMirrorAuto extends OpMode {
                 break;
 
             case FINISHED:
+                if (turretForceHold) {
+                    turretHoldTarget = 0;
+                }
                 break;
 
             case IDLE:
