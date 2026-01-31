@@ -375,7 +375,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
         shooterWaitStartMs = System.currentTimeMillis();
 
         // Turn turret before any paths run
-        turretHoldTarget = 240;   // target position for turret
+        turretHoldTarget = 230;   // target position for turret
         turretForceHold = true;
 
         state = AutoState.WAIT_FOR_SHOOTER;

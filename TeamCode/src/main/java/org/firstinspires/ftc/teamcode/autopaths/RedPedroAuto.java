@@ -386,7 +386,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         // Turn turret before any paths run (mirror blue: negative for red side)
-        turretHoldTarget = -240;
+        turretHoldTarget = -230;
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
