@@ -58,7 +58,6 @@ public class TurretController {
     public static double INTEGRAL_CLAMP = 50.0;
 
     // Rightward asymmetry control (biases target instead of slowing PID output)
-    // 0.0 = no effect. 0.4 = scale rightward target step by 60% when near center.
     @Sorter(sort = 12)
     public static double RIGHTWARD_ENCODER_DAMP = 0.8;
     @Sorter(sort = 13)
@@ -71,6 +70,10 @@ public class TurretController {
     public static double HOMING_POWER = 0.5;
     @Sorter(sort = 16)
     public static int HOMING_TARGET_DEADBAND = 12;
+
+    // Safety timeout (ms) to exit homing if switch never triggers
+    @Sorter(sort = 17)
+    public static long HOMING_TIMEOUT_MS = 3000;
 
     // Internal state
     private double turretIntegral = 0.0;
@@ -90,16 +93,14 @@ public class TurretController {
     // state for manual->auto transition detection
     private boolean manualActiveLast = false;
 
-    // reset edge detection (used only during homing sweep)
-    private boolean resetPrev = false;
-
     // Homing sweep state
     private boolean homingMode = false;
     private boolean homingCommandPrev = false;
     private boolean homingDirectionPos = true;
     private int homingTarget = HOMING_AMPLITUDE_TICKS;
+    private long homingStartMs = 0L;
 
-    // NEW: freeze/hold mode after homing
+    // Freeze/hold mode after homing
     private boolean freezeMode = false;
     private int freezeHoldTarget = 0;
 
@@ -143,7 +144,6 @@ public class TurretController {
 
     /**
      * Command a manual homing sweep (oscillate between -amp and +amp) using a button.
-     * Call this every loop with the button state (e.g., gamepad1.dpad_up).
      * Rising edge starts the sweep; if already frozen, rising edge unfreezes and resumes tracking.
      */
     public void commandHomingSweep(boolean homingButtonPressed) {
@@ -165,7 +165,7 @@ public class TurretController {
         homingMode = true;
         homingDirectionPos = true;
         homingTarget = HOMING_AMPLITUDE_TICKS;
-        resetPrev = false;
+        homingStartMs = System.currentTimeMillis();
         freezeMode = false; // ensure we are not frozen while homing
         // clear PID-related history to avoid stale values
         turretIntegral = 0.0;
@@ -239,10 +239,7 @@ public class TurretController {
     }
 
     /**
-     * NEW: Hold a fixed encoder target (virtual ticks) using the same PID loop.
-     * Call this from AUTO to keep the turret locked at a specific encoder value.
-     *
-     * @param targetVirtualTicks target in virtual encoder space (same space as getVirtualPosition()).
+     * Hold a fixed encoder target (virtual ticks) using the same PID loop.
      */
     public void holdPositionTicks(int targetVirtualTicks) {
         long nowMs = System.currentTimeMillis();
@@ -318,13 +315,9 @@ public class TurretController {
 
     /**
      * Main update method. Call from OpMode loop.
-     * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
-     * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
-     * - If homing sweep is active: it overrides both manual/auto until homing completes.
-     * - If freezeMode is active: it holds the last captured position and ignores heading tracking.
-     *
-     * @param manualNow whether operator control is active
-     * @param manualPower requested manual power in [-1, 1] (only used if manualNow)
+     * - Homing overrides everything until done.
+     * - Freeze mode: holds position, no auto heading tracking, but manual still works.
+     * - Manual always takes priority and can adjust even while frozen; the held target is updated to the manual position.
      */
     public void update(boolean manualNow, double manualPower) {
         long nowMs = System.currentTimeMillis();
@@ -339,13 +332,34 @@ public class TurretController {
             }
         }
 
+        // Current virtual encoder position (used in multiple branches)
+        int currentVirtualTicks = getVirtualEncoderPosition();
+
+        // --- Manual branch (always allowed, even when frozen) ---
+        if (manualNow) {
+            applyManualPower(manualPower, TURRET_MIN_POS, TURRET_MAX_POS, currentVirtualTicks);
+            // Reset PID state timing to avoid stale derivatives
+            turretIntegral = 0.0;
+            lastErrorTicks = 0;
+            lastTimeMs = nowMs;
+            lastDerivative = 0.0;
+            manualActiveLast = true;
+
+            // If frozen, keep holding from the new manually-set position
+            if (freezeMode) {
+                freezeHoldTarget = getVirtualEncoderPosition();
+            }
+            publishTelemetry();
+            return;
+        }
+
         // --- Freeze/hold mode: bypass heading tracking, hold position ---
         if (freezeMode) {
             holdPositionTicks(freezeHoldTarget);
             return;
         }
 
-        // Pull latest config each loop so UI changes apply live
+        // --- Auto tracking branch (only when not frozen) ---
         int minPosCfg = TURRET_MIN_POS;
         int maxPosCfg = TURRET_MAX_POS;
         double ticksPerRadScaleCfg = TICKS_PER_RADIAN_SCALE;
@@ -364,24 +378,7 @@ public class TurretController {
         // Derived mapping
         double ticksPerRad = ((maxPosCfg - minPosCfg) / (2.0 * Math.PI)) * ticksPerRadScaleCfg;
 
-        // Current virtual encoder position
-        int currentVirtualTicks = getVirtualEncoderPosition();
-
-        // detect transitions
-        if (manualNow) {
-            // Manual: apply manual power but enforce virtual hard limits
-            applyManualPower(manualPower, minPosCfg, maxPosCfg, currentVirtualTicks);
-            // Reset PID state
-            turretIntegral = 0.0;
-            lastErrorTicks = 0;
-            lastTimeMs = nowMs;
-            lastDerivative = 0.0;
-            manualActiveLast = true;
-            publishTelemetry();
-            return;
-        }
-
-        // If we just transitioned from manual to auto, re-capture references
+        // detect transitions from manual->auto
         if (manualActiveLast && !manualNow) {
             captureReferences();
             currentVirtualTicks = 0;
@@ -414,12 +411,12 @@ public class TurretController {
         if (desiredVirtualTicks > maxPosCfg) desiredVirtualTicks = maxPosCfg;
         if (desiredVirtualTicks < minPosCfg) desiredVirtualTicks = minPosCfg;
 
-        // ---- Rightward asymmetry by biasing the target itself (offset logic) ----
+        // Rightward asymmetry by biasing the target itself
         int delta = desiredVirtualTicks - currentVirtualTicks;
         int desiredBiased = desiredVirtualTicks;
         boolean rightDampActive = delta > 0 && Math.abs(delta) <= rightDampWindowCfg;
         if (rightDampActive) {
-            double scale = Math.max(0.0, 1.0 - rightDampCfg); // e.g., 0.6 if RIGHTWARD_ENCODER_DAMP=0.4
+            double scale = Math.max(0.0, 1.0 - rightDampCfg);
             desiredBiased = currentVirtualTicks + (int) Math.round(delta * scale);
         }
 
@@ -499,15 +496,13 @@ public class TurretController {
 
     /**
      * Homing sweep state machine. Returns true if homing finished (reset captured).
+     * Stops immediately on limit switch and cuts power to avoid overshoot.
      */
     private boolean runHomingSweep() {
-        // Read current config
-        int minPosCfg = TURRET_MIN_POS;
-        int maxPosCfg = TURRET_MAX_POS;
-
-        // Rising-edge reset detection ONLY during homing
+        // Immediate stop if limit switch trips
         boolean resetNow = encoderResetTrigger != null && encoderResetTrigger.getAsBoolean();
-        if (resetNow && !resetPrev) {
+        if (resetNow) {
+            turretMotor.setPower(0.0); // cut power first to prevent coasting past the switch
             try {
                 turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -518,18 +513,24 @@ public class TurretController {
             lastAppliedPower = 0.0;
             lastDerivative = 0.0;
 
-            // NEW: enter freeze/hold after successful homing
+            // Enter freeze/hold after successful homing
             freezeMode = true;
             freezeHoldTarget = getVirtualEncoderPosition(); // typically 0 after captureReferences()
             homingMode = false;    // exit homing after successful reset
-            resetPrev = resetNow;
             return true;           // done homing
         }
-        resetPrev = resetNow;
+
+        // Safety timeout: bail out if switch never triggers
+        if (System.currentTimeMillis() - homingStartMs > HOMING_TIMEOUT_MS) {
+            turretMotor.setPower(0.0);
+            homingMode = false;
+            // do not freeze; just exit homing
+            return true;
+        }
 
         int current = getVirtualEncoderPosition();
 
-        // Flip direction when near target
+        // Simple sweep: flip direction when nearing amplitude
         if (homingDirectionPos && current >= homingTarget - HOMING_TARGET_DEADBAND) {
             homingDirectionPos = false;
             homingTarget = -HOMING_AMPLITUDE_TICKS;
@@ -541,7 +542,7 @@ public class TurretController {
         double power = homingDirectionPos ? HOMING_POWER : -HOMING_POWER;
 
         // Respect hard limits
-        if ((current >= maxPosCfg && power > 0.0) || (current <= minPosCfg && power < 0.0)) {
+        if ((current >= TURRET_MAX_POS && power > 0.0) || (current <= TURRET_MIN_POS && power < 0.0)) {
             power = 0.0;
         }
 
@@ -583,7 +584,6 @@ public class TurretController {
      * Return current heading (Z) in radians. Prefer Pinpoint; fall back to BNO IMU; else 0.
      * NOTE: Pinpoint heading is negated to match the previous BNO055 sign convention.
      */
-
     private double getHeadingRadians() {
         if (pinpoint != null) {
             try {
@@ -624,5 +624,6 @@ public class TurretController {
         telemetry.addData("turret.dampedError", lastDampedError);
         telemetry.addData("turret.offset", encoderOffset);
         telemetry.addData("turret.freeze", freezeMode);
+        telemetry.addData("turret.homing", homingMode);
     }
 }
