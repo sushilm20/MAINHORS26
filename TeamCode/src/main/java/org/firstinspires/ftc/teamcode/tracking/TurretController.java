@@ -99,6 +99,10 @@ public class TurretController {
     private boolean homingDirectionPos = true;
     private int homingTarget = HOMING_AMPLITUDE_TICKS;
 
+    // NEW: freeze/hold mode after homing
+    private boolean freezeMode = false;
+    private int freezeHoldTarget = 0;
+
     // telemetry values (readable by the OpMode)
     private int lastDesiredTicks = 0;
     private int lastErrorReported = 0;
@@ -140,11 +144,19 @@ public class TurretController {
     /**
      * Command a manual homing sweep (oscillate between -amp and +amp) using a button.
      * Call this every loop with the button state (e.g., gamepad1.dpad_up).
-     * Rising edge starts the sweep; it stops automatically after a reset is detected.
+     * Rising edge starts the sweep; if already frozen, rising edge unfreezes and resumes tracking.
      */
     public void commandHomingSweep(boolean homingButtonPressed) {
         if (homingButtonPressed && !homingCommandPrev) {
-            startHomingSweep();
+            if (freezeMode) {
+                // Unfreeze: re-capture references and resume tracking
+                freezeMode = false;
+                captureReferences();
+                resetPidState();
+                lastTimeMs = System.currentTimeMillis();
+            } else {
+                startHomingSweep();
+            }
         }
         homingCommandPrev = homingButtonPressed;
     }
@@ -154,6 +166,7 @@ public class TurretController {
         homingDirectionPos = true;
         homingTarget = HOMING_AMPLITUDE_TICKS;
         resetPrev = false;
+        freezeMode = false; // ensure we are not frozen while homing
         // clear PID-related history to avoid stale values
         turretIntegral = 0.0;
         lastDerivative = 0.0;
@@ -197,6 +210,7 @@ public class TurretController {
      * Cleanly disable turret tracking and stop the motor.
      */
     public void disable() {
+        freezeMode = false;
         turretIntegral = 0.0;
         lastErrorTicks = 0;
         lastDerivative = 0.0;
@@ -307,6 +321,7 @@ public class TurretController {
      * - If manualNow is true: the controller will apply manualPower (respecting hard limits), and PID state is reset.
      * - If manualNow is false: the controller will run automatic tracking using heading + turret encoder mapping.
      * - If homing sweep is active: it overrides both manual/auto until homing completes.
+     * - If freezeMode is active: it holds the last captured position and ignores heading tracking.
      *
      * @param manualNow whether operator control is active
      * @param manualPower requested manual power in [-1, 1] (only used if manualNow)
@@ -317,11 +332,17 @@ public class TurretController {
         // --- Homing sweep overrides everything until done ---
         if (homingMode) {
             if (runHomingSweep()) {
-                // homing finished this cycle (reset detected); fall through to auto with fresh timing
+                // homing finished this cycle; fall through so freeze/hold can engage
                 nowMs = System.currentTimeMillis();
             } else {
                 return; // still homing; skip normal control
             }
+        }
+
+        // --- Freeze/hold mode: bypass heading tracking, hold position ---
+        if (freezeMode) {
+            holdPositionTicks(freezeHoldTarget);
+            return;
         }
 
         // Pull latest config each loop so UI changes apply live
@@ -496,6 +517,10 @@ public class TurretController {
             lastTimeMs = System.currentTimeMillis();
             lastAppliedPower = 0.0;
             lastDerivative = 0.0;
+
+            // NEW: enter freeze/hold after successful homing
+            freezeMode = true;
+            freezeHoldTarget = getVirtualEncoderPosition(); // typically 0 after captureReferences()
             homingMode = false;    // exit homing after successful reset
             resetPrev = resetNow;
             return true;           // done homing
@@ -598,5 +623,6 @@ public class TurretController {
         telemetry.addData("turret.error", lastErrorReported);
         telemetry.addData("turret.dampedError", lastDampedError);
         telemetry.addData("turret.offset", encoderOffset);
+        telemetry.addData("turret.freeze", freezeMode);
     }
 }
