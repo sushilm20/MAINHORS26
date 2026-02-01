@@ -57,7 +57,7 @@ public class FarRed6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = -300;
+    private static final int TURRET_START_POS = -86;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -67,30 +67,25 @@ public class FarRed6 extends OpMode {
     private boolean gateClosed = true;
 
     private long autoStartMs = -1;
-    private boolean shutdownDone = false;
 
     // ============================
-    // Timing
+    // Timing (same as Blue)
     // ============================
-    // PRE_ACTION_WAIT_SECONDS: after we are at (or timed-out waiting for) the shoot pose, we pause this long
-    //                           before starting the intake run into the shooter (lets pose settle).
-    // PRE_ACTION_MAX_POSE_WAIT_SECONDS: max wait to reach pose tolerance before starting PRE_ACTION timer anyway.
-    // SHOOTER_WAIT_TIMEOUT_MS: max time to wait for shooter to spin up before moving on.
-    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.6;
+    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
     @Sorter(sort = 1)  public static long   CLAW_CLOSE_MS = 190L;
     @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
     // ============================
-    // Intake power rules
+    // Intake power rules (same)
     // ============================
     @Sorter(sort = 10) public static double INTAKE_IDLE_POWER   = -0.50;
-    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.70;
+    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.55; // slowed feed
     @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER= -1.00;
 
     // ============================
-    // Gate settings (tight)
+    // Gate settings (same)
     // ============================
     @Sorter(sort = 20) public static double GATE_OPEN = 0.67;
     @Sorter(sort = 21) public static double GATE_CLOSED = 0.50;
@@ -105,27 +100,41 @@ public class FarRed6 extends OpMode {
     @Sorter(sort = 30) public static double START_POSE_TOLERANCE_IN = 6.0;
 
     // ============================
-    // Path poses (unmirrored originals)
+    // Base (Blue) poses/headings to mirror
     // ============================
-    @Sorter(sort = 100) public static double START_X = 63.0;
-    @Sorter(sort = 101) public static double START_Y = 8.0;
-    @Sorter(sort = 102) public static double START_HEADING_DEG = 90.0;
+    @Sorter(sort = 100) public static double BASE_START_X = 63.0;
+    @Sorter(sort = 101) public static double BASE_START_Y = 8.0;
+    @Sorter(sort = 102) public static double BASE_START_HEADING_DEG = 90.0;
 
-    @Sorter(sort = 110) public static double SHOOT_X = 58.0;
-    @Sorter(sort = 111) public static double SHOOT_Y = 14.0;
-    @Sorter(sort = 112) public static double SHOOT_HEADING_DEG = 90.0;
-    @Sorter(sort = 113) public static double SHOOT_RETURN_HEADING_DEG = 180.0;
+    @Sorter(sort = 110) public static double BASE_SHOOT_X = 58.0;
+    @Sorter(sort = 111) public static double BASE_SHOOT_Y = 14.0;
+    @Sorter(sort = 112) public static double BASE_SHOOT_HEADING_DEG = 90.0;
+    @Sorter(sort = 113) public static double BASE_SHOOT_RETURN_HEADING_DEG = 180.0;
 
-    @Sorter(sort = 120) public static double COLLECT_CTRL_X = 27.0;
-    @Sorter(sort = 121) public static double COLLECT_CTRL_Y = 18.0;
-    @Sorter(sort = 122) public static double COLLECT_END_X = 15.0;
-    @Sorter(sort = 123) public static double COLLECT_END_Y = 14.0;
-    @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195.0;
+    @Sorter(sort = 120) public static double BASE_COLLECT_CTRL_X = 27.0;
+    @Sorter(sort = 121) public static double BASE_COLLECT_CTRL_Y = 18.0;
+    @Sorter(sort = 122) public static double BASE_COLLECT_END_X = 16.0;
+    @Sorter(sort = 123) public static double BASE_COLLECT_END_Y = 14.0;
+    @Sorter(sort = 124) public static double BASE_COLLECT_HEADING_DEG = 195.0;
 
-    @Sorter(sort = 130) public static double EXTEND_END_Y = 10.392;
+    @Sorter(sort = 130) public static double BASE_EXTEND_END_Y = 10.392;
 
-    @Sorter(sort = 140) public static double BACK_COLLECT_X = 14.0;
-    @Sorter(sort = 141) public static double BACK_COLLECT_Y = 14.0;
+    @Sorter(sort = 140) public static double BASE_BACK_COLLECT_X = 16.0;
+    @Sorter(sort = 141) public static double BASE_BACK_COLLECT_Y = 14.0;
+
+    // ===== Mirrored (Red) poses/headings computed from base =====
+    private Pose START_POSE_R;
+    private Pose SHOOT_POSE_R;
+    private Pose SHOOT_RETURN_POSE_R; // heading-only use
+    private Pose COLLECT_CTRL_POSE_R;
+    private Pose COLLECT_END_POSE_R;
+    private Pose EXTEND_END_POSE_R;
+    private Pose BACK_COLLECT_POSE_R;
+
+    private double START_HEADING_R;
+    private double SHOOT_HEADING_R;
+    private double SHOOT_RETURN_HEADING_R;
+    private double COLLECT_HEADING_R;
 
     public FarRed6() {}
 
@@ -143,11 +152,26 @@ public class FarRed6 extends OpMode {
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
-        follower = Constants.createFollower(hardwareMap);
-        paths = new Paths(follower);
 
-        // Start on red (mirrored) side
-        follower.setStartingPose(mirrorPose(START_X, START_Y, START_HEADING_DEG));
+        // Compute mirrored poses/headings from base Blue values
+        START_POSE_R          = mirrorPose(BASE_START_X, BASE_START_Y, BASE_START_HEADING_DEG);
+        SHOOT_POSE_R          = mirrorPose(BASE_SHOOT_X, BASE_SHOOT_Y, BASE_SHOOT_HEADING_DEG);
+        COLLECT_CTRL_POSE_R   = mirrorPose(BASE_COLLECT_CTRL_X, BASE_COLLECT_CTRL_Y);
+        COLLECT_END_POSE_R    = mirrorPose(BASE_COLLECT_END_X, BASE_COLLECT_END_Y, BASE_COLLECT_HEADING_DEG);
+        EXTEND_END_POSE_R     = mirrorPose(BASE_COLLECT_END_X, BASE_EXTEND_END_Y, BASE_COLLECT_HEADING_DEG);
+        BACK_COLLECT_POSE_R   = mirrorPose(BASE_BACK_COLLECT_X, BASE_BACK_COLLECT_Y, BASE_COLLECT_HEADING_DEG);
+
+        START_HEADING_R        = START_POSE_R.getHeading();
+        SHOOT_HEADING_R        = SHOOT_POSE_R.getHeading();
+        SHOOT_RETURN_HEADING_R = mirrorPose(0, 0, BASE_SHOOT_RETURN_HEADING_DEG).getHeading();
+        COLLECT_HEADING_R      = COLLECT_END_POSE_R.getHeading();
+
+        follower = Constants.createFollower(hardwareMap);
+        paths = new Paths(follower, START_POSE_R, SHOOT_POSE_R, COLLECT_CTRL_POSE_R, COLLECT_END_POSE_R,
+                EXTEND_END_POSE_R, BACK_COLLECT_POSE_R, START_HEADING_R, SHOOT_HEADING_R,
+                SHOOT_RETURN_HEADING_R, COLLECT_HEADING_R);
+
+        follower.setStartingPose(new Pose(START_POSE_R.getX(), START_POSE_R.getY(), START_HEADING_R));
 
         intakeTimer = new Timer();
         preActionTimer = new Timer();
@@ -178,10 +202,18 @@ public class FarRed6 extends OpMode {
         }
 
         try {
-            try { pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint"); }
-            catch (Exception e) { panelsTelemetry.debug("Init", "PinPoint IMU not found: " + e.getMessage()); }
-            try { hubImu = hardwareMap.get(BNO055IMU.class, "imu"); }
-            catch (Exception e) { panelsTelemetry.debug("Init", "Expansion hub IMU not found: " + e.getMessage()); }
+            try {
+                pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+                panelsTelemetry.debug("Init", "Found PinPoint IMU as 'pinpoint'");
+            } catch (Exception e) {
+                panelsTelemetry.debug("Init", "PinPoint IMU not found: " + e.getMessage());
+            }
+            try {
+                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
+                panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
+            } catch (Exception e) {
+                panelsTelemetry.debug("Init", "Expansion hub IMU not found: " + e.getMessage());
+            }
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
             if (imu != null) {
                 BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
@@ -300,11 +332,6 @@ public class FarRed6 extends OpMode {
             panelsTelemetry.debug("TurretRefCaptured", String.valueOf(turretRefCaptured));
         }
         panelsTelemetry.update(telemetry);
-
-        if (state == AutoState.FINISHED && !shutdownDone) {
-            resetToInitState();
-            shutdownDone = true;
-        }
     }
 
     @Override
@@ -329,30 +356,36 @@ public class FarRed6 extends OpMode {
     // ---------- State Machine ----------
     private void runStateMachine(long nowMs) {
         switch (state) {
-            case WAIT_FOR_SHOOTER:
+            case WAIT_FOR_SHOOTER: {
                 boolean atTarget = flywheel != null && flywheel.isAtTarget();
                 long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
                 if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) startPath(1);
                 break;
+            }
 
-            case RUNNING_PATH:
+            case RUNNING_PATH: {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
                     int next = finished + 1;
-                    if (next > 6) {
-                        state = AutoState.FINISHED;
-                    } else if (endsAtShoot(finished)) {
-                        nextPathIndex = next;
+
+                    if (endsAtShoot(finished)) {
+                        nextPathIndex = (next <= 6) ? next : -1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
+                        poseWaitTimer.resetTimer();
+                        rpmStableTimer.resetTimer();
+                        if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
                         state = AutoState.PRE_ACTION;
-                    } else {
+                    } else if (next <= 6) {
                         startPath(next);
+                    } else {
+                        state = AutoState.FINISHED;
                     }
                 }
                 break;
+            }
 
-            case PRE_ACTION:
+            case PRE_ACTION: {
                 if (!preActionEntered) {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
@@ -371,8 +404,9 @@ public class FarRed6 extends OpMode {
                     }
                 }
                 break;
+            }
 
-            case INTAKE_RUN:
+            case INTAKE_RUN: {
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(0.2);
@@ -380,8 +414,9 @@ public class FarRed6 extends OpMode {
                     state = AutoState.CLAW_ACTION;
                 }
                 break;
+            }
 
-            case CLAW_ACTION:
+            case CLAW_ACTION: {
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
                     if (clawServo != null) clawServo.setPosition(0.63);
                     if (nextPathIndex > 0 && nextPathIndex <= 6) {
@@ -392,6 +427,7 @@ public class FarRed6 extends OpMode {
                     }
                 }
                 break;
+            }
 
             case FINISHED:
             case IDLE:
@@ -453,9 +489,8 @@ public class FarRed6 extends OpMode {
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
-            Pose shoot = mirrorPose(SHOOT_X, SHOOT_Y);
-            double dx = p.getX() - shoot.getX();
-            double dy = p.getY() - shoot.getY();
+            double dx = p.getX() - SHOOT_POSE_R.getX();
+            double dy = p.getY() - SHOOT_POSE_R.getY();
             return Math.hypot(dx, dy);
         } catch (Exception e) {
             return Double.POSITIVE_INFINITY;
@@ -494,7 +529,7 @@ public class FarRed6 extends OpMode {
         }
     }
 
-    // ---------- Paths (mirrored to red) ----------
+    // ---------- Paths ----------
     public static class Paths {
         public PathChain StartTOShoot3;
         public PathChain Collect3;
@@ -503,60 +538,59 @@ public class FarRed6 extends OpMode {
         public PathChain BackTOCollect;
         public PathChain BackTOShootFinal;
 
-        public Paths(Follower follower) {
+        public Paths(Follower follower,
+                     Pose START_POSE_R,
+                     Pose SHOOT_POSE_R,
+                     Pose COLLECT_CTRL_POSE_R,
+                     Pose COLLECT_END_POSE_R,
+                     Pose EXTEND_END_POSE_R,
+                     Pose BACK_COLLECT_POSE_R,
+                     double START_HEADING_R,
+                     double SHOOT_HEADING_R,
+                     double SHOOT_RETURN_HEADING_R,
+                     double COLLECT_HEADING_R) {
+
             StartTOShoot3 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(START_X, START_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(START_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(SHOOT_HEADING_DEG)))
+                            new Pose(START_POSE_R.getX(), START_POSE_R.getY()),
+                            new Pose(SHOOT_POSE_R.getX(), SHOOT_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(START_HEADING_R, SHOOT_HEADING_R)
                     .build();
 
             Collect3 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            mirrorPose(SHOOT_X, SHOOT_Y),
-                            mirrorPose(COLLECT_CTRL_X, COLLECT_CTRL_Y),
-                            mirrorPose(COLLECT_END_X, COLLECT_END_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(SHOOT_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)))
+                            new Pose(SHOOT_POSE_R.getX(), SHOOT_POSE_R.getY()),
+                            new Pose(COLLECT_CTRL_POSE_R.getX(), COLLECT_CTRL_POSE_R.getY()),
+                            new Pose(COLLECT_END_POSE_R.getX(), COLLECT_END_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(SHOOT_HEADING_R, COLLECT_HEADING_R)
                     .build();
 
             ExtendCollect3 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(COLLECT_END_X, COLLECT_END_Y),
-                            mirrorPose(COLLECT_END_X, EXTEND_END_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)))
+                            new Pose(COLLECT_END_POSE_R.getX(), COLLECT_END_POSE_R.getY()),
+                            new Pose(EXTEND_END_POSE_R.getX(), EXTEND_END_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(COLLECT_HEADING_R, COLLECT_HEADING_R)
                     .build();
 
             BackTOShoot = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(COLLECT_END_X, EXTEND_END_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(SHOOT_RETURN_HEADING_DEG)))
+                            new Pose(EXTEND_END_POSE_R.getX(), EXTEND_END_POSE_R.getY()),
+                            new Pose(SHOOT_POSE_R.getX(), SHOOT_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(COLLECT_HEADING_R, SHOOT_RETURN_HEADING_R)
                     .build();
 
             BackTOCollect = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(SHOOT_X, SHOOT_Y),
-                            mirrorPose(BACK_COLLECT_X, BACK_COLLECT_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(SHOOT_RETURN_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)))
+                            new Pose(SHOOT_POSE_R.getX(), SHOOT_POSE_R.getY()),
+                            new Pose(BACK_COLLECT_POSE_R.getX(), BACK_COLLECT_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(SHOOT_RETURN_HEADING_R, COLLECT_HEADING_R)
                     .build();
 
             BackTOShootFinal = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(BACK_COLLECT_X, BACK_COLLECT_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            Math.toRadians(mirrorHeadingDeg(COLLECT_HEADING_DEG)),
-                            Math.toRadians(mirrorHeadingDeg(SHOOT_RETURN_HEADING_DEG)))
+                            new Pose(BACK_COLLECT_POSE_R.getX(), BACK_COLLECT_POSE_R.getY()),
+                            new Pose(SHOOT_POSE_R.getX(), SHOOT_POSE_R.getY())))
+                    .setLinearHeadingInterpolation(COLLECT_HEADING_R, SHOOT_RETURN_HEADING_R)
                     .build();
         }
     }

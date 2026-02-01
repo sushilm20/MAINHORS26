@@ -136,7 +136,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 64.0;
+    public static double SHOOT_POSE_X = 58.0;
     @Sorter(sort = 111)
     public static double SHOOT_POSE_Y = 80.0;
     @Sorter(sort = 112)

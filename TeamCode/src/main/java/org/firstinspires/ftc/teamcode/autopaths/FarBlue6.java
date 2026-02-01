@@ -57,7 +57,7 @@ public class FarBlue6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = 300;
+    private static final int TURRET_START_POS = -86;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -67,20 +67,11 @@ public class FarBlue6 extends OpMode {
     private boolean gateClosed = true;
 
     private long autoStartMs = -1;
-    private boolean shutdownDone = false;
 
     // ============================
     // Timing
     // ============================
-    // PRE_ACTION_WAIT_SECONDS: after we are at (or timed-out waiting for) the shoot pose, we pause this long
-    //                           before starting the intake run into the shooter (lets pose settle).
-
-    // PRE_ACTION_MAX_POSE_WAIT_SECONDS: maximum time we wait to be within pose tolerance before starting
-    //                                   the PRE_ACTION timer anyway (prevents deadlock if pose never settles).
-
-
-    // SHOOTER_WAIT_TIMEOUT_MS: max time to wait for shooter to spin up before moving on.
-    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.6;
+    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6; // was 0.6, +1s
     @Sorter(sort = 1)  public static long   CLAW_CLOSE_MS = 190L;
     @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
@@ -89,12 +80,12 @@ public class FarBlue6 extends OpMode {
     // ============================
     // Intake power rules
     // ============================
-    @Sorter(sort = 10) public static double INTAKE_IDLE_POWER   = -0.50; // when not collecting or shooting
-    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.70; // when at shoot pose / shooting
-    @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER= -1.00; // during collect paths
+    @Sorter(sort = 10) public static double INTAKE_IDLE_POWER   = -0.50;
+    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.55; // slowed feed
+    @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER= -1.00;
 
     // ============================
-    // Gate settings (tight)
+    // Gate settings
     // ============================
     @Sorter(sort = 20) public static double GATE_OPEN = 0.67;
     @Sorter(sort = 21) public static double GATE_CLOSED = 0.50;
@@ -122,13 +113,13 @@ public class FarBlue6 extends OpMode {
 
     @Sorter(sort = 120) public static double COLLECT_CTRL_X = 27.0;
     @Sorter(sort = 121) public static double COLLECT_CTRL_Y = 18.0;
-    @Sorter(sort = 122) public static double COLLECT_END_X = 15.0;
+    @Sorter(sort = 122) public static double COLLECT_END_X = 16.0;
     @Sorter(sort = 123) public static double COLLECT_END_Y = 14.0;
     @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195.0;
 
     @Sorter(sort = 130) public static double EXTEND_END_Y = 10.392;
 
-    @Sorter(sort = 140) public static double BACK_COLLECT_X = 14.0;
+    @Sorter(sort = 140) public static double BACK_COLLECT_X = 16.0;
     @Sorter(sort = 141) public static double BACK_COLLECT_Y = 14.0;
 
     public FarBlue6() {}
@@ -301,11 +292,6 @@ public class FarBlue6 extends OpMode {
             panelsTelemetry.debug("TurretRefCaptured", String.valueOf(turretRefCaptured));
         }
         panelsTelemetry.update(telemetry);
-
-        if (state == AutoState.FINISHED && !shutdownDone) {
-            resetToInitState();
-            shutdownDone = true;
-        }
     }
 
     @Override
@@ -330,35 +316,44 @@ public class FarBlue6 extends OpMode {
     // ---------- State Machine ----------
     private void runStateMachine(long nowMs) {
         switch (state) {
-            case WAIT_FOR_SHOOTER:
+            case WAIT_FOR_SHOOTER: {
                 boolean atTarget = flywheel != null && flywheel.isAtTarget();
                 long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
                 if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) startPath(1);
                 break;
+            }
 
-            case RUNNING_PATH:
+            case RUNNING_PATH: {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
                     int next = finished + 1;
-                    if (next > 6) {
-                        state = AutoState.FINISHED;
-                    } else if (endsAtShoot(finished)) {
-                        nextPathIndex = next;
+
+                    if (endsAtShoot(finished)) {
+                        nextPathIndex = (next <= 6) ? next : -1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
+                        poseWaitTimer.resetTimer();
+                        rpmStableTimer.resetTimer();
+                        if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM); // ensure full spin before volley
                         state = AutoState.PRE_ACTION;
-                    } else {
+                    } else if (next <= 6) {
                         startPath(next);
+                    } else {
+                        state = AutoState.FINISHED;
                     }
                 }
                 break;
+            }
 
-            case PRE_ACTION:
+            case PRE_ACTION: {
+                // Enter once per volley
                 if (!preActionEntered) {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
                 }
+
+                // Start the short settle timer once close enough OR after max wait
                 if (!preActionTimerStarted) {
                     double dist = distanceToShootPose();
                     if (dist <= START_POSE_TOLERANCE_IN || poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
@@ -366,23 +361,27 @@ public class FarBlue6 extends OpMode {
                         preActionTimerStarted = true;
                     }
                 } else {
+                    // Watchdog: never hang here
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
                     }
                 }
                 break;
+            }
 
-            case INTAKE_RUN:
+            case INTAKE_RUN: {
+                // Watchdog: proceed after timer
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
+                    if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM); // slight drop while feeding
                     if (clawServo != null) clawServo.setPosition(0.2);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }
                 break;
+            }
 
-            case CLAW_ACTION:
+            case CLAW_ACTION: {
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
                     if (clawServo != null) clawServo.setPosition(0.63);
                     if (nextPathIndex > 0 && nextPathIndex <= 6) {
@@ -393,6 +392,7 @@ public class FarBlue6 extends OpMode {
                     }
                 }
                 break;
+            }
 
             case FINISHED:
             case IDLE:
