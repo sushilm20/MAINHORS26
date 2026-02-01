@@ -114,7 +114,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.51;
+    public static double GATE_CLOSED = 0.45;
     @Sorter(sort = 32)
     public static double GATE_OPEN_TOLERANCE_IN = 3.0;
     @Sorter(sort = 33)
@@ -214,9 +214,9 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - MOVE FOR RP POSITION
     // ========================================
     @Sorter(sort = 180)
-    public static double MOVE_RP_X = 55.0;
+    public static double MOVE_RP_X = 36.0;
     @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 78.0;
+    public static double MOVE_RP_Y = 80.0;
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 135.0;
 

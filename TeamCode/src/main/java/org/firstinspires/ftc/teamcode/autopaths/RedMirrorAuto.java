@@ -128,7 +128,7 @@ public class RedMirrorAuto extends OpMode {
     public static double GATE_OPEN = 0.67;
 
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.51;
+    public static double GATE_CLOSED = 0.45;
 
     @Sorter(sort = 32)
     public static double GATE_OPEN_TOLERANCE_IN = 10.0;
@@ -158,10 +158,10 @@ public class RedMirrorAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 64.0;
+    public static double SHOOT_POSE_X = 65.0;
 
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 80.0;
+    public static double SHOOT_POSE_Y = 88.0;
 
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180.0;
@@ -262,12 +262,10 @@ public class RedMirrorAuto extends OpMode {
     // ========================================
     // PATH POSES - MOVE FOR RP POSITION
     // ========================================
-    @Sorter(sort = 180)
-    public static double MOVE_RP_X = 55.0;
-
+    @Sorter(sort=173)
+    static double MOVE_RP_X = 36.0;
     @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 78.0;
-
+    public static double MOVE_RP_Y = 80.0;
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 135.0;
 
@@ -275,11 +273,11 @@ public class RedMirrorAuto extends OpMode {
 
     /* Helpers to mirror poses/headings using the Pose.mirror() helper already available on Pose. */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror(140);
+        return new Pose(x, y).mirror(146);
     }
 
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(140);
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(146);
     }
 
     private static double mirrorHeading(double headingDeg) {
