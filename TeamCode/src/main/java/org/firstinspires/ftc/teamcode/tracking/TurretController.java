@@ -207,6 +207,26 @@ public class TurretController {
     }
 
     /**
+     * Force-exit homing/freeze and recenter heading + encoder reference.
+     * Useful for a “reset” button that should immediately resume tracking without homing.
+     */
+    public void recenterAndResume(boolean resetEncoder) {
+        homingMode = false;
+        freezeMode = false;
+
+        if (resetEncoder) {
+            try {
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            } catch (Exception ignored) {}
+        }
+
+        captureReferences();   // sets headingReferenceRad/lastHeadingRad and encoderOffset
+        resetPidState();       // clears PID integrator/derivative history
+        lastTimeMs = System.currentTimeMillis();
+    }
+
+    /**
      * Cleanly disable turret tracking and stop the motor.
      */
     public void disable() {

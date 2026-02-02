@@ -69,7 +69,7 @@ public class wildexperiment extends LinearOpMode {
     private static final double GATE_CLOSED = 0.467;//gate close code
     private static final long INTAKE_DURATION_MS = 1050;
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
-    private static final double INTAKE_SEQUENCE_POWER = 1.0;
+    private static final double INTKE_SEQUENCE_POWER = 1.0;
 
     // Claw constants
     private static final double CLAW_OPEN = 0.63;
@@ -189,7 +189,7 @@ public class wildexperiment extends LinearOpMode {
                 led1Red, led1Green, led2Red, led2Green,
                 GATE_OPEN, GATE_CLOSED,
                 INTAKE_DURATION_MS, CLAW_TRIGGER_BEFORE_END_MS,
-                INTAKE_SEQUENCE_POWER
+                INTKE_SEQUENCE_POWER
         );
 
         clawController = new ClawController(clawServo, CLAW_OPEN, CLAW_CLOSED, CLAW_CLOSE_MS);
@@ -214,7 +214,6 @@ public class wildexperiment extends LinearOpMode {
         turretController.resetPidState();
 
         waitForStart();
-
 
         if (isStopRequested()) {
             turretController.disable();
@@ -249,7 +248,7 @@ public class wildexperiment extends LinearOpMode {
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1) -> reset encoder + references
+            // A button reset (gamepad1) -> reset encoder + references (no homing/hold)
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
                 resetTurretEncoderAndReferences(imuParams);
@@ -407,16 +406,12 @@ public class wildexperiment extends LinearOpMode {
 
     /**
      * Reset turret encoder and capture references (used on gp1 A and gp2 touchpad).
+     * Also clears any homing/freeze state so tracking resumes immediately.
      */
     private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
-        try {
-            turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        } catch (Exception ignored) {}
         if (pinpoint != null) {
             try { pinpoint.update(); } catch (Exception ignored) {}
         }
-        turretController.captureReferences();
-        turretController.resetPidState();
+        turretController.recenterAndResume(true);
     }
 }
