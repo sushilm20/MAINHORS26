@@ -6,6 +6,7 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -23,7 +24,7 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
+@TeleOp(name="HORS Official ⭐", group="Linear OpMode")
 public class OfficialHORS extends LinearOpMode {
 
     // Drive + subsystems
@@ -32,6 +33,7 @@ public class OfficialHORS extends LinearOpMode {
     private Servo clawServo;
     private Servo leftHoodServo, rightHoodServo;
     private Servo gateServo;
+    private DigitalChannel turretLimitSwitch;
 
     private TurretController turretController;
     private DriveController driveController;
@@ -64,7 +66,7 @@ public class OfficialHORS extends LinearOpMode {
 
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
-    private static final double GATE_CLOSED = 0.50;//gate close code
+    private static final double GATE_CLOSED = 0.467;//gate close code
     private static final long INTAKE_DURATION_MS = 1050;
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
     private static final double INTAKE_SEQUENCE_POWER = 1.0;
@@ -109,6 +111,14 @@ public class OfficialHORS extends LinearOpMode {
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
+
+        // Optional: turret limit switch (active-low example)
+        try {
+            turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
+            turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
+        } catch (Exception e) {
+            turretLimitSwitch = null; // safe fallback if not configured
+        }
 
         // LEDs (per-channel)
         LED led1Red = getLedSafe("led_1_red");
@@ -165,6 +175,11 @@ public class OfficialHORS extends LinearOpMode {
 
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
+        // Hook the limit switch to homing reset (manual sweep only)
+        if (turretLimitSwitch != null) {
+            // Active-low REV mag/touch: getState() == false when pressed
+            turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
+        }
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor); // pass voltage sensor
         flywheel.setShooterOn(false);
@@ -311,18 +326,14 @@ public class OfficialHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret control (manual only; drive-to-position removed)
+            // Turret control: manual homing sweep + manual jog
+            // Press dpad_up to start the homing oscillation; it will reset when the mag switch is hit.
+            turretController.commandHomingSweep(gamepad1.dpad_up);
+
             boolean manualNow = false;
             double manualPower = 0.0;
 
-            // D-pad up can be used as a low-speed forward nudge if desired
-            boolean dpadUpNow = gamepad1.dpad_up;
-            if (dpadUpNow && !dpadUpLast) {
-                manualNow = true;
-                manualPower = 0.2;
-            }
-            dpadUpLast = dpadUpNow;
-
+            // Manual jog (bumper / stick). Removed dpad_up manual power so it can trigger homing instead.
             if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
                 manualNow = true; manualPower = 0.25;
             } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
