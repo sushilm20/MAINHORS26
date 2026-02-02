@@ -119,7 +119,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.51;
+    public static double GATE_CLOSED = 0.45;
     @Sorter(sort = 32)
     public static double GATE_OPEN_TOLERANCE_IN = 10.0;
     @Sorter(sort = 33)
@@ -217,9 +217,9 @@ public class RedPedroAuto extends OpMode {
     // PATH POSES - MOVE FOR RP POSITION
     // ========================================
     @Sorter(sort = 180)
-    public static double MOVE_RP_X = 94.0;
+    public static double MOVE_RP_X = 110.0;
     @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 75.0;
+    public static double MOVE_RP_Y = 80.0;
     @Sorter(sort = 182)
     public static double MOVE_RP_HEADING = 45.0;
 

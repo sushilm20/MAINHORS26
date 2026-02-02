@@ -58,7 +58,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2670;
+    private static final double AUTO_SHOOTER_RPM = 2650;
 
     private DcMotor intakeMotor;
     private Servo clawServo;

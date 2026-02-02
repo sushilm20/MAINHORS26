@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Far 9?? 🔴", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "Far 9?? 🔴 (Mirrored)", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
 @Configurable
 public class FarRed6 extends OpMode {
 
@@ -69,7 +69,7 @@ public class FarRed6 extends OpMode {
     private long autoStartMs = -1;
 
     // ============================
-    // Timing (same as Blue)
+    // Timing (kept from latest Blue fixes)
     // ============================
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
     @Sorter(sort = 1)  public static long   CLAW_CLOSE_MS = 190L;
@@ -78,14 +78,14 @@ public class FarRed6 extends OpMode {
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
     // ============================
-    // Intake power rules (same)
+    // Intake power rules
     // ============================
     @Sorter(sort = 10) public static double INTAKE_IDLE_POWER   = -0.50;
     @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.55; // slowed feed
     @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER= -1.00;
 
     // ============================
-    // Gate settings (same)
+    // Gate settings
     // ============================
     @Sorter(sort = 20) public static double GATE_OPEN = 0.67;
     @Sorter(sort = 21) public static double GATE_CLOSED = 0.50;
@@ -125,7 +125,6 @@ public class FarRed6 extends OpMode {
     // ===== Mirrored (Red) poses/headings computed from base =====
     private Pose START_POSE_R;
     private Pose SHOOT_POSE_R;
-    private Pose SHOOT_RETURN_POSE_R; // heading-only use
     private Pose COLLECT_CTRL_POSE_R;
     private Pose COLLECT_END_POSE_R;
     private Pose EXTEND_END_POSE_R;
@@ -138,38 +137,39 @@ public class FarRed6 extends OpMode {
 
     public FarRed6() {}
 
-    // Mirror helpers (Pose.mirror() flips field side)
+    /* Mirror helpers using the same pattern as your RedMirrorAuto sample (mirror across field width 146). */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror();
+        return new Pose(x, y).mirror(146);
     }
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror();
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(146);
     }
     private static double mirrorHeadingDeg(double headingDeg) {
-        return Math.toDegrees(mirrorPose(0, 0, headingDeg).getHeading());
+        return Math.toDegrees(new Pose(0, 0, Math.toRadians(headingDeg)).mirror(146).getHeading());
     }
 
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // Compute mirrored poses/headings from base Blue values
-        START_POSE_R          = mirrorPose(BASE_START_X, BASE_START_Y, BASE_START_HEADING_DEG);
-        SHOOT_POSE_R          = mirrorPose(BASE_SHOOT_X, BASE_SHOOT_Y, BASE_SHOOT_HEADING_DEG);
-        COLLECT_CTRL_POSE_R   = mirrorPose(BASE_COLLECT_CTRL_X, BASE_COLLECT_CTRL_Y);
-        COLLECT_END_POSE_R    = mirrorPose(BASE_COLLECT_END_X, BASE_COLLECT_END_Y, BASE_COLLECT_HEADING_DEG);
-        EXTEND_END_POSE_R     = mirrorPose(BASE_COLLECT_END_X, BASE_EXTEND_END_Y, BASE_COLLECT_HEADING_DEG);
-        BACK_COLLECT_POSE_R   = mirrorPose(BASE_BACK_COLLECT_X, BASE_BACK_COLLECT_Y, BASE_COLLECT_HEADING_DEG);
+        // Compute mirrored poses/headings from base (Blue) values
+        START_POSE_R        = mirrorPose(BASE_START_X, BASE_START_Y, BASE_START_HEADING_DEG);
+        SHOOT_POSE_R        = mirrorPose(BASE_SHOOT_X, BASE_SHOOT_Y, BASE_SHOOT_HEADING_DEG);
+        COLLECT_CTRL_POSE_R = mirrorPose(BASE_COLLECT_CTRL_X, BASE_COLLECT_CTRL_Y);
+        COLLECT_END_POSE_R  = mirrorPose(BASE_COLLECT_END_X, BASE_COLLECT_END_Y, BASE_COLLECT_HEADING_DEG);
+        EXTEND_END_POSE_R   = mirrorPose(BASE_COLLECT_END_X, BASE_EXTEND_END_Y, BASE_COLLECT_HEADING_DEG);
+        BACK_COLLECT_POSE_R = mirrorPose(BASE_BACK_COLLECT_X, BASE_BACK_COLLECT_Y, BASE_COLLECT_HEADING_DEG);
 
-        START_HEADING_R        = START_POSE_R.getHeading();
-        SHOOT_HEADING_R        = SHOOT_POSE_R.getHeading();
-        SHOOT_RETURN_HEADING_R = mirrorPose(0, 0, BASE_SHOOT_RETURN_HEADING_DEG).getHeading();
-        COLLECT_HEADING_R      = COLLECT_END_POSE_R.getHeading();
+        START_HEADING_R         = START_POSE_R.getHeading();
+        SHOOT_HEADING_R         = SHOOT_POSE_R.getHeading();
+        SHOOT_RETURN_HEADING_R  = mirrorPose(0, 0, BASE_SHOOT_RETURN_HEADING_DEG).getHeading();
+        COLLECT_HEADING_R       = COLLECT_END_POSE_R.getHeading();
 
         follower = Constants.createFollower(hardwareMap);
-        paths = new Paths(follower, START_POSE_R, SHOOT_POSE_R, COLLECT_CTRL_POSE_R, COLLECT_END_POSE_R,
-                EXTEND_END_POSE_R, BACK_COLLECT_POSE_R, START_HEADING_R, SHOOT_HEADING_R,
-                SHOOT_RETURN_HEADING_R, COLLECT_HEADING_R);
+        paths = new Paths(follower,
+                START_POSE_R, SHOOT_POSE_R, COLLECT_CTRL_POSE_R, COLLECT_END_POSE_R,
+                EXTEND_END_POSE_R, BACK_COLLECT_POSE_R,
+                START_HEADING_R, SHOOT_HEADING_R, SHOOT_RETURN_HEADING_R, COLLECT_HEADING_R);
 
         follower.setStartingPose(new Pose(START_POSE_R.getX(), START_POSE_R.getY(), START_HEADING_R));
 
@@ -529,7 +529,7 @@ public class FarRed6 extends OpMode {
         }
     }
 
-    // ---------- Paths ----------
+    // ---------- Paths (mirrored) ----------
     public static class Paths {
         public PathChain StartTOShoot3;
         public PathChain Collect3;
