@@ -24,6 +24,7 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDir
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.AdaptiveRPM;
+import org.firstinspires.ftc.teamcode.subsystems.BallisticsCalculator;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
@@ -43,16 +44,21 @@ import java.util.Locale;
 public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
     // ==================== VISION/STREAM CONFIGURATION ====================
-    @Sorter(sort = 0) public static double RANGE_SCALE = 1.0;       // Distance calibration multiplier
-    @Sorter(sort = 1) public static double RANGE_BIAS = 0.0;        // Distance calibration offset (inches)
-    @Sorter(sort = 2) public static int STREAM_FPS = 30;            // Camera stream FPS
-    @Sorter(sort = 3) public static int CAM_RES_WIDTH = 640;        // Camera resolution width
-    @Sorter(sort = 4) public static int CAM_RES_HEIGHT = 480;       // Camera resolution height
+    @Sorter(sort = 0) public static double RANGE_SCALE = 1.0;
+    @Sorter(sort = 1) public static double RANGE_BIAS = 0.0;
+    @Sorter(sort = 2) public static int STREAM_FPS = 30;
+    @Sorter(sort = 3) public static int CAM_RES_WIDTH = 640;
+    @Sorter(sort = 4) public static int CAM_RES_HEIGHT = 480;
 
     // ==================== ADAPTIVE MODE SETTINGS ====================
-    @Sorter(sort = 5) public static boolean ADAPTIVE_MODE_ENABLED = true;  // Enable/disable adaptive RPM
-    @Sorter(sort = 6) public static int TARGET_APRILTAG_ID = -1;           // Target tag (-1 = any)
-    @Sorter(sort = 7) public static boolean ADAPTIVE_HOOD_ENABLED = true;  // Enable/disable adaptive hood
+    @Sorter(sort = 5) public static boolean ADAPTIVE_MODE_ENABLED = true;
+    @Sorter(sort = 6) public static int TARGET_APRILTAG_ID = -1;
+    @Sorter(sort = 7) public static boolean ADAPTIVE_HOOD_ENABLED = true;
+    @Sorter(sort = 8) public static boolean TURRET_LEAD_ENABLED = true;
+
+    // ==================== GOAL POSITION (for bearing calculation) ====================
+    @Sorter(sort = 9) public static double GOAL_X = 72.0;
+    @Sorter(sort = 10) public static double GOAL_Y = 72.0;
 
     // ==================== HARDWARE ====================
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -83,12 +89,15 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     // ==================== POSE TRACKING ====================
     private Follower follower;
     private Pose currentPose = new Pose();
+    private Pose lastPose = new Pose();
+    private long lastPoseTimeMs = 0;
+    private double robotVx = 0, robotVy = 0;
 
     // ==================== IMUs ====================
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
 
-    // ==================== TOGGLE STATE TRACKING ====================
+    // ==================== TOGGLE STATE ====================
     private boolean dpadDownLast = false;
     private boolean dpadLeftLast = false;
     private boolean dpadRightLast = false;
@@ -100,14 +109,16 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private boolean aPressedLast = false;
     private boolean dpadUpLast = false;
     private boolean optionsPressedLast = false;
-    private boolean sharePressedLast = false;  // For toggling adaptive hood
+    private boolean sharePressedLast = false;
+    private boolean guidePressedLast = false;
 
     private boolean isFarMode = false;
     private boolean adaptiveModeActive = true;
     private boolean adaptiveHoodActive = true;
+    private boolean turretLeadActive = true;
 
-    // Manual hood offset (for fine-tuning on top of adaptive)
     private double manualHoodOffset = 0.0;
+    private double manualTurretLeadOffset = 0.0;
 
     // ==================== CONSTANTS ====================
     private static final double RIGHT_HOOD_CLOSE = 0.16;
@@ -129,34 +140,26 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
 
-    // Manual hood adjustment step for adaptive mode
     private static final double MANUAL_HOOD_OFFSET_STEP = 0.005;
 
     @Override
     public void runOpMode() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // Initialize all hardware
         initializeHardware();
-
-        // Initialize vision system
         initializeVision();
-
-        // Initialize controllers
         initializeControllers();
 
-        // Create AdaptiveRPM controller
         adaptiveRPM = new AdaptiveRPM();
         adaptiveModeActive = ADAPTIVE_MODE_ENABLED;
         adaptiveHoodActive = ADAPTIVE_HOOD_ENABLED;
+        turretLeadActive = TURRET_LEAD_ENABLED;
 
         telemetry.addData("Status", "Initialized");
-        telemetry.addData("Adaptive RPM", adaptiveModeActive ? "ENABLED" : "DISABLED");
-        telemetry.addData("Adaptive Hood", adaptiveHoodActive ? "ENABLED" : "DISABLED");
-        telemetry.addData("Regression", AdaptiveRPM.getRegressionInfo());
+        telemetry.addData("Mode", AdaptiveRPM.USE_PHYSICS_MODEL ? "PHYSICS" : "REGRESSION");
+        telemetry.addData("Calibration", AdaptiveRPM.getRegressionInfo());
         telemetry.update();
 
-        // Prepare subsystems
         turretController.captureReferences();
         turretController.resetPidState();
 
@@ -167,50 +170,49 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             return;
         }
 
-        // After start: capture current state
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
         imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
+        lastPoseTimeMs = System.currentTimeMillis();
 
-        // Main loop
         while (opModeIsActive()) {
             if (isStopRequested()) break;
 
             long nowMs = System.currentTimeMillis();
 
-            // Update pinpoint IMU
             if (pinpoint != null) {
                 try { pinpoint.update(); } catch (Exception ignored) {}
             }
 
-            // Update follower for pose
             if (follower != null) {
                 follower.update();
                 currentPose = follower.getPose();
+                calculateRobotVelocity(nowMs);
             }
 
-            // Process vision and get distance
+            double bearingToGoal = calculateBearingToGoal();
             double detectedDistance = processVisionAndGetDistance();
 
-            // Update adaptive RPM and hood if enabled
             if (adaptiveModeActive) {
+                if (turretLeadActive) {
+                    adaptiveRPM.setRobotVelocity(robotVx, robotVy, bearingToGoal);
+                } else {
+                    adaptiveRPM.setRobotVelocity(0, 0, 0);
+                }
+
                 double targetRpm = adaptiveRPM.update(detectedDistance, nowMs);
                 flywheel.setTargetRpm(targetRpm);
 
-                // Update hood position if adaptive hood is enabled
                 if (adaptiveHoodActive) {
                     double targetHood = adaptiveRPM.getTargetHoodPosition();
-                    // Apply manual offset (clamped to valid range)
                     targetHood = Math.max(HOOD_MIN, Math.min(HOOD_MAX, targetHood + manualHoodOffset));
                     rightHoodServo.setPosition(targetHood);
                 }
 
-                // Update far mode state for telemetry
                 isFarMode = targetRpm >= FlywheelController.RPM_SWITCH_THRESHOLD;
             }
 
-            // Handle input controls
             handleResetControls(nowMs, imuParams);
             handleModeToggles(nowMs);
             handleDriveControls();
@@ -218,44 +220,80 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             handleGateAndIntakeControls(nowMs);
             handleClawControls(nowMs);
             handleHoodControls(nowMs);
-            handleTurretControls();
+            handleTurretControls(nowMs);
 
-            // Rumble when at target
             if (flywheel.isAtTarget()) {
-                final int RUMBLE_MS = 200;
-                try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
-                try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
+                try { gamepad1.rumble(200); } catch (Throwable ignored) {}
+                try { gamepad2.rumble(200); } catch (Throwable ignored) {}
             }
 
-            // Update telemetry
-            updateTelemetry(detectedDistance);
+            updateTelemetry(detectedDistance, bearingToGoal);
         }
 
         cleanup();
     }
 
+    // ==================== VELOCITY & BEARING CALCULATIONS ====================
+
+    private void calculateRobotVelocity(long nowMs) {
+        if (currentPose == null || lastPose == null) {
+            robotVx = 0;
+            robotVy = 0;
+            return;
+        }
+
+        long dtMs = nowMs - lastPoseTimeMs;
+        if (dtMs <= 0) {
+            return;
+        }
+
+        double dt = dtMs / 1000.0;
+
+        double dx = currentPose.getX() - lastPose.getX();
+        double dy = currentPose.getY() - lastPose.getY();
+
+        robotVx = dx / dt;
+        robotVy = dy / dt;
+
+        lastPose = new Pose(currentPose.getX(), currentPose.getY(), currentPose.getHeading());
+        lastPoseTimeMs = nowMs;
+    }
+
+    private double calculateBearingToGoal() {
+        if (currentPose == null) {
+            return 0;
+        }
+
+        double dx = GOAL_X - currentPose.getX();
+        double dy = GOAL_Y - currentPose.getY();
+
+        double fieldBearing = Math.atan2(dy, dx);
+        double robotBearing = fieldBearing - currentPose.getHeading();
+
+        while (robotBearing > Math.PI) robotBearing -= 2 * Math.PI;
+        while (robotBearing < -Math.PI) robotBearing += 2 * Math.PI;
+
+        return Math.toDegrees(robotBearing);
+    }
+
     // ==================== INITIALIZATION ====================
 
     private void initializeHardware() {
-        // Drive motors
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
         backRightDrive = hardwareMap.get(DcMotor.class, "backRight");
 
-        // Shooter/turret/intake motors
         shooter = hardwareMap.get(DcMotor.class, "shooter");
         shooter2 = hardwareMap.get(DcMotor.class, "shooter2");
         turret = hardwareMap.get(DcMotor.class, "turret");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
 
-        // Servos
         clawServo = hardwareMap.get(Servo.class, "clawServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
-        // Turret limit switch
         try {
             turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
             turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
@@ -263,7 +301,6 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             turretLimitSwitch = null;
         }
 
-        // Motor directions
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -273,13 +310,11 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         turret.setDirection(DcMotor.Direction.FORWARD);
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
 
-        // Motor modes
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // IMU initialization
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
         imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
@@ -294,7 +329,6 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             try { imu.initialize(imuParams); } catch (Exception ignored) {}
         }
 
-        // Follower initialization
         try {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
@@ -321,9 +355,7 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
         try {
             portalBuilder.setCamera(hardwareMap.get(WebcamName.class, "webcam1"));
-            panelsTelemetry.debug("VISION", "Using webcam1");
         } catch (IllegalArgumentException e) {
-            panelsTelemetry.debug("VISION", "webcam1 not found, using phone camera");
             portalBuilder.setCamera(BuiltinCameraDirection.BACK);
         }
 
@@ -333,19 +365,16 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     }
 
     private void initializeControllers() {
-        // LEDs
         LED led1Red = getLedSafe("led_1_red");
         LED led1Green = getLedSafe("led_1_green");
         LED led2Red = getLedSafe("led_2_red");
         LED led2Green = getLedSafe("led_2_green");
 
-        // Voltage sensor
         VoltageSensor batterySensor = null;
         try {
             batterySensor = hardwareMap.voltageSensor.iterator().next();
         } catch (Exception ignored) {}
 
-        // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         if (turretLimitSwitch != null) {
             turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
@@ -374,11 +403,10 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
                 HOOD_DEBOUNCE_MS
         );
 
-        // Initial positions
         gateController.setGateClosed(true);
     }
 
-    // ==================== VISION PROCESSING ====================
+    // ==================== VISION ====================
 
     private double processVisionAndGetDistance() {
         if (aprilTagProcessor == null) {
@@ -390,15 +418,13 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         cameraStreamManager.updateAprilTagDetections(detections);
 
         if (detections.isEmpty()) {
-            String overlayText = String.format(Locale.US, "No Tag | %s | RPM: %.0f | Hood: %.3f",
-                    adaptiveModeActive ? "ADAPTIVE" : "MANUAL",
-                    flywheel.getTargetRPM(),
-                    adaptiveRPM.getLastOutputHood() + manualHoodOffset);
+            String mode = AdaptiveRPM.USE_PHYSICS_MODEL ? "PHY" : "REG";
+            String overlayText = String.format(Locale.US, "No Tag | %s | RPM:%.0f | Hood:%.3f",
+                    mode, flywheel.getTargetRPM(), adaptiveRPM.getLastOutputHood());
             cameraStreamManager.setOverlayText(overlayText);
             return -1.0;
         }
 
-        // Find the target tag or use first detection
         AprilTagDetection targetDetection = null;
         for (AprilTagDetection detection : detections) {
             if (TARGET_APRILTAG_ID == -1 || detection.id == TARGET_APRILTAG_ID) {
@@ -407,28 +433,19 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             }
         }
 
-        if (targetDetection == null) {
-            cameraStreamManager.setOverlayText("Target tag not found");
+        if (targetDetection == null || targetDetection.ftcPose == null) {
+            cameraStreamManager.setOverlayText("Target not found");
             return -1.0;
         }
 
-        if (targetDetection.ftcPose == null) {
-            cameraStreamManager.setOverlayText(String.format("Tag %d - No pose", targetDetection.id));
-            return -1.0;
-        }
-
-        // Get calibrated distance
         double rawDistance = targetDetection.ftcPose.range;
         double calibratedDistance = (rawDistance * RANGE_SCALE) + RANGE_BIAS;
 
-        // Build overlay text
+        String mode = AdaptiveRPM.USE_PHYSICS_MODEL ? "PHY" : "REG";
         String overlayText = String.format(Locale.US,
                 "ID:%d | Dist:%.1f\" | RPM:%.0f | Hood:%.3f | %s",
-                targetDetection.id,
-                calibratedDistance,
-                flywheel.getTargetRPM(),
-                adaptiveRPM.getLastOutputHood() + manualHoodOffset,
-                adaptiveModeActive ? "AUTO" : "MAN");
+                targetDetection.id, calibratedDistance,
+                flywheel.getTargetRPM(), adaptiveRPM.getLastOutputHood(), mode);
         cameraStreamManager.setOverlayText(overlayText);
 
         detectionTimer.reset();
@@ -438,39 +455,35 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     // ==================== CONTROL HANDLERS ====================
 
     private void handleResetControls(long nowMs, BNO055IMU.Parameters imuParams) {
-        // Gamepad2 touchpad reset
         boolean gp2Touch = getTouchpad(gamepad2);
         if (gp2Touch && !gamepad2TouchpadLast) {
             resetTurretEncoderAndReferences(imuParams);
             driveController.stop();
             adaptiveRPM.reset();
             manualHoodOffset = 0.0;
+            manualTurretLeadOffset = 0.0;
         }
         gamepad2TouchpadLast = gp2Touch;
 
-        // Gamepad1 A button reset
         boolean aNow = gamepad1.a;
         if (aNow && !aPressedLast) {
             resetTurretEncoderAndReferences(imuParams);
             driveController.stop();
             adaptiveRPM.reset();
             manualHoodOffset = 0.0;
+            manualTurretLeadOffset = 0.0;
         }
         aPressedLast = aNow;
     }
 
     private void handleModeToggles(long nowMs) {
-        // Toggle adaptive RPM mode with OPTIONS button
+        // Toggle adaptive RPM
         boolean optionsNow = gamepad1.options || gamepad2.options;
         if (optionsNow && !optionsPressedLast) {
             adaptiveModeActive = !adaptiveModeActive;
             if (!adaptiveModeActive) {
                 flywheel.setCloseMode();
                 isFarMode = false;
-                // Set hood to close position in manual mode
-                if (!adaptiveHoodActive) {
-                    rightHoodServo.setPosition(RIGHT_HOOD_CLOSE);
-                }
             } else {
                 adaptiveRPM.reset();
                 manualHoodOffset = 0.0;
@@ -478,18 +491,23 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         }
         optionsPressedLast = optionsNow;
 
-        // Toggle adaptive hood mode with SHARE button
+        // Toggle adaptive hood
         boolean shareNow = gamepad1.share || gamepad2.share;
         if (shareNow && !sharePressedLast) {
             adaptiveHoodActive = !adaptiveHoodActive;
-            if (!adaptiveHoodActive) {
-                // When disabling, keep current position
-                manualHoodOffset = 0.0;
-            }
         }
         sharePressedLast = shareNow;
 
-        // Manual far/close toggle on gamepad1 touchpad (only in manual mode)
+        // Toggle physics/regression mode
+        boolean guideNow = gamepad1.guide || gamepad2.guide;
+        if (guideNow && !guidePressedLast) {
+            AdaptiveRPM.USE_PHYSICS_MODEL = !AdaptiveRPM.USE_PHYSICS_MODEL;
+            BallisticsCalculator.USE_PHYSICS_MODEL = AdaptiveRPM.USE_PHYSICS_MODEL;
+            adaptiveRPM.reset();
+        }
+        guidePressedLast = guideNow;
+
+        // Manual far/close toggle
         boolean touchpadNow = getTouchpad(gamepad1);
         if (touchpadNow && !touchpadPressedLast) {
             if (!adaptiveModeActive) {
@@ -499,7 +517,6 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
                     rightHoodServo.setPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
                 }
             } else {
-                // In adaptive mode, touchpad disables adaptive
                 adaptiveModeActive = false;
                 flywheel.setCloseMode();
                 isFarMode = false;
@@ -516,14 +533,12 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     }
 
     private void handleFlywheelControls(long nowMs) {
-        // Toggle shooter on/off
         boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
         if (dpadDownNow && !dpadDownLast) {
             flywheel.toggleShooterOn();
         }
         dpadDownLast = dpadDownNow;
 
-        // Manual RPM adjustment (disables adaptive mode)
         boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
         if (dpadLeftNow && !dpadLeftLast) {
             if (adaptiveModeActive) {
@@ -542,34 +557,29 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         }
         dpadRightLast = dpadRightNow;
 
-        // Left trigger handling
         boolean calibPressed = gamepad1.back || gamepad2.back;
         flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
         flywheel.update(nowMs, calibPressed);
     }
 
     private void handleGateAndIntakeControls(long nowMs) {
-        // Gate toggle (B) - only when not in hood adjustment context
         boolean bNow = gamepad1.b || gamepad2.b;
         if (bNow && !bPressedLast && !gateController.isBusy()) {
             gateController.toggleGate();
         }
         bPressedLast = bNow;
 
-        // Intake sequence (Y)
         boolean yNow = gamepad1.y || gamepad2.y;
         if (yNow && !yPressedLast && !gateController.isBusy()) {
             gateController.startIntakeSequence(nowMs);
         }
         yPressedLast = yNow;
 
-        // Gate update + claw trigger
         boolean shouldTriggerClaw = gateController.update(nowMs);
         if (shouldTriggerClaw) {
             clawController.trigger(nowMs);
         }
 
-        // Manual intake (only if gate not busy)
         if (!gateController.isBusy()) {
             boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
             if (leftTriggerNow) {
@@ -592,22 +602,18 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     }
 
     private void handleHoodControls(long nowMs) {
-        // Left hood still uses manual nudge via HoodController
         if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
         if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-        // Right hood: in adaptive mode, adjust offset; in manual mode, direct control
         if (adaptiveHoodActive && adaptiveModeActive) {
-            // Adjust manual offset on top of adaptive value
             if (gamepad2.right_stick_y < -0.2) {
                 manualHoodOffset += MANUAL_HOOD_OFFSET_STEP;
-                manualHoodOffset = Math.min(manualHoodOffset, 0.1); // Cap offset
+                manualHoodOffset = Math.min(manualHoodOffset, 0.1);
             } else if (gamepad2.right_stick_y > 0.2) {
                 manualHoodOffset -= MANUAL_HOOD_OFFSET_STEP;
-                manualHoodOffset = Math.max(manualHoodOffset, -0.1); // Cap offset
+                manualHoodOffset = Math.max(manualHoodOffset, -0.1);
             }
         } else {
-            // Manual mode: use HoodController directly
             if (gamepad2.right_stick_y < -0.2) {
                 hoodController.nudgeRightUp(nowMs);
             } else if (gamepad2.right_stick_y > 0.2) {
@@ -616,7 +622,7 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         }
     }
 
-    private void handleTurretControls() {
+    private void handleTurretControls(long nowMs) {
         turretController.commandHomingSweep(gamepad1.dpad_up);
 
         boolean manualNow = false;
@@ -635,47 +641,46 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
     // ==================== TELEMETRY ====================
 
-    private void updateTelemetry(double detectedDistance) {
-        // Mode info
-        telemetry.addData("Mode", "%s RPM | %s Hood",
-                adaptiveModeActive ? "ADAPTIVE 🎯" : "MANUAL",
-                adaptiveHoodActive ? "ADAPTIVE" : "MANUAL");
+    private void updateTelemetry(double detectedDistance, double bearingToGoal) {
+        String modeStr = AdaptiveRPM.USE_PHYSICS_MODEL ? "PHYSICS" : "REGRESSION";
+        telemetry.addData("Model", modeStr);
+        telemetry.addData("Adaptive", "%s RPM | %s Hood | %s Lead",
+                adaptiveModeActive ? "ON" : "OFF",
+                adaptiveHoodActive ? "ON" : "OFF",
+                turretLeadActive ? "ON" : "OFF");
 
-        // Flywheel info
-        telemetry.addData("Flywheel", "Current: %.0f | Target: %.0f RPM",
+        telemetry.addData("Flywheel", "Cur:%.0f | Tgt:%.0f RPM",
                 flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-        telemetry.addData("PIDF Mode", flywheel.isUsingFarCoefficients() ? "FAR" : "CLOSE");
+        telemetry.addData("PIDF", flywheel.isUsingFarCoefficients() ? "FAR" : "CLOSE");
 
-        // Hood info
         double currentHood = adaptiveRPM.getLastOutputHood() + manualHoodOffset;
-        telemetry.addData("Hood", "Position: %.3f | Offset: %+.3f", currentHood, manualHoodOffset);
+        telemetry.addData("Hood", "Pos:%.3f | Offset:%+.3f", currentHood, manualHoodOffset);
 
-        // Adaptive info
         if (adaptiveModeActive) {
             telemetry.addData("Adaptive", adaptiveRPM.getStatusString());
             if (detectedDistance > 0) {
                 telemetry.addData("Distance", "%.1f inches", detectedDistance);
             }
+            if (turretLeadActive && adaptiveRPM.hasValidDetection()) {
+                telemetry.addData("Turret Lead", "%.1f°", adaptiveRPM.getTurretLeadAngleDeg());
+            }
         }
 
-        // Pose info
+        telemetry.addData("Velocity", "Vx:%.1f Vy:%.1f in/s", robotVx, robotVy);
+        telemetry.addData("Bearing", "%.1f°", bearingToGoal);
+
         telemetry.addData("Pose", currentPose != null
                 ? String.format("(%.1f, %.1f, %.1f°)",
                 currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
                 : "N/A");
 
-        // Controls reminder
         telemetry.addLine();
-        telemetry.addData("Controls", "OPTIONS: RPM Mode | SHARE: Hood Mode | DPAD: Manual RPM");
+        telemetry.addData("Controls", "OPT:Adaptive | SHARE:Hood | GUIDE:Physics");
 
-        // Panels telemetry
-        panelsTelemetry.debug("FLYWHEEL", String.format("RPM: %.0f/%.0f | Hood: %.3f",
+        panelsTelemetry.debug("FLYWHEEL", String.format("RPM:%.0f/%.0f | Hood:%.3f",
                 flywheel.getCurrentRPM(), flywheel.getTargetRPM(), currentHood));
         panelsTelemetry.debug("MODE", String.format("%s | %s",
-                adaptiveModeActive ? "AUTO-RPM" : "MANUAL-RPM",
-                adaptiveHoodActive ? "AUTO-HOOD" : "MANUAL-HOOD"));
-        panelsTelemetry.debug("DISTANCE", detectedDistance > 0 ?
-                String.format("%.1f in", detectedDistance) : "No tag");
+                adaptiveModeActive ? "AUTO" : "MANUAL", modeStr));
 
         telemetry.update();
         panelsTelemetry.update(telemetry);
