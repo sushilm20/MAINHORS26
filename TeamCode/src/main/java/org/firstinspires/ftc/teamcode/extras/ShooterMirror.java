@@ -14,5 +14,6 @@ public class ShooterMirror {
     public void update() {
         if (primary == null || secondary == null) return;
         secondary.setPower(primary.getPower());
+        //updated to set power
     }
 }
