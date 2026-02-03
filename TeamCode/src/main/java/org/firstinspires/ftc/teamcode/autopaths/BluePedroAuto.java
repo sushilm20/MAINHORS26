@@ -12,6 +12,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -369,7 +370,7 @@ public class BluePedroAuto extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
-            intakeMotor.setDirection(DcMotor.Direction.FORWARD);
+            intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake Motor mapping failed: " + e.getMessage());

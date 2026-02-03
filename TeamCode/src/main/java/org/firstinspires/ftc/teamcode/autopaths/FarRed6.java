@@ -239,7 +239,7 @@ public class FarRed6 extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
-            intakeMotor.setDirection(DcMotor.Direction.FORWARD);
+            intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake map failed: " + e.getMessage());
