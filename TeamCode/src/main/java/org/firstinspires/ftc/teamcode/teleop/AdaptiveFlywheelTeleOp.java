@@ -42,20 +42,19 @@ import java.util.Locale;
 @TeleOp(name = "HORS Adaptive Flywheel 🎯", group = "TeleOp")
 public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
-    // --- Vision/Stream configuration ---
+    // ==================== VISION/STREAM CONFIGURATION ====================
     @Sorter(sort = 0) public static double RANGE_SCALE = 1.0;       // Distance calibration multiplier
     @Sorter(sort = 1) public static double RANGE_BIAS = 0.0;        // Distance calibration offset (inches)
     @Sorter(sort = 2) public static int STREAM_FPS = 30;            // Camera stream FPS
     @Sorter(sort = 3) public static int CAM_RES_WIDTH = 640;        // Camera resolution width
     @Sorter(sort = 4) public static int CAM_RES_HEIGHT = 480;       // Camera resolution height
 
-    // --- Adaptive mode toggle ---
+    // ==================== ADAPTIVE MODE SETTINGS ====================
     @Sorter(sort = 5) public static boolean ADAPTIVE_MODE_ENABLED = true;  // Enable/disable adaptive RPM
+    @Sorter(sort = 6) public static int TARGET_APRILTAG_ID = -1;           // Target tag (-1 = any)
+    @Sorter(sort = 7) public static boolean ADAPTIVE_HOOD_ENABLED = true;  // Enable/disable adaptive hood
 
-    // --- Target AprilTag ID (set to -1 to use any detected tag) ---
-    @Sorter(sort = 6) public static int TARGET_APRILTAG_ID = -1;
-
-    // --- Hardware ---
+    // ==================== HARDWARE ====================
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, shooter2, turret, intakeMotor;
     private Servo clawServo;
@@ -63,7 +62,7 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private Servo gateServo;
     private DigitalChannel turretLimitSwitch;
 
-    // --- Controllers ---
+    // ==================== CONTROLLERS ====================
     private TurretController turretController;
     private DriveController driveController;
     private FlywheelController flywheel;
@@ -72,24 +71,24 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private HoodController hoodController;
     private AdaptiveRPM adaptiveRPM;
 
-    // --- Vision ---
+    // ==================== VISION ====================
     private VisionPortal visionPortal;
     private AprilTagProcessor aprilTagProcessor;
     private CameraStreamManager cameraStreamManager;
     private final ElapsedTime detectionTimer = new ElapsedTime();
 
-    // --- Telemetry ---
+    // ==================== TELEMETRY ====================
     private TelemetryManager panelsTelemetry;
 
-    // --- Pose tracking ---
+    // ==================== POSE TRACKING ====================
     private Follower follower;
     private Pose currentPose = new Pose();
 
-    // --- IMUs ---
+    // ==================== IMUs ====================
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
 
-    // --- Toggle state tracking ---
+    // ==================== TOGGLE STATE TRACKING ====================
     private boolean dpadDownLast = false;
     private boolean dpadLeftLast = false;
     private boolean dpadRightLast = false;
@@ -100,13 +99,17 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false;
     private boolean dpadUpLast = false;
-    private boolean optionsPressedLast = false;  // For toggling adaptive mode
+    private boolean optionsPressedLast = false;
+    private boolean sharePressedLast = false;  // For toggling adaptive hood
 
     private boolean isFarMode = false;
-    private boolean lastPidfMode = false;
-    private boolean adaptiveModeActive = true;  // Runtime toggle
+    private boolean adaptiveModeActive = true;
+    private boolean adaptiveHoodActive = true;
 
-    // --- Constants (same as wildexperiment) ---
+    // Manual hood offset (for fine-tuning on top of adaptive)
+    private double manualHoodOffset = 0.0;
+
+    // ==================== CONSTANTS ====================
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
@@ -126,6 +129,9 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
 
+    // Manual hood adjustment step for adaptive mode
+    private static final double MANUAL_HOOD_OFFSET_STEP = 0.005;
+
     @Override
     public void runOpMode() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -142,11 +148,12 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         // Create AdaptiveRPM controller
         adaptiveRPM = new AdaptiveRPM();
         adaptiveModeActive = ADAPTIVE_MODE_ENABLED;
+        adaptiveHoodActive = ADAPTIVE_HOOD_ENABLED;
 
         telemetry.addData("Status", "Initialized");
-        telemetry.addData("Adaptive Mode", adaptiveModeActive ? "ENABLED" : "DISABLED");
-        telemetry.addData("RPM Regression", String.format("%.2f * dist + %.1f",
-                AdaptiveRPM.getSlope(), AdaptiveRPM.getIntercept()));
+        telemetry.addData("Adaptive RPM", adaptiveModeActive ? "ENABLED" : "DISABLED");
+        telemetry.addData("Adaptive Hood", adaptiveHoodActive ? "ENABLED" : "DISABLED");
+        telemetry.addData("Regression", AdaptiveRPM.getRegressionInfo());
         telemetry.update();
 
         // Prepare subsystems
@@ -186,17 +193,21 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             // Process vision and get distance
             double detectedDistance = processVisionAndGetDistance();
 
-            // Update adaptive RPM if enabled
+            // Update adaptive RPM and hood if enabled
             if (adaptiveModeActive) {
                 double targetRpm = adaptiveRPM.update(detectedDistance, nowMs);
                 flywheel.setTargetRpm(targetRpm);
 
-                // Update far mode state based on RPM threshold
-                boolean shouldBeFarMode = targetRpm >= FlywheelController.RPM_SWITCH_THRESHOLD;
-                if (shouldBeFarMode != isFarMode) {
-                    isFarMode = shouldBeFarMode;
-                    // Hood will auto-adjust via PIDF mode change detection below
+                // Update hood position if adaptive hood is enabled
+                if (adaptiveHoodActive) {
+                    double targetHood = adaptiveRPM.getTargetHoodPosition();
+                    // Apply manual offset (clamped to valid range)
+                    targetHood = Math.max(HOOD_MIN, Math.min(HOOD_MAX, targetHood + manualHoodOffset));
+                    rightHoodServo.setPosition(targetHood);
                 }
+
+                // Update far mode state for telemetry
+                isFarMode = targetRpm >= FlywheelController.RPM_SWITCH_THRESHOLD;
             }
 
             // Handle input controls
@@ -208,13 +219,6 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             handleClawControls(nowMs);
             handleHoodControls(nowMs);
             handleTurretControls();
-
-            // Check PIDF mode change and update hood
-            boolean currentPidfMode = flywheel.isUsingFarCoefficients();
-            if (currentPidfMode != lastPidfMode) {
-                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
-                lastPidfMode = currentPidfMode;
-            }
 
             // Rumble when at target
             if (flywheel.isAtTarget()) {
@@ -376,10 +380,6 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
     // ==================== VISION PROCESSING ====================
 
-    /**
-     * Process AprilTag detections and return distance in inches.
-     * Returns -1 if no valid detection.
-     */
     private double processVisionAndGetDistance() {
         if (aprilTagProcessor == null) {
             cameraStreamManager.setOverlayText("Vision not ready");
@@ -387,14 +387,13 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         }
 
         List<AprilTagDetection> detections = aprilTagProcessor.getDetections();
-
-        // Update camera stream with detections for visual overlay
         cameraStreamManager.updateAprilTagDetections(detections);
 
         if (detections.isEmpty()) {
-            String overlayText = String.format(Locale.US, "No Tag | Mode: %s | RPM: %.0f",
+            String overlayText = String.format(Locale.US, "No Tag | %s | RPM: %.0f | Hood: %.3f",
                     adaptiveModeActive ? "ADAPTIVE" : "MANUAL",
-                    flywheel.getTargetRPM());
+                    flywheel.getTargetRPM(),
+                    adaptiveRPM.getLastOutputHood() + manualHoodOffset);
             cameraStreamManager.setOverlayText(overlayText);
             return -1.0;
         }
@@ -424,11 +423,12 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
         // Build overlay text
         String overlayText = String.format(Locale.US,
-                "ID:%d | Dist:%.1f in | RPM:%.0f | %s",
+                "ID:%d | Dist:%.1f\" | RPM:%.0f | Hood:%.3f | %s",
                 targetDetection.id,
                 calibratedDistance,
                 flywheel.getTargetRPM(),
-                adaptiveModeActive ? "ADAPTIVE" : "MANUAL");
+                adaptiveRPM.getLastOutputHood() + manualHoodOffset,
+                adaptiveModeActive ? "AUTO" : "MAN");
         cameraStreamManager.setOverlayText(overlayText);
 
         detectionTimer.reset();
@@ -444,6 +444,7 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             resetTurretEncoderAndReferences(imuParams);
             driveController.stop();
             adaptiveRPM.reset();
+            manualHoodOffset = 0.0;
         }
         gamepad2TouchpadLast = gp2Touch;
 
@@ -453,36 +454,52 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
             resetTurretEncoderAndReferences(imuParams);
             driveController.stop();
             adaptiveRPM.reset();
+            manualHoodOffset = 0.0;
         }
         aPressedLast = aNow;
     }
 
     private void handleModeToggles(long nowMs) {
-        // Toggle adaptive mode with OPTIONS/BACK button
+        // Toggle adaptive RPM mode with OPTIONS button
         boolean optionsNow = gamepad1.options || gamepad2.options;
         if (optionsNow && !optionsPressedLast) {
             adaptiveModeActive = !adaptiveModeActive;
             if (!adaptiveModeActive) {
-                // When switching to manual, set to close RPM
                 flywheel.setCloseMode();
                 isFarMode = false;
+                // Set hood to close position in manual mode
+                if (!adaptiveHoodActive) {
+                    rightHoodServo.setPosition(RIGHT_HOOD_CLOSE);
+                }
             } else {
-                // Reset adaptive controller when re-enabling
                 adaptiveRPM.reset();
+                manualHoodOffset = 0.0;
             }
         }
         optionsPressedLast = optionsNow;
+
+        // Toggle adaptive hood mode with SHARE button
+        boolean shareNow = gamepad1.share || gamepad2.share;
+        if (shareNow && !sharePressedLast) {
+            adaptiveHoodActive = !adaptiveHoodActive;
+            if (!adaptiveHoodActive) {
+                // When disabling, keep current position
+                manualHoodOffset = 0.0;
+            }
+        }
+        sharePressedLast = shareNow;
 
         // Manual far/close toggle on gamepad1 touchpad (only in manual mode)
         boolean touchpadNow = getTouchpad(gamepad1);
         if (touchpadNow && !touchpadPressedLast) {
             if (!adaptiveModeActive) {
-                // Manual mode: toggle far/close
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
-                hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                if (!adaptiveHoodActive) {
+                    rightHoodServo.setPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                }
             } else {
-                // Adaptive mode: touchpad toggles adaptive on/off
+                // In adaptive mode, touchpad disables adaptive
                 adaptiveModeActive = false;
                 flywheel.setCloseMode();
                 isFarMode = false;
@@ -506,11 +523,10 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
         }
         dpadDownLast = dpadDownNow;
 
-        // Manual RPM adjustment (only works in manual mode or as override)
+        // Manual RPM adjustment (disables adaptive mode)
         boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
         if (dpadLeftNow && !dpadLeftLast) {
             if (adaptiveModeActive) {
-                // In adaptive mode, dpad left/right temporarily disables adaptive
                 adaptiveModeActive = false;
             }
             flywheel.adjustTargetRPM(-50.0);
@@ -533,7 +549,7 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     }
 
     private void handleGateAndIntakeControls(long nowMs) {
-        // Gate toggle (B)
+        // Gate toggle (B) - only when not in hood adjustment context
         boolean bNow = gamepad1.b || gamepad2.b;
         if (bNow && !bPressedLast && !gateController.isBusy()) {
             gateController.toggleGate();
@@ -576,10 +592,28 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     }
 
     private void handleHoodControls(long nowMs) {
+        // Left hood still uses manual nudge via HoodController
         if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
         if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
-        if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
-        else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
+
+        // Right hood: in adaptive mode, adjust offset; in manual mode, direct control
+        if (adaptiveHoodActive && adaptiveModeActive) {
+            // Adjust manual offset on top of adaptive value
+            if (gamepad2.right_stick_y < -0.2) {
+                manualHoodOffset += MANUAL_HOOD_OFFSET_STEP;
+                manualHoodOffset = Math.min(manualHoodOffset, 0.1); // Cap offset
+            } else if (gamepad2.right_stick_y > 0.2) {
+                manualHoodOffset -= MANUAL_HOOD_OFFSET_STEP;
+                manualHoodOffset = Math.max(manualHoodOffset, -0.1); // Cap offset
+            }
+        } else {
+            // Manual mode: use HoodController directly
+            if (gamepad2.right_stick_y < -0.2) {
+                hoodController.nudgeRightUp(nowMs);
+            } else if (gamepad2.right_stick_y > 0.2) {
+                hoodController.nudgeRightDown(nowMs);
+            }
+        }
     }
 
     private void handleTurretControls() {
@@ -602,11 +636,19 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
     // ==================== TELEMETRY ====================
 
     private void updateTelemetry(double detectedDistance) {
+        // Mode info
+        telemetry.addData("Mode", "%s RPM | %s Hood",
+                adaptiveModeActive ? "ADAPTIVE 🎯" : "MANUAL",
+                adaptiveHoodActive ? "ADAPTIVE" : "MANUAL");
+
         // Flywheel info
-        telemetry.addData("Mode", adaptiveModeActive ? "ADAPTIVE 🎯" : "MANUAL");
         telemetry.addData("Flywheel", "Current: %.0f | Target: %.0f RPM",
                 flywheel.getCurrentRPM(), flywheel.getTargetRPM());
         telemetry.addData("PIDF Mode", flywheel.isUsingFarCoefficients() ? "FAR" : "CLOSE");
+
+        // Hood info
+        double currentHood = adaptiveRPM.getLastOutputHood() + manualHoodOffset;
+        telemetry.addData("Hood", "Position: %.3f | Offset: %+.3f", currentHood, manualHoodOffset);
 
         // Adaptive info
         if (adaptiveModeActive) {
@@ -624,11 +666,14 @@ public class AdaptiveFlywheelTeleOp extends LinearOpMode {
 
         // Controls reminder
         telemetry.addLine();
-        telemetry.addData("Controls", "OPTIONS: Toggle Adaptive | DPAD L/R: Manual RPM");
+        telemetry.addData("Controls", "OPTIONS: RPM Mode | SHARE: Hood Mode | DPAD: Manual RPM");
 
-        panelsTelemetry.debug("FLYWHEEL", String.format("RPM: %.0f/%.0f | %s",
-                flywheel.getCurrentRPM(), flywheel.getTargetRPM(),
-                adaptiveModeActive ? "ADAPTIVE" : "MANUAL"));
+        // Panels telemetry
+        panelsTelemetry.debug("FLYWHEEL", String.format("RPM: %.0f/%.0f | Hood: %.3f",
+                flywheel.getCurrentRPM(), flywheel.getTargetRPM(), currentHood));
+        panelsTelemetry.debug("MODE", String.format("%s | %s",
+                adaptiveModeActive ? "AUTO-RPM" : "MANUAL-RPM",
+                adaptiveHoodActive ? "AUTO-HOOD" : "MANUAL-HOOD"));
         panelsTelemetry.debug("DISTANCE", detectedDistance > 0 ?
                 String.format("%.1f in", detectedDistance) : "No tag");
 
