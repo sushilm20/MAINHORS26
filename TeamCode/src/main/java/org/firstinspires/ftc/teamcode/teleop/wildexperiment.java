@@ -56,6 +56,7 @@ public class wildexperiment extends LinearOpMode {
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false; // gamepad1 A reset latch
     private boolean dpadUpLast = false;
+    private boolean gamepad2RightBumperLast = false; // For RPM mode toggle on gamepad2
 
     private boolean isFarMode = false;
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
@@ -258,8 +259,8 @@ public class wildexperiment extends LinearOpMode {
             }
             aPressedLast = aNow;
 
-            // Far/close toggle on gamepad1 touchpad
-            boolean touchpadNow = getTouchpad(gamepad1);
+            // Far/close toggle on gamepad1 touchpad OR gamepad2 right bumper
+            boolean touchpadNow = getTouchpad(gamepad1) || gamepad2.right_bumper;
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
@@ -286,7 +287,7 @@ public class wildexperiment extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // Gate manual toggle (B)
+            // Gate manual toggle (B) - both gamepad1 and gamepad2
             boolean bNow = gamepad1.b || gamepad2.b;
             if (bNow && !bPressedLast && !gateController.isBusy()) {
                 gateController.toggleGate();
@@ -326,24 +327,24 @@ public class wildexperiment extends LinearOpMode {
             }
 
             // Turret control: manual homing sweep + manual jog
-            // Press dpad_up to start the homing oscillation; it will reset when the mag switch is hit.
-            turretController.commandHomingSweep(gamepad1.dpad_up);
+            // Press gamepad1.dpad_up OR gamepad2.left_bumper to start the homing oscillation
+            turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             boolean manualNow = false;
             double manualPower = 0.0;
 
-            // Manual jog (bumper / stick). Removed dpad_up manual power so it can trigger homing instead.
-            if (gamepad1.right_bumper || gamepad2.left_stick_x > 0.2) {
-                manualNow = true; manualPower = 0.25;
-            } else if (gamepad1.left_bumper || gamepad2.left_stick_x < -0.2) {
-                manualNow = true; manualPower = -0.25;
+            // Manual turret jog: gamepad1 bumpers OR gamepad2 right stick (increased power to 0.35)
+            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
+                manualNow = true; manualPower = 0.35;
+            } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
+                manualNow = true; manualPower = -0.35;
             }
 
             turretController.update(manualNow, manualPower);
 
-            // Intake manual (only if gate not busy)
+            // Intake manual (only if gate not busy) - added gamepad2.left_trigger for outtake
             if (!gateController.isBusy()) {
-                boolean leftTriggerNow = gamepad1.left_trigger > 0.1;
+                boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
                 if (leftTriggerNow) {
                     intakeMotor.setPower(-1.0);
                 } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
@@ -361,11 +362,9 @@ public class wildexperiment extends LinearOpMode {
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Hood adjustments
+            // Hood adjustments (gamepad1.a/b for left hood only, removed gamepad2 right stick)
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
-            if (gamepad2.right_stick_y < -0.2) hoodController.nudgeRightUp(nowMs);
-            else if (gamepad2.right_stick_y > 0.2) hoodController.nudgeRightDown(nowMs);
 
             // Telemetry: flywheel & gate with PIDF mode info
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
