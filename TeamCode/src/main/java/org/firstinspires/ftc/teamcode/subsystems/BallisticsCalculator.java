@@ -39,10 +39,10 @@ public class BallisticsCalculator {
     // ==================== FLYWHEEL CALIBRATION ====================
     // Linear fit: RPM = slope * launchSpeed + intercept
     // Derived from empirical measurements
-    @Sorter(sort = 8) public static double FLYWHEEL_SPEED_SLOPE = 28.5;      // RPM per inch/s of launch speed
+    @Sorter(sort = 8) public static double FLYWHEEL_SPEED_SLOPE = 29.0;      // RPM per inch/s of launch speed
     @Sorter(sort = 9) public static double FLYWHEEL_SPEED_INTERCEPT = 800.0; // Base RPM offset
-    @Sorter(sort = 10) public static double FLYWHEEL_RPM_MIN = 2400.0;       // Minimum flywheel RPM
-    @Sorter(sort = 11) public static double FLYWHEEL_RPM_MAX = 4000.0;       // Maximum flywheel RPM
+    @Sorter(sort = 10) public static double FLYWHEEL_RPM_MIN = 2500.0;       // Minimum flywheel RPM
+    @Sorter(sort = 11) public static double FLYWHEEL_RPM_MAX = 3500.0;       // Maximum flywheel RPM
 
     // ==================== DISTANCE CALIBRATION ====================
     // For when using simple distance-based regression as fallback

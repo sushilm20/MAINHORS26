@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /**
  * AdaptiveRPM - Adaptive flywheel and hood control using ballistics or simple regression.
@@ -61,6 +62,11 @@ public class AdaptiveRPM {
     private long lastValidDetectionTimeMs = 0;
     private boolean hasValidDetection = false;
 
+    // For telemetry - track raw calculated values before smoothing
+    private double lastRawRpm = RPM_FALLBACK;
+    private double lastRawHood = HOOD_FALLBACK;
+    private double lastRawDistance = -1.0;
+
     // Last ballistic solution (for telemetry)
     private BallisticsCalculator.BallisticSolution lastSolution = null;
 
@@ -111,6 +117,8 @@ public class AdaptiveRPM {
      * @return Target RPM
      */
     public double update(double distanceInches, long currentTimeMs) {
+        lastRawDistance = distanceInches;
+
         boolean isValidReading = distanceInches >= DIST_MIN_VALID &&
                 distanceInches <= DIST_MAX_VALID;
 
@@ -157,6 +165,10 @@ public class AdaptiveRPM {
             rawRpm = Math.max(RPM_MIN, Math.min(RPM_MAX, rawRpm));
             rawHood = Math.max(HOOD_MIN, Math.min(HOOD_MAX, rawHood));
 
+            // Store raw values for telemetry
+            lastRawRpm = rawRpm;
+            lastRawHood = rawHood;
+
             // Smooth outputs
             smoothedRpm = (RPM_SMOOTHING_ALPHA * rawRpm) +
                     ((1.0 - RPM_SMOOTHING_ALPHA) * smoothedRpm);
@@ -193,6 +205,128 @@ public class AdaptiveRPM {
             return update(-1.0, currentTimeMs);
         }
         return update(distanceInches, currentTimeMs);
+    }
+
+    // ==================== TELEMETRY ====================
+
+    /**
+     * Display comprehensive telemetry about the adaptive RPM system.
+     * Call this in your OpMode's loop after calling update().
+     */
+    public void displayTelemetry(Telemetry telemetry) {
+        telemetry.addLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        telemetry.addLine("📊 ADAPTIVE RPM TELEMETRY");
+        telemetry.addLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        // Mode
+        telemetry.addLine();
+        telemetry.addData("🎯 Mode", USE_PHYSICS_MODEL ? "PHYSICS MODEL" : "REGRESSION");
+        telemetry.addData("✓ Valid Detection", hasValidDetection ? "YES" : "NO");
+
+        // Distance Section
+        telemetry.addLine();
+        telemetry.addLine("📏 DISTANCE:");
+        telemetry.addData("  Raw Input", formatDistance(lastRawDistance));
+        telemetry.addData("  Smoothed", formatDistance(smoothedDistance));
+        telemetry.addData("  Last Valid", formatDistance(lastValidDistance));
+
+        // RPM Section
+        telemetry.addLine();
+        telemetry.addLine("⚙️ RPM:");
+        telemetry.addData("  Calculated (Raw)", formatRpm(lastRawRpm));
+        telemetry.addData("  Smoothed", formatRpm(smoothedRpm));
+        telemetry.addData("  Output (w/Hysteresis)", formatRpm(lastOutputRpm));
+        telemetry.addData("  Delta to Output", String.format("%.1f", smoothedRpm - lastOutputRpm));
+
+        // Hood Section
+        telemetry.addLine();
+        telemetry.addLine("🎪 HOOD:");
+        telemetry.addData("  Calculated (Raw)", formatHood(lastRawHood));
+        telemetry.addData("  Smoothed", formatHood(smoothedHood));
+        telemetry.addData("  Output (w/Hysteresis)", formatHood(lastOutputHood));
+        telemetry.addData("  Delta to Output", String.format("%.4f", smoothedHood - lastOutputHood));
+
+        // Turret Lead (if applicable)
+        if (Math.abs(lastTurretLead) > 0.01) {
+            telemetry.addLine();
+            telemetry.addData("🎯 Turret Lead", String.format("%.2f°", lastTurretLead));
+        }
+
+        // Calibration Info
+        telemetry.addLine();
+        telemetry.addLine("📐 CALIBRATION:");
+        telemetry.addData("  RPM Slope", String.format("%.3f RPM/inch", getRpmSlope()));
+        telemetry.addData("  RPM Intercept", String.format("%.1f RPM", RPM_CLOSE - getRpmSlope() * DIST_CLOSE_INCHES));
+        telemetry.addData("  Hood Slope", String.format("%.5f/inch", getHoodSlope()));
+        telemetry.addData("  Hood Intercept", String.format("%.4f", HOOD_CLOSE - getHoodSlope() * DIST_CLOSE_INCHES));
+
+        // Smoothing & Hysteresis
+        telemetry.addLine();
+        telemetry.addLine("🔧 FILTERS:");
+        telemetry.addData("  RPM Smoothing α", RPM_SMOOTHING_ALPHA);
+        telemetry.addData("  RPM Hysteresis", String.format("%.0f RPM", RPM_HYSTERESIS));
+        telemetry.addData("  Hood Smoothing α", HOOD_SMOOTHING_ALPHA);
+        telemetry.addData("  Hood Hysteresis", String.format("%.3f", HOOD_HYSTERESIS));
+
+        // Physics Model Info (if enabled)
+        if (USE_PHYSICS_MODEL && lastSolution != null) {
+            telemetry.addLine();
+            telemetry.addLine("🚀 PHYSICS SOLUTION:");
+            telemetry.addData("  Valid", lastSolution.valid ? "YES" : "NO");
+            telemetry.addData("  Launch Angle", String.format("%.2f°", lastSolution.launchAngleDeg));
+
+        }
+
+        // Quick Reference at Bottom
+        telemetry.addLine();
+        telemetry.addLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        telemetry.addData("📌 Status", getStatusString());
+        telemetry.addLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    }
+
+    /**
+     * Compact telemetry for competition (minimal lines).
+     */
+    public void displayCompactTelemetry(Telemetry telemetry) {
+        telemetry.addLine("═══ ADAPTIVE RPM ═══");
+        telemetry.addData("Mode", USE_PHYSICS_MODEL ? "Physics" : "Regression");
+        telemetry.addData("Detection", hasValidDetection ? "✓" : "✗");
+        telemetry.addData("Distance", String.format("%.1f\" (smoothed: %.1f\")", lastRawDistance, smoothedDistance));
+        telemetry.addData("RPM", String.format("%.0f → %.0f → %.0f", lastRawRpm, smoothedRpm, lastOutputRpm));
+        telemetry.addData("Hood", String.format("%.3f → %.3f → %.3f", lastRawHood, smoothedHood, lastOutputHood));
+        if (Math.abs(lastTurretLead) > 0.01) {
+            telemetry.addData("Turret Lead", String.format("%.2f°", lastTurretLead));
+        }
+        telemetry.addData("RPM Slope", String.format("%.3f/in", getRpmSlope()));
+    }
+
+    /**
+     * Debug telemetry - shows everything including internal state.
+     */
+    public void displayDebugTelemetry(Telemetry telemetry) {
+        displayTelemetry(telemetry);
+
+        telemetry.addLine();
+        telemetry.addLine("🔍 DEBUG INFO:");
+        telemetry.addData("  Robot Vx", String.format("%.2f in/s", robotVx));
+        telemetry.addData("  Robot Vy", String.format("%.2f in/s", robotVy));
+        telemetry.addData("  Target Bearing", String.format("%.2f°", targetBearing));
+        telemetry.addData("  Last Detection Time", lastValidDetectionTimeMs);
+        telemetry.addData("  Dist Smoothing α", DISTANCE_SMOOTHING_ALPHA);
+    }
+
+    // Helper formatting methods
+    private String formatDistance(double dist) {
+        if (dist < 0) return "N/A";
+        return String.format("%.1f\"", dist);
+    }
+
+    private String formatRpm(double rpm) {
+        return String.format("%.0f RPM", rpm);
+    }
+
+    private String formatHood(double hood) {
+        return String.format("%.4f", hood);
     }
 
     // ==================== GETTERS ====================
@@ -237,6 +371,18 @@ public class AdaptiveRPM {
         return lastSolution;
     }
 
+    public double getLastRawRpm() {
+        return lastRawRpm;
+    }
+
+    public double getLastRawHood() {
+        return lastRawHood;
+    }
+
+    public double getLastRawDistance() {
+        return lastRawDistance;
+    }
+
     public void reset() {
         lastValidDistance = -1.0;
         smoothedDistance = -1.0;
@@ -250,6 +396,9 @@ public class AdaptiveRPM {
         lastSolution = null;
         robotVx = 0;
         robotVy = 0;
+        lastRawRpm = RPM_FALLBACK;
+        lastRawHood = HOOD_FALLBACK;
+        lastRawDistance = -1.0;
     }
 
     public void forceSet(double rpm, double hood) {
@@ -257,6 +406,8 @@ public class AdaptiveRPM {
         lastOutputRpm = rpm;
         smoothedHood = hood;
         lastOutputHood = hood;
+        lastRawRpm = rpm;
+        lastRawHood = hood;
     }
 
     public String getStatusString() {
