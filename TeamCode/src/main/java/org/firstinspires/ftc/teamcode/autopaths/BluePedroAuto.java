@@ -365,7 +365,7 @@ public class BluePedroAuto extends OpMode {
                 flywheel.setShooterOn(false);
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
+            panelsTelemetry.debug("Init", " Flywheel/TurretController creation error: " + e.getMessage());
         }
 
         try {
