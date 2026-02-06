@@ -2,13 +2,15 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.pedropathing.geometry.Pose;
 
+import org.firstinspires.ftc.teamcode.tracking.CalibrationPoints;
+
 /**
  * Computes target hood position from robot pose relative to a goal.
  * Supports BLUE and RED alliance - auto-mirrors poses for red!
  */
 public class HoodVersatile {
 
-    private static final double MIRROR_AXIS = 146.0;
+    private static final double MIRROR_AXIS = CalibrationPoints.MIRROR_AXIS;
 
     private final HoodController hoodController;
     private final Pose blueGoalPose;

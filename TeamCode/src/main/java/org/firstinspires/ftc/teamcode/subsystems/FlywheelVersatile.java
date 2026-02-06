@@ -1,6 +1,9 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.pedropathing.geometry.Pose;
+
+import org.firstinspires.ftc.teamcode.tracking.CalibrationPoints;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -8,29 +11,37 @@ import java.util.List;
 
 /**
  * Computes target RPM from robot pose relative to a goal using piecewise linear interpolation.
- * Supports both BLUE and RED alliance - just call setRedAlliance(true) and it auto-mirrors!
+ * Supports both BLUE and RED alliance with automatic pose mirroring.
  */
 public class FlywheelVersatile {
 
+    /**
+     * Calibration point: pose + rpm
+     */
     public static class CalibrationPoint {
         public final Pose pose;
         public final double rpm;
+
         public CalibrationPoint(Pose pose, double rpm) {
             this.pose = pose;
             this.rpm = rpm;
         }
     }
 
+    /**
+     * Internal class for sorted distance-based points
+     */
     private static class DistancePoint {
         final double distance;
         final double rpm;
+
         DistancePoint(double distance, double rpm) {
             this.distance = distance;
             this.rpm = rpm;
         }
     }
 
-    private static final double MIRROR_AXIS = 146.0;  // Your mirror axis
+    private static final double MIRROR_AXIS = CalibrationPoints.MIRROR_AXIS;
 
     private final FlywheelController flywheel;
     private final Pose blueGoalPose;
@@ -40,12 +51,14 @@ public class FlywheelVersatile {
     private double flatRadius = 0.0;
 
     private boolean isRedAlliance = false;
-    private Pose effectiveGoalPose;  // Cached goal pose for current alliance
 
     private double trimRpm = 0.0;
     private double lastBaseRpm = 0.0;
     private double lastDistance = 0.0;
 
+    /**
+     * Constructor using CalibrationPoint list
+     */
     public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
                              List<CalibrationPoint> calibration,
@@ -54,6 +67,9 @@ public class FlywheelVersatile {
         this(flywheel, goalPose, calibration, minRpm, maxRpm, 0.0);
     }
 
+    /**
+     * Constructor using CalibrationPoint list with flat radius
+     */
     public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
                              List<CalibrationPoint> calibration,
@@ -62,7 +78,6 @@ public class FlywheelVersatile {
                              double flatRadius) {
         this.flywheel = flywheel;
         this.blueGoalPose = goalPose;
-        this.effectiveGoalPose = goalPose;  // Default to blue
         this.minRpm = minRpm;
         this.maxRpm = maxRpm;
         this.flatRadius = Math.max(0.0, flatRadius);
@@ -78,17 +93,50 @@ public class FlywheelVersatile {
     }
 
     /**
+     * Constructor using raw calibration data array
+     */
+    public FlywheelVersatile(FlywheelController flywheel,
+                             Pose goalPose,
+                             double[][] calibrationData,
+                             double minRpm,
+                             double maxRpm) {
+        this(flywheel, goalPose, calibrationData, minRpm, maxRpm, 0.0);
+    }
+
+    /**
+     * Constructor using raw calibration data array with flat radius
+     */
+    public FlywheelVersatile(FlywheelController flywheel,
+                             Pose goalPose,
+                             double[][] calibrationData,
+                             double minRpm,
+                             double maxRpm,
+                             double flatRadius) {
+        this.flywheel = flywheel;
+        this.blueGoalPose = goalPose;
+        this.minRpm = minRpm;
+        this.maxRpm = maxRpm;
+        this.flatRadius = Math.max(0.0, flatRadius);
+        this.lastBaseRpm = clamp((minRpm + maxRpm) / 2.0);
+
+        // Convert raw data to distance points and sort
+        this.sortedPoints = new ArrayList<>();
+        for (double[] point : calibrationData) {
+            if (point.length >= 4) {
+                Pose pose = new Pose(point[0], point[1], Math.toRadians(point[2]));
+                double dist = distanceToGoalBlue(pose);
+                sortedPoints.add(new DistancePoint(dist, point[3]));
+            }
+        }
+        Collections.sort(sortedPoints, Comparator.comparingDouble(a -> a.distance));
+    }
+
+    /**
      * Set whether this is red alliance.
      * When true, robot poses are auto-mirrored before distance calculation.
      */
     public void setRedAlliance(boolean isRed) {
         this.isRedAlliance = isRed;
-        // Cache the effective goal pose
-        if (isRed) {
-            this.effectiveGoalPose = blueGoalPose.mirror(MIRROR_AXIS);
-        } else {
-            this.effectiveGoalPose = blueGoalPose;
-        }
     }
 
     public boolean isRedAlliance() {
@@ -97,10 +145,6 @@ public class FlywheelVersatile {
 
     public void setFlatRadius(double flatRadius) {
         this.flatRadius = Math.max(0.0, flatRadius);
-    }
-
-    public Pose getEffectiveGoalPose() {
-        return effectiveGoalPose;
     }
 
     /**
