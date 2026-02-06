@@ -8,11 +8,7 @@ import com. qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm. robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external. Telemetry;
 
-/**
- * PIDF flywheel controller (dual-motor capable) with backward-compatible shims for existing callers.
- * Supports configurable close/far RPM targets (2650/4500) that propagate across the codebase.
- * Uses dual PIDF coefficients:  one set for below RPM_SWITCH_THRESHOLD, one set for above.
- */
+
 @Configurable
 public class FlywheelController {
 

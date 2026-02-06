@@ -22,6 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
+import org.firstinspires.ftc.teamcode.subsystems.HoodVersatile;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @TeleOp(name="HORS EXPERIMENTAL 🤖", group="Linear OpMode")
@@ -41,6 +42,7 @@ public class wildexperiment extends LinearOpMode {
     private GateController gateController;
     private ClawController clawController;
     private HoodController hoodController;
+    private HoodVersatile hoodVersatile;
 
     // Telemetry
     private TelemetryManager panelsTelemetry;
@@ -57,11 +59,19 @@ public class wildexperiment extends LinearOpMode {
     private boolean aPressedLast = false; // gamepad1 A reset latch
     private boolean dpadUpLast = false;
     private boolean gamepad2RightBumperLast = false; // For RPM mode toggle on gamepad2
+    private boolean gamepad2DpadUpLast = false;      // For hood trim up
+    private boolean gamepad2DpadDownLast = false;    // For hood trim down
 
     private boolean isFarMode = false;
-    private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
 
-    // Hood presets
+    // Goal pose for hood/flywheel calculations (adjust to your actual goal position)
+    private static final Pose BLUE_GOAL = new Pose(0, 144, 0);
+
+    // Hood calibration poses for distance-based adjustment
+    private static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);  // Hood at minimum here
+    private static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);      // Hood at maximum here
+
+    // Hood presets (kept for manual override if needed)
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
@@ -83,6 +93,7 @@ public class wildexperiment extends LinearOpMode {
     private static final double HOOD_LEFT_STEP = 0.025;
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
+    private static final double HOOD_TRIM_STEP = 0.005; // Trim adjustment step
 
     // IMUs
     private BNO055IMU imu;
@@ -91,6 +102,9 @@ public class wildexperiment extends LinearOpMode {
     //Pose tracking
     private Follower follower;
     private Pose currentPose = new Pose();  // Robot pose, updated each loop
+
+    // Auto hood mode toggle
+    private boolean autoHoodEnabled = true;
 
     @Override
     public void runOpMode() {
@@ -202,11 +216,22 @@ public class wildexperiment extends LinearOpMode {
                 HOOD_DEBOUNCE_MS
         );
 
+        // Create pose-based hood controller (HoodVersatile)
+        hoodVersatile = new HoodVersatile(
+                hoodController,
+                BLUE_GOAL,
+                HOOD_CLOSE_POSE,   // At pose (20, 122) -> hood at HOOD_MIN
+                HOOD_FAR_POSE,     // At pose (72, 12) -> hood at HOOD_MAX
+                HOOD_MIN,          // 0.12
+                HOOD_MAX           // 0.45
+        );
+
         // Initial positions
         gateController.setGateClosed(true); // gate closed at init
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
         telemetry.addData("\nTurret IMU", imuUsed);
+        telemetry.addData("Auto Hood", "ENABLED (pose-based)");
 
         telemetry.update();
 
@@ -260,11 +285,16 @@ public class wildexperiment extends LinearOpMode {
             aPressedLast = aNow;
 
             // Far/close toggle on gamepad1 touchpad OR gamepad2 right bumper
+            // This now toggles auto hood mode on/off
             boolean touchpadNow = getTouchpad(gamepad1) || gamepad2.right_bumper;
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
-                hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                // Toggle auto hood - when toggled off, use manual preset
+                autoHoodEnabled = !autoHoodEnabled;
+                if (!autoHoodEnabled) {
+                    hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                }
             }
             touchpadPressedLast = touchpadNow;
 
@@ -312,11 +342,18 @@ public class wildexperiment extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Check if PIDF mode changed and update hood accordingly
-            boolean currentPidfMode = flywheel.isUsingFarCoefficients();
-            if (currentPidfMode != lastPidfMode) {
-                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
-                lastPidfMode = currentPidfMode;
+            // Update hood position based on robot pose (automatic distance-based adjustment)
+            if (autoHoodEnabled && follower != null && currentPose != null) {
+                hoodVersatile.update(currentPose);
+            }
+
+            // Hood trim adjustment (gamepad2 left stick Y when auto hood is enabled)
+            if (autoHoodEnabled) {
+                if (gamepad2.left_stick_y < -0.5) {
+                    hoodVersatile.adjustTrim(HOOD_TRIM_STEP);
+                } else if (gamepad2.left_stick_y > 0.5) {
+                    hoodVersatile.adjustTrim(-HOOD_TRIM_STEP);
+                }
             }
 
             // Rumble when at target
@@ -362,14 +399,24 @@ public class wildexperiment extends LinearOpMode {
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Hood adjustments (gamepad1.a/b for left hood only, removed gamepad2 right stick)
+            // Hood manual adjustments for LEFT hood only (gamepad1.a/b)
+            // These work regardless of auto hood mode
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // Telemetry: flywheel & gate with PIDF mode info
+            // Telemetry: flywheel, hood & gate info
             telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            //telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+
+            // Hood telemetry
+            if (autoHoodEnabled) {
+                telemetry.addData("Hood (AUTO)", "Pos: %.3f | Dist: %.1f | Trim: %.3f",
+                        hoodVersatile.getLastTargetPos(),
+                        hoodVersatile.getLastDistance(),
+                        hoodVersatile.getTrimPos());
+            } else {
+                telemetry.addData("Hood (MANUAL)", "Pos: %.3f", hoodController.getRightPos());
+            }
 
             telemetry.addData("Pose", currentPose != null
                     ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
