@@ -20,12 +20,18 @@ import com.bylazar.telemetry.TelemetryManager;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
+import org.firstinspires.ftc.teamcode.subsystems.HoodVersatile;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
-public class OfficialHORS extends LinearOpMode {
+import java.util.Arrays;
+import java.util.List;
+
+@TeleOp(name="HORS experiment BLUE 🔵", group="Linear OpMode")
+public class wildexperimentBlue extends LinearOpMode {
 
     // Drive + subsystems
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -38,9 +44,11 @@ public class OfficialHORS extends LinearOpMode {
     private TurretController turretController;
     private DriveController driveController;
     private FlywheelController flywheel;
+    private FlywheelVersatile flywheelVersatile;
     private GateController gateController;
     private ClawController clawController;
     private HoodController hoodController;
+    private HoodVersatile hoodVersatile;
 
     // Telemetry
     private TelemetryManager panelsTelemetry;
@@ -54,27 +62,40 @@ public class OfficialHORS extends LinearOpMode {
     private boolean yPressedLast = false;
     private boolean touchpadPressedLast = false;
     private boolean gamepad2TouchpadLast = false;
-    private boolean aPressedLast = false; // gamepad1 A reset latch
+    private boolean aPressedLast = false;
     private boolean dpadUpLast = false;
-    private boolean gamepad2RightBumperLast = false; // For RPM mode toggle on gamepad2
 
     private boolean isFarMode = false;
-    private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
+    private boolean autoHoodEnabled = true;
+    private boolean autoFlywheelEnabled = true;
 
-    // Hood presets
+    // ========== BLUE ALLIANCE SETTINGS ==========
+    private static final boolean IS_RED_ALLIANCE = false;
+
+    // BLUE start pose
+    private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(130));
+
+    // BLUE goal pose
+    private static final Pose BLUE_GOAL = new Pose(0, 144, 0);
+
+    // Hood calibration poses (BLUE)
+    private static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);
+    private static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);
+
+    // Hood presets (for manual mode)
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.24;
 
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
-    private static final double GATE_CLOSED = 0.467;//gate close code
+    private static final double GATE_CLOSED = 0.467;
     private static final long INTAKE_DURATION_MS = 1050;
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
     private static final double INTKE_SEQUENCE_POWER = 1.0;
 
     // Claw constants
     private static final double CLAW_OPEN = 0.63;
-    private static final double CLAW_CLOSED = 0.2;//like that
+    private static final double CLAW_CLOSED = 0.2;
     private static final long CLAW_CLOSE_MS = 500L;
 
     // Hood constants
@@ -83,14 +104,15 @@ public class OfficialHORS extends LinearOpMode {
     private static final double HOOD_LEFT_STEP = 0.025;
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
+    private static final double HOOD_TRIM_STEP = 0.005;
 
     // IMUs
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
 
-    //Pose tracking
+    // Pose tracking
     private Follower follower;
-    private Pose currentPose = new Pose();  // Robot pose, updated each loop
+    private Pose currentPose = new Pose();
 
     @Override
     public void runOpMode() {
@@ -113,21 +135,21 @@ public class OfficialHORS extends LinearOpMode {
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
-        // Optional: turret limit switch (active-low example)
+        // Optional: turret limit switch
         try {
             turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
             turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
         } catch (Exception e) {
-            turretLimitSwitch = null; // safe fallback if not configured
+            turretLimitSwitch = null;
         }
 
-        // LEDs (per-channel)
+        // LEDs
         LED led1Red = getLedSafe("led_1_red");
         LED led1Green = getLedSafe("led_1_green");
         LED led2Red = getLedSafe("led_2_red");
         LED led2Green = getLedSafe("led_2_green");
 
-        // Voltage sensor (first available)
+        // Voltage sensor
         VoltageSensor batterySensor = null;
         try {
             batterySensor = hardwareMap.voltageSensor.iterator().next();
@@ -163,10 +185,9 @@ public class OfficialHORS extends LinearOpMode {
             try { imu.initialize(imuParams); } catch (Exception ignored) {}
         }
 
-        try { //Follower
-            // Initialize PedroPathing follower for pose tracking and drivetrain control
+        try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(130)));  // Default starting pose (adjust as needed)
+            follower.setStartingPose(START_POSE);
         } catch (Exception e) {
             telemetry.addData("Error", "Follower initialization failed!");
             follower = null;
@@ -176,13 +197,11 @@ public class OfficialHORS extends LinearOpMode {
 
         // Create controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
-        // Hook the limit switch to homing reset (manual sweep only)
         if (turretLimitSwitch != null) {
-            // Active-low REV mag/touch: getState() == false when pressed
             turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
-        flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor); // pass voltage sensor
+        flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
         gateController = new GateController(
@@ -202,15 +221,39 @@ public class OfficialHORS extends LinearOpMode {
                 HOOD_DEBOUNCE_MS
         );
 
-        // Initial positions
-        gateController.setGateClosed(true); // gate closed at init
-        telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
-        telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
-        telemetry.addData("\nTurret IMU", imuUsed);
+        // ========== FLYWHEEL VERSATILE (BLUE calibration) ==========
+        List<CalibrationPoint> calibrationPoints = Arrays.asList(
+                new CalibrationPoint(new Pose(48, 96, 135), 2300),
+                new CalibrationPoint(new Pose(60, 125, 135), 2400),
+                new CalibrationPoint(new Pose(60, 82, 135), 2500),
+                new CalibrationPoint(new Pose(72, 72, 135), 2650),
+                new CalibrationPoint(new Pose(72, 120, 167), 2550),
+                new CalibrationPoint(new Pose(95, 120, 135), 2850),
+                new CalibrationPoint(new Pose(52, 14, 135), 3750)
+        );
+        flywheelVersatile = new FlywheelVersatile(flywheel, BLUE_GOAL, calibrationPoints, 2300, 4000);
+        flywheelVersatile.setRedAlliance(IS_RED_ALLIANCE);  // false for blue
 
+        // ========== HOOD VERSATILE (BLUE calibration) ==========
+        hoodVersatile = new HoodVersatile(
+                hoodController,
+                BLUE_GOAL,
+                HOOD_CLOSE_POSE,
+                HOOD_FAR_POSE,
+                HOOD_MIN,
+                HOOD_MAX
+        );
+        hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);  // false for blue
+
+        // Initial positions
+        gateController.setGateClosed(true);
+        telemetry.addData("Status", "Initialized");
+        telemetry.addData("Alliance", "BLUE 🔵");
+        telemetry.addData("Start Pose", "(%.1f, %.1f, %.1f°)",
+                START_POSE.getX(), START_POSE.getY(), Math.toDegrees(START_POSE.getHeading()));
+        telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
 
-        // Prepare subsystems - just capture current state, don't reset anything yet
         turretController.captureReferences();
         turretController.resetPidState();
 
@@ -221,7 +264,6 @@ public class OfficialHORS extends LinearOpMode {
             return;
         }
 
-        // After start: re-zero with Option A (no IMU reset, just capture current state)
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
 
@@ -235,76 +277,102 @@ public class OfficialHORS extends LinearOpMode {
             }
 
             if (follower != null) {
-                follower.update();  // Update pose and drivetrain
-                currentPose = follower.getPose();  // Retrieve current robot pose
+                follower.update();
+                currentPose = follower.getPose();
             }
 
-            // Touchpad reset (gamepad2) -> reset encoder + references
+            // ========== TOUCHPAD (GP2) = RESET POSE TO START ==========
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
+                if (follower != null) {
+                    follower.setStartingPose(START_POSE);
+                }
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp2 touchpad)");
-                telemetry.update();
+                gamepad2.rumble(300);
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1) -> reset encoder + references (no homing/hold)
+            // A button (GP1) = reset pose
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
+                if (follower != null) {
+                    follower.setStartingPose(START_POSE);
+                }
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
-                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp1 A)");
-                telemetry.update();
+                gamepad1.rumble(300);
             }
             aPressedLast = aNow;
 
-            // Far/close toggle on gamepad1 touchpad OR gamepad2 right bumper
+            // Touchpad (GP1) or RB (GP2) = toggle auto modes
             boolean touchpadNow = getTouchpad(gamepad1) || gamepad2.right_bumper;
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
-                hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                autoHoodEnabled = !autoHoodEnabled;
+                autoFlywheelEnabled = !autoFlywheelEnabled;
+                if (!autoHoodEnabled) {
+                    hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                }
             }
             touchpadPressedLast = touchpadNow;
 
             // Drive
-            double axial = -gamepad1.left_stick_y;//up down
-            double lateral = gamepad1.left_stick_x; // strafe
-            double yaw = gamepad1.right_stick_x; //heading
+            double axial = -gamepad1.left_stick_y;
+            double lateral = gamepad1.left_stick_x;
+            double yaw = gamepad1.right_stick_x;
             driveController.setDrive(axial, lateral, yaw, 1.0);
 
-            // Flywheel toggles (DPAD)
+            // Flywheel toggles
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
             dpadDownLast = dpadDownNow;
 
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
-            if (dpadLeftNow && !dpadLeftLast) flywheel.adjustTargetRPM(-50.0);
+            if (dpadLeftNow && !dpadLeftLast) {
+                if (autoFlywheelEnabled) {
+                    flywheelVersatile.adjustTrim(-50.0);
+                } else {
+                    flywheel.adjustTargetRPM(-50.0);
+                }
+            }
             dpadLeftLast = dpadLeftNow;
 
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
-            if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
+            if (dpadRightNow && !dpadRightLast) {
+                if (autoFlywheelEnabled) {
+                    flywheelVersatile.adjustTrim(50.0);
+                } else {
+                    flywheel.adjustTargetRPM(50.0);
+                }
+            }
             dpadRightLast = dpadRightNow;
 
-            // Gate manual toggle (B) - both gamepad1 and gamepad2
+            // Gate toggle (B)
             boolean bNow = gamepad1.b || gamepad2.b;
             if (bNow && !bPressedLast && !gateController.isBusy()) {
                 gateController.toggleGate();
             }
             bPressedLast = bNow;
 
-            // Intake auto sequence (Y)
+            // Intake sequence (Y)
             boolean yNow = gamepad1.y || gamepad2.y;
             if (yNow && !yPressedLast && !gateController.isBusy()) {
                 gateController.startIntakeSequence(nowMs);
             }
             yPressedLast = yNow;
 
-            // Gate sequence update + claw auto trigger
+            // Gate update
             boolean shouldTriggerClaw = gateController.update(nowMs);
             if (shouldTriggerClaw) {
                 clawController.trigger(nowMs);
+            }
+
+            // Auto flywheel RPM
+            if (autoFlywheelEnabled && follower != null && currentPose != null) {
+                double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
+                flywheel.setTargetRPM(targetRpm);
             }
 
             // Flywheel update
@@ -312,37 +380,39 @@ public class OfficialHORS extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Check if PIDF mode changed and update hood accordingly
-            boolean currentPidfMode = flywheel.isUsingFarCoefficients();
-            if (currentPidfMode != lastPidfMode) {
-                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
-                lastPidfMode = currentPidfMode;
+            // Auto hood
+            if (autoHoodEnabled && follower != null && currentPose != null) {
+                hoodVersatile.update(currentPose);
             }
 
-            // Rumble when at target
+            // Hood trim
+            if (autoHoodEnabled) {
+                if (gamepad2.left_stick_y < -0.5) {
+                    hoodVersatile.adjustTrim(HOOD_TRIM_STEP);
+                } else if (gamepad2.left_stick_y > 0.5) {
+                    hoodVersatile.adjustTrim(-HOOD_TRIM_STEP);
+                }
+            }
+
+            // Rumble at target
             if (flywheel.isAtTarget()) {
-                final int RUMBLE_MS = 200;
-                try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
-                try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
+                try { gamepad1.rumble(200); } catch (Throwable ignored) {}
+                try { gamepad2.rumble(200); } catch (Throwable ignored) {}
             }
 
-            // Turret control: manual homing sweep + manual jog
-            // Press gamepad1.dpad_up OR gamepad2.left_bumper to start the homing oscillation
+            // Turret control
             turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             boolean manualNow = false;
             double manualPower = 0.0;
-
-            // Manual turret jog: gamepad1 bumpers OR gamepad2 right stick (increased power to 0.35)
             if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
                 manualNow = true; manualPower = 0.35;
             } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
                 manualNow = true; manualPower = -0.35;
             }
-
             turretController.update(manualNow, manualPower);
 
-            // Intake manual (only if gate not busy) - added gamepad2.left_trigger for outtake
+            // Intake manual
             if (!gateController.isBusy()) {
                 boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
                 if (leftTriggerNow) {
@@ -354,7 +424,7 @@ public class OfficialHORS extends LinearOpMode {
                 }
             }
 
-            // Claw manual (X)
+            // Claw (X)
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xPressedLast) {
                 clawController.trigger(nowMs);
@@ -362,19 +432,33 @@ public class OfficialHORS extends LinearOpMode {
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Hood adjustments (gamepad1.a/b for left hood only, removed gamepad2 right stick)
-            if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
-            if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
+            // Telemetry
+            telemetry.addData("Alliance", "BLUE 🔵");
+            telemetry.addData("Flywheel", "%.0f / %.0f rpm %s",
+                    flywheel.getCurrentRPM(), flywheel.getTargetRPM(),
+                    autoFlywheelEnabled ? "(AUTO)" : "(MANUAL)");
 
-            // Telemetry: flywheel & gate with PIDF mode info
-            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
-                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-            //telemetry.addData("\nGate", gateController.isGateClosed() ? "Closed" : "Open");
+            if (autoHoodEnabled) {
+                telemetry.addData("Hood (AUTO)", "%.3f | Dist: %.1f",
+                        hoodVersatile.getLastTargetPos(), hoodVersatile.getLastDistance());
+            } else {
+                telemetry.addData("Hood (MANUAL)", "%.3f", hoodController.getRightPos());
+            }
 
-            telemetry.addData("Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
+            telemetry.addData("Pose", "(%.1f, %.1f, %.1f°)",
+                    currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()));
+
+            // Panels
+            panelsTelemetry.debug("Alliance", "BLUE");
+            panelsTelemetry.debug("X", String.format("%.1f", currentPose.getX()));
+            panelsTelemetry.debug("Y", String.format("%.1f", currentPose.getY()));
+            panelsTelemetry.debug("Fly RPM", String.format("%.0f", flywheel.getCurrentRPM()));
+            panelsTelemetry.debug("Fly Target", String.format("%.0f", flywheel.getTargetRPM()));
+            panelsTelemetry.debug("Hood", String.format("%.3f", hoodVersatile.getLastTargetPos()));
+            panelsTelemetry.debug("Distance", String.format("%.1f", hoodVersatile.getLastDistance()));
+
             telemetry.update();
+            panelsTelemetry.update(telemetry);
         }
 
         turretController.disable();
@@ -390,11 +474,6 @@ public class OfficialHORS extends LinearOpMode {
         catch (Exception ignored) { return null; }
     }
 
-    /**
-     * Option A: No Movement on Start
-     *
-     * Capture current heading and turret position as the new reference.
-     */
     private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
         if (pinpoint != null) {
             try { pinpoint.update(); } catch (Exception ignored) {}
@@ -403,10 +482,6 @@ public class OfficialHORS extends LinearOpMode {
         turretController.resetPidState();
     }
 
-    /**
-     * Reset turret encoder and capture references (used on gp1 A and gp2 touchpad).
-     * Also clears any homing/freeze state so tracking resumes immediately.
-     */
     private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
         if (pinpoint != null) {
             try { pinpoint.update(); } catch (Exception ignored) {}
