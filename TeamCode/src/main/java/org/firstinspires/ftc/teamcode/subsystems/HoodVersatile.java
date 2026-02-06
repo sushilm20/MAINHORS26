@@ -4,33 +4,32 @@ import com.pedropathing.geometry.Pose;
 
 /**
  * Computes target hood position from robot pose relative to a goal.
- * Uses linear interpolation between two calibration points:
- * - Close pose (e.g., 20, 122) -> minPos (hood low)
- * - Far pose (e.g., 72, 12) -> maxPos (hood high)
- *
- * As the robot moves farther from the goal along this diagonal,
- * the hood rises proportionally.
+ * Supports BLUE and RED alliance - auto-mirrors poses for red!
  */
 public class HoodVersatile {
 
+    private static final double MIRROR_AXIS = 146.0;
+
     private final HoodController hoodController;
-    private final Pose goalPose;      // The goal/target location
-    private final Pose closePose;     // Calibration: closest shooting point
-    private final Pose farPose;       // Calibration: farthest shooting point
-    private final double minPos;      // Hood position when close
-    private final double maxPos;      // Hood position when far
+    private final Pose blueGoalPose;
+    private final Pose blueClosePose;
+    private final Pose blueFarPose;
+    private final double minPos;
+    private final double maxPos;
+
+    private boolean isRedAlliance = false;
 
     private double slope = 0.0;
     private double intercept = 0.0;
-    private double trimPos = 0.0;     // Driver trim adjustment
+    private double trimPos = 0.0;
     private double lastTargetPos = 0.0;
     private double lastDistance = 0.0;
 
     /**
      * @param hoodController The underlying hood controller
-     * @param goalPose       The goal location (for distance reference)
-     * @param closePose      Pose where hood should be at minimum (e.g., 20, 122)
-     * @param farPose        Pose where hood should be at maximum (e.g., 72, 12)
+     * @param goalPose       The BLUE goal location
+     * @param closePose      BLUE pose where hood should be at minimum
+     * @param farPose        BLUE pose where hood should be at maximum
      * @param minPos         Hood servo position when close
      * @param maxPos         Hood servo position when far
      */
@@ -41,9 +40,9 @@ public class HoodVersatile {
                          double minPos,
                          double maxPos) {
         this.hoodController = hoodController;
-        this.goalPose = goalPose;
-        this.closePose = closePose;
-        this.farPose = farPose;
+        this.blueGoalPose = goalPose;
+        this.blueClosePose = closePose;
+        this.blueFarPose = farPose;
         this.minPos = minPos;
         this.maxPos = maxPos;
         this.lastTargetPos = minPos;
@@ -51,29 +50,56 @@ public class HoodVersatile {
     }
 
     /**
-     * Computes linear regression: hood position as a function of distance to goal.
-     * Two-point form: we know (closeDistance -> minPos) and (farDistance -> maxPos).
+     * Set red alliance mode - auto mirrors all poses!
+     */
+    public void setRedAlliance(boolean isRed) {
+        this.isRedAlliance = isRed;
+    }
+
+    public boolean isRedAlliance() {
+        return isRedAlliance;
+    }
+
+    /**
+     * Computes linear regression using BLUE coordinates.
      */
     private void computeRegression() {
-        double closeDist = distanceToGoal(closePose);
-        double farDist = distanceToGoal(farPose);
+        double closeDist = distanceToGoalBlue(blueClosePose);
+        double farDist = distanceToGoalBlue(blueFarPose);
 
         if (Math.abs(farDist - closeDist) < 1e-6) {
-            // Edge case: same distance, no slope
             slope = 0.0;
             intercept = minPos;
             return;
         }
 
-        // Linear regression: pos = slope * distance + intercept
-        // Two points: (closeDist, minPos) and (farDist, maxPos)
         slope = (maxPos - minPos) / (farDist - closeDist);
         intercept = minPos - slope * closeDist;
     }
 
-    private double distanceToGoal(Pose pose) {
-        double dx = pose.getX() - goalPose.getX();
-        double dy = pose.getY() - goalPose.getY();
+    /**
+     * Distance using BLUE coordinates (for calibration)
+     */
+    private double distanceToGoalBlue(Pose pose) {
+        double dx = pose.getX() - blueGoalPose.getX();
+        double dy = pose.getY() - blueGoalPose.getY();
+        return Math.hypot(dx, dy);
+    }
+
+    /**
+     * Distance that auto-mirrors for red alliance
+     */
+    private double distanceToGoal(Pose robotPose) {
+        Pose effectivePose = robotPose;
+
+        // Mirror robot pose if red alliance
+        if (isRedAlliance) {
+            effectivePose = robotPose.mirror(MIRROR_AXIS);
+        }
+
+        // Always calculate to BLUE goal
+        double dx = effectivePose.getX() - blueGoalPose.getX();
+        double dy = effectivePose.getY() - blueGoalPose.getY();
         return Math.hypot(dx, dy);
     }
 
@@ -81,9 +107,6 @@ public class HoodVersatile {
         return distanceToGoal(pose);
     }
 
-    /**
-     * Computes the base hood position based on current robot pose.
-     */
     public double computeBasePosition(Pose robotPose) {
         if (robotPose == null) {
             return lastTargetPos;
@@ -94,9 +117,6 @@ public class HoodVersatile {
         return lastTargetPos;
     }
 
-    /**
-     * Gets the final target position including driver trim.
-     */
     public double getFinalTargetPosition(Pose robotPose) {
         double base = computeBasePosition(robotPose);
         return clamp(base + trimPos);
@@ -104,16 +124,12 @@ public class HoodVersatile {
 
     /**
      * Updates the hood controller with the pose-based position.
-     * Call this each loop iteration.
      */
     public void update(Pose robotPose) {
         double targetPos = getFinalTargetPosition(robotPose);
         hoodController.setRightPosition(targetPos);
     }
 
-    /**
-     * Adjusts the driver trim for fine-tuning.
-     */
     public void adjustTrim(double delta) {
         trimPos += delta;
     }
