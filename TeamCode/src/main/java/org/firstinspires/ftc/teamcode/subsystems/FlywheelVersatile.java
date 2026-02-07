@@ -11,11 +11,7 @@ import java.util.List;
 
 /**
  * Computes target RPM from robot pose using piecewise linear interpolation.
- *
- * CLOSE to goal = LOW RPM
- * FAR from goal = HIGH RPM
- *
- * Supports auto-mirroring for red alliance.
+ * CLOSE to goal = LOW RPM, FAR from goal = HIGH RPM
  */
 public class FlywheelVersatile {
 
@@ -32,9 +28,11 @@ public class FlywheelVersatile {
     private static final double MIRROR_AXIS = CalibrationPoints.MIRROR_AXIS;
 
     private final Pose blueGoalPose;
+    private final Pose startPose;
     private final List<DistancePoint> sortedPoints;
     private final double minRpm;
     private final double maxRpm;
+    private final double startDistance;
 
     private boolean isRedAlliance = false;
 
@@ -42,18 +40,20 @@ public class FlywheelVersatile {
     private double lastBaseRpm;
     private double lastDistance = 0.0;
 
-    /**
-     * Constructor using raw calibration data array
-     */
     public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
                              double[][] calibrationData,
                              double minRpm,
                              double maxRpm) {
         this.blueGoalPose = goalPose;
+        this.startPose = CalibrationPoints.BLUE_START_POSE;
         this.minRpm = minRpm;
         this.maxRpm = maxRpm;
-        this.lastBaseRpm = minRpm;  // Start at minimum RPM
+
+        // Calculate start distance
+        this.startDistance = calculateDistanceBlue(startPose);
+        this.lastBaseRpm = minRpm;
+        this.lastDistance = startDistance;
 
         // Convert raw data to distance points
         this.sortedPoints = new ArrayList<>();
@@ -66,7 +66,6 @@ public class FlywheelVersatile {
             }
         }
 
-        // Sort by distance (ascending: closest first)
         Collections.sort(sortedPoints, Comparator.comparingDouble(a -> a.distance));
     }
 
@@ -78,43 +77,64 @@ public class FlywheelVersatile {
         return isRedAlliance;
     }
 
-    /**
-     * Distance to goal using BLUE coordinates
-     */
     private double calculateDistanceBlue(Pose pose) {
+        if (pose == null) {
+            return startDistance;
+        }
         double dx = pose.getX() - blueGoalPose.getX();
         double dy = pose.getY() - blueGoalPose.getY();
         return Math.hypot(dx, dy);
     }
 
-    /**
-     * Distance to goal with auto-mirroring for red alliance
-     */
     private double calculateDistance(Pose robotPose) {
+        if (robotPose == null) {
+            return startDistance;
+        }
+
         Pose effectivePose = robotPose;
 
-        if (isRedAlliance && robotPose != null) {
+        if (isRedAlliance) {
             effectivePose = robotPose.mirror(MIRROR_AXIS);
         }
 
         return calculateDistanceBlue(effectivePose);
     }
 
+    /**
+     * Check if a pose is valid (not at origin, reasonable values)
+     */
+    private boolean isValidPose(Pose pose) {
+        if (pose == null) {
+            return false;
+        }
+        double x = pose.getX();
+        double y = pose.getY();
+
+        // Reject poses at or very near origin
+        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
+            return false;
+        }
+
+        // Reject poses outside field bounds (0-144 inches typical)
+        if (x < -10 || x > 160 || y < -10 || y > 160) {
+            return false;
+        }
+
+        return true;
+    }
+
     public double getDistanceToGoal(Pose pose) {
         return calculateDistance(pose);
     }
 
-    /**
-     * Compute base RPM using piecewise linear interpolation
-     */
     public double computeBaseRpm(Pose robotPose) {
-        if (robotPose == null) {
+        // If pose is invalid, return last known good value
+        if (!isValidPose(robotPose)) {
             return lastBaseRpm;
         }
 
         lastDistance = calculateDistance(robotPose);
 
-        // Handle edge cases
         if (sortedPoints.isEmpty()) {
             lastBaseRpm = minRpm;
             return lastBaseRpm;
@@ -125,7 +145,7 @@ public class FlywheelVersatile {
             return lastBaseRpm;
         }
 
-        // Find the two points that bracket our distance
+        // Find bracketing points
         DistancePoint lower = null;
         DistancePoint upper = null;
 
@@ -138,13 +158,13 @@ public class FlywheelVersatile {
             }
         }
 
-        // Below all calibration points - use minimum
+        // Below all calibration points
         if (lower == null) {
             lastBaseRpm = clamp(sortedPoints.get(0).rpm);
             return lastBaseRpm;
         }
 
-        // Above all calibration points - extrapolate from last two
+        // Above all calibration points - extrapolate
         if (upper == null) {
             int n = sortedPoints.size();
             DistancePoint p1 = sortedPoints.get(n - 2);
@@ -174,9 +194,6 @@ public class FlywheelVersatile {
         return lastBaseRpm;
     }
 
-    /**
-     * Get final RPM including trim adjustment
-     */
     public double getFinalTargetRPM(Pose robotPose) {
         double base = computeBaseRpm(robotPose);
         return clamp(base + trimRpm);
@@ -200,6 +217,10 @@ public class FlywheelVersatile {
 
     public double getLastDistance() {
         return lastDistance;
+    }
+
+    public double getStartDistance() {
+        return startDistance;
     }
 
     private double clamp(double value) {

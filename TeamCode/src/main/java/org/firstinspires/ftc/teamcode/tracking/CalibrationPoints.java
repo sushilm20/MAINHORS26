@@ -15,18 +15,15 @@ public class CalibrationPoints {
     public static final Pose BLUE_GOAL = new Pose(0, 144, 0);
 
     // ==================== START POSES (BLUE) ====================
-    // This is the CLOSEST shooting position (~30 units from goal)
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
 
     // ==================== HOOD CALIBRATION ====================
-    // Close = where hood is at MINIMUM (start pose, ~30 units from goal)
     public static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);
-    // Far = where hood is at MAXIMUM (~150 units from goal)
     public static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);
 
     // Hood servo positions
-    public static final double HOOD_MIN = 0.12;  // Position when CLOSE to goal
-    public static final double HOOD_MAX = 0.48;  // Position when FAR from goal
+    public static final double HOOD_MIN = 0.12;
+    public static final double HOOD_MAX = 0.48;
 
     // Hood control constants
     public static final double HOOD_LEFT_STEP = 0.025;
@@ -34,33 +31,24 @@ public class CalibrationPoints {
     public static final long HOOD_DEBOUNCE_MS = 120L;
     public static final double HOOD_TRIM_STEP = 0.005;
 
-    // Manual preset values (for when auto is disabled)
+    // Manual preset values
     public static final double RIGHT_HOOD_CLOSE = 0.16;
     public static final double RIGHT_HOOD_FAR = 0.24;
 
     // ==================== FLYWHEEL CALIBRATION ====================
-    // RPM bounds
-    public static final double FLYWHEEL_MIN_RPM = 2300;  // RPM when CLOSE to goal
-    public static final double FLYWHEEL_MAX_RPM = 4000;  // RPM when FAR from goal
+    public static final double FLYWHEEL_MIN_RPM = 2300;
+    public static final double FLYWHEEL_MAX_RPM = 4000;
 
     // Calibration data: {x, y, heading, rpm}
-    // Sorted by distance from goal (closest to farthest)
     public static final double[][] FLYWHEEL_CALIBRATION_DATA = {
-            // CLOSE (~30-50 units from goal)
             {20, 122, 130, 2300},   // Start pose - minimum RPM
-            {48, 96, 135, 2300},
-
-            // MEDIUM (~60-80 units from goal)
+            {48, 96, 135, 2350},
             {60, 125, 135, 2400},
             {60, 82, 135, 2500},
             {72, 120, 167, 2550},
-
-            // FAR (~90-110 units from goal)
             {72, 72, 135, 2650},
             {95, 120, 135, 2850},
-
-            // MAX RANGE (~130-150 units from goal)
-            {52, 14, 135, 3750}    // Farthest - maximum RPM
+            {52, 14, 135, 3750}
     };
 
     // ==================== GATE/INTAKE CONSTANTS ====================
@@ -91,34 +79,20 @@ public class CalibrationPoints {
         return BLUE_GOAL;
     }
 
-    public static Pose mirrorPose(Pose pose) {
-        return pose.mirror(MIRROR_AXIS);
-    }
-
-    public static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror(MIRROR_AXIS);
-    }
-
-    public static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(MIRROR_AXIS);
-    }
-
-    /**
-     * Calculate distance from a pose to the BLUE goal
-     */
     public static double distanceToGoal(Pose pose) {
         double dx = pose.getX() - BLUE_GOAL.getX();
         double dy = pose.getY() - BLUE_GOAL.getY();
         return Math.hypot(dx, dy);
     }
 
-    /**
-     * Calculate distance from a pose to the BLUE goal (mirrored if red)
-     */
     public static double distanceToGoal(Pose pose, boolean isRedAlliance) {
         Pose effectivePose = isRedAlliance ? pose.mirror(MIRROR_AXIS) : pose;
         double dx = effectivePose.getX() - BLUE_GOAL.getX();
         double dy = effectivePose.getY() - BLUE_GOAL.getY();
         return Math.hypot(dx, dy);
+    }
+
+    public static Pose mirrorPose(Pose pose) {
+        return pose.mirror(MIRROR_AXIS);
     }
 }
