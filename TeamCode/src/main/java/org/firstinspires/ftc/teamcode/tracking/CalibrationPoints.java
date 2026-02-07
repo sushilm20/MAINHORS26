@@ -21,16 +21,23 @@ public class CalibrationPoints {
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
 
     // ==================== HOOD CALIBRATION POSES (BLUE) ====================
+    // Close pose: where hood should be at MINIMUM (0.12)
+    // Distance from (20, 122) to goal (0, 144) = sqrt(20^2 + 22^2) = ~30 units
     public static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);
+
+    // Far pose: where hood should be at MAXIMUM (0.48)
+    // Distance from (72, 12) to goal (0, 144) = sqrt(72^2 + 132^2) = ~150 units
     public static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);
 
     // ==================== HOOD CONSTANTS ====================
-    public static final double HOOD_MIN = 0.12;
-    public static final double HOOD_MAX = 0.45;
+    public static final double HOOD_MIN = 0.12;      // Hood position when CLOSE to goal
+    public static final double HOOD_MAX = 0.48;      // Hood position when FAR from goal (changed from 0.45!)
     public static final double HOOD_LEFT_STEP = 0.025;
     public static final double HOOD_RIGHT_STEP = 0.01;
     public static final long HOOD_DEBOUNCE_MS = 120L;
     public static final double HOOD_TRIM_STEP = 0.005;
+
+    // Manual preset values (for when auto is disabled)
     public static final double RIGHT_HOOD_CLOSE = 0.16;
     public static final double RIGHT_HOOD_FAR = 0.24;
 
