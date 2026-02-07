@@ -204,9 +204,11 @@ public class wildexperimentBlue extends LinearOpMode {
                 CalibrationPoints.CLAW_CLOSE_MS
         );
 
+// Initialize hood controller - START AT MINIMUM POSITION
         hoodController = new HoodController(
                 leftHoodServo, rightHoodServo,
-                CalibrationPoints.HOOD_MIN, CalibrationPoints.RIGHT_HOOD_CLOSE,
+                CalibrationPoints.HOOD_MIN,  // Initial LEFT = MIN
+                CalibrationPoints.HOOD_MIN,  // Initial RIGHT = MIN (not RIGHT_HOOD_CLOSE!)
                 CalibrationPoints.HOOD_MIN, CalibrationPoints.HOOD_MAX,
                 CalibrationPoints.HOOD_LEFT_STEP, CalibrationPoints.HOOD_RIGHT_STEP,
                 CalibrationPoints.HOOD_DEBOUNCE_MS

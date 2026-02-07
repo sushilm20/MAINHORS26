@@ -57,17 +57,24 @@ public class HoodController {
         lastRightMs = nowMs;
     }
 
+    // PUBLIC - so HoodVersatile can set it
     public void setRightPosition(double pos) {
         rightPos = clip(pos);
         right.setPosition(rightPos);
     }
 
-    public double getLeftPos() { return leftPos; }
-    public double getRightPos() { return rightPos; }
-
-    private void setLeftPosition(double pos) {
+    // PUBLIC - for symmetry
+    public void setLeftPosition(double pos) {
         leftPos = clip(pos);
         left.setPosition(leftPos);
+    }
+
+    public double getLeftPos() {
+        return leftPos;
+    }
+
+    public double getRightPos() {
+        return rightPos;
     }
 
     private double clip(double v) {
