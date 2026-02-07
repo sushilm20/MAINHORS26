@@ -39,7 +39,7 @@ public class TurretController {
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.20;
+    public static double TURRET_KD = 0.235;
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 

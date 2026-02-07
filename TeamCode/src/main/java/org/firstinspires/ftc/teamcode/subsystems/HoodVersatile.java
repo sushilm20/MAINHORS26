@@ -14,10 +14,8 @@ public class HoodVersatile {
 
     private final HoodController hoodController;
     private final Pose blueGoalPose;
-    private final Pose startPose;
     private final double closeDistance;
     private final double farDistance;
-    private final double startDistance;
     private final double minPos;
     private final double maxPos;
 
@@ -28,6 +26,7 @@ public class HoodVersatile {
     private double trimPos = 0.0;
     private double lastTargetPos;
     private double lastDistance = 0.0;
+    private double lastValidDistance = 0.0;
 
     public HoodVersatile(HoodController hoodController,
                          Pose goalPose,
@@ -37,19 +36,19 @@ public class HoodVersatile {
                          double maxPos) {
         this.hoodController = hoodController;
         this.blueGoalPose = goalPose;
-        this.startPose = CalibrationPoints.BLUE_START_POSE;
         this.minPos = minPos;
         this.maxPos = maxPos;
 
         // Calculate distances
         this.closeDistance = calculateDistanceBlue(closePose);
         this.farDistance = calculateDistanceBlue(farPose);
-        this.startDistance = calculateDistanceBlue(startPose);
 
-        // Initialize to position based on start pose
-        this.lastDistance = startDistance;
+        // Initialize with close distance
+        this.lastDistance = closeDistance;
+        this.lastValidDistance = closeDistance;
+        this.lastTargetPos = minPos;
+
         computeRegression();
-        this.lastTargetPos = computePositionFromDistance(startDistance);
     }
 
     public void setRedAlliance(boolean isRed) {
@@ -80,7 +79,7 @@ public class HoodVersatile {
 
     private double calculateDistanceBlue(Pose pose) {
         if (pose == null) {
-            return startDistance;
+            return lastValidDistance;
         }
         double dx = pose.getX() - blueGoalPose.getX();
         double dy = pose.getY() - blueGoalPose.getY();
@@ -89,7 +88,7 @@ public class HoodVersatile {
 
     private double calculateDistance(Pose robotPose) {
         if (robotPose == null) {
-            return startDistance;
+            return lastValidDistance;
         }
 
         Pose effectivePose = robotPose;
@@ -102,22 +101,30 @@ public class HoodVersatile {
     }
 
     /**
+     * Check if a distance value is reasonable
+     */
+    private boolean isReasonableDistance(double distance) {
+        return distance >= 10.0 && distance <= 200.0;
+    }
+
+    /**
      * Check if a pose is valid
      */
     private boolean isValidPose(Pose pose) {
         if (pose == null) {
             return false;
         }
+
         double x = pose.getX();
         double y = pose.getY();
 
-        // Reject poses at or very near origin
+        // Reject origin
         if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
             return false;
         }
 
-        // Reject poses outside field bounds
-        if (x < -10 || x > 160 || y < -10 || y > 160) {
+        // Reject out of field bounds
+        if (x < -5 || x > 150 || y < -5 || y > 150) {
             return false;
         }
 
@@ -129,12 +136,28 @@ public class HoodVersatile {
     }
 
     public double computeBasePosition(Pose robotPose) {
-        // If pose is invalid, return last known good value
+        // Validate pose
         if (!isValidPose(robotPose)) {
             return lastTargetPos;
         }
 
-        lastDistance = calculateDistance(robotPose);
+        double newDistance = calculateDistance(robotPose);
+
+        // Validate distance
+        if (!isReasonableDistance(newDistance)) {
+            return lastTargetPos;
+        }
+
+        // Check for sudden jumps (more than 50 units is suspicious)
+        if (Math.abs(newDistance - lastValidDistance) > 50.0) {
+            return lastTargetPos;
+        }
+
+        // Accept this distance
+        lastDistance = newDistance;
+        lastValidDistance = newDistance;
+
+        // Calculate position
         lastTargetPos = computePositionFromDistance(lastDistance);
 
         return lastTargetPos;
@@ -174,6 +197,10 @@ public class HoodVersatile {
         return lastDistance;
     }
 
+    public double getLastValidDistance() {
+        return lastValidDistance;
+    }
+
     public double getMinPos() {
         return minPos;
     }
@@ -196,10 +223,6 @@ public class HoodVersatile {
 
     public double getFarDistance() {
         return farDistance;
-    }
-
-    public double getStartDistance() {
-        return startDistance;
     }
 
     private double clamp(double value) {
