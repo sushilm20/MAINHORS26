@@ -31,7 +31,7 @@ public class TurretController {
     @Sorter(sort = 1)
     public static int TURRET_MAX_POS = 1000;
     @Sorter(sort = 2)
-    public static double TICKS_PER_RADIAN_SCALE = 0.9;
+    public static double TICKS_PER_RADIAN_SCALE = 0.87;
 
     // PID like config
     @Sorter(sort = 3)
@@ -47,7 +47,7 @@ public class TurretController {
     @Sorter(sort = 7)
     public static double FF_GAIN = 5.0;
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.94;
+    public static double POWER_SMOOTH_ALPHA = 0.9;
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 1.0;
 
@@ -59,7 +59,7 @@ public class TurretController {
 
     // Rightward asymmetry control (biases target instead of slowing PID output)
     @Sorter(sort = 12)
-    public static double RIGHTWARD_ENCODER_DAMP = 0.8;
+    public static double RIGHTWARD_ENCODER_DAMP = 0.9;
     @Sorter(sort = 13)
     public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
 
