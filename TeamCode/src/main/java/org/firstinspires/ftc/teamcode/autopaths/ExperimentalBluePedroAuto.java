@@ -187,7 +187,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - COLLECT SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 14.0;
+    public static double COLLECT_SECOND3_X = 16.0;
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 58.0;
     @Sorter(sort = 152)
@@ -205,7 +205,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 14.0;
+    public static double COLLECT_THIRD3_X = 16.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 35.0;
     @Sorter(sort = 172)
@@ -375,7 +375,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
         shooterWaitStartMs = System.currentTimeMillis();
 
         // Turn turret before any paths run
-        turretHoldTarget = 230;   // target position for turret
+        turretHoldTarget = 240;   // target position for turret
         turretForceHold = true;
 
         state = AutoState.WAIT_FOR_SHOOTER;
