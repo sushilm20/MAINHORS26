@@ -158,15 +158,17 @@ public class FlywheelVersatile {
             return lastBaseRpm;
         }
 
+        // Mark as initialized on first valid distance
+        // This must happen before the jump check so subsequent calls will check for jumps
+        boolean wasInitialized = isInitialized;
+        isInitialized = true;
+
         // Check for sudden jumps to detect sensor errors
-        // BUT allow the first real initialization to set any valid distance
-        if (isInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
+        // Skip this check on first initialization
+        if (wasInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
             // Suspicious jump - ignore this reading
             return lastBaseRpm;
         }
-
-        // Mark as initialized so future calls will check for jumps
-        isInitialized = true;
 
         // Accept this distance
         lastDistance = newDistance;
