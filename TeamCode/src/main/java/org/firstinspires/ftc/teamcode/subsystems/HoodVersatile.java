@@ -27,6 +27,7 @@ public class HoodVersatile {
     private double lastTargetPos;
     private double lastDistance = 0.0;
     private double lastValidDistance = 0.0;
+    private boolean isInitialized = false;
 
     public HoodVersatile(HoodController hoodController,
                          Pose goalPose,
@@ -149,13 +150,15 @@ public class HoodVersatile {
         }
 
         // Check for sudden jumps (more than 50 units is suspicious)
-        if (Math.abs(newDistance - lastValidDistance) > 50.0) {
+        // BUT allow the first real initialization to set any valid distance
+        if (isInitialized && Math.abs(newDistance - lastValidDistance) > 50.0) {
             return lastTargetPos;
         }
 
         // Accept this distance
         lastDistance = newDistance;
         lastValidDistance = newDistance;
+        isInitialized = true;
 
         // Calculate position
         lastTargetPos = computePositionFromDistance(lastDistance);

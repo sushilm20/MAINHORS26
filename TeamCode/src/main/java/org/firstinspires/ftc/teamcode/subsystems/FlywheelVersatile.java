@@ -40,6 +40,7 @@ public class FlywheelVersatile {
     private double lastBaseRpm;
     private double lastDistance = 0.0;
     private double lastValidDistance = 0.0;
+    private boolean isInitialized = false;
 
     public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
@@ -158,7 +159,8 @@ public class FlywheelVersatile {
         }
 
         // Check for sudden jumps (more than 50 units in one cycle is suspicious)
-        if (Math.abs(newDistance - lastValidDistance) > 50.0) {
+        // BUT allow the first real initialization to set any valid distance
+        if (isInitialized && Math.abs(newDistance - lastValidDistance) > 50.0) {
             // Suspicious jump - ignore this reading
             return lastBaseRpm;
         }
@@ -166,6 +168,7 @@ public class FlywheelVersatile {
         // Accept this distance
         lastDistance = newDistance;
         lastValidDistance = newDistance;
+        isInitialized = true;
 
         // Calculate RPM
         if (sortedPoints.isEmpty()) {
