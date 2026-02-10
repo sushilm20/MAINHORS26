@@ -165,10 +165,12 @@ public class FlywheelVersatile {
             return lastBaseRpm;
         }
 
+        // Mark as initialized so future calls will check for jumps
+        isInitialized = true;
+
         // Accept this distance
         lastDistance = newDistance;
         lastValidDistance = newDistance;
-        isInitialized = true;
 
         // Calculate RPM
         if (sortedPoints.isEmpty()) {

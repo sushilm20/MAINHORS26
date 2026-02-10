@@ -155,10 +155,12 @@ public class HoodVersatile {
             return lastTargetPos;
         }
 
+        // Mark as initialized so future calls will check for jumps
+        isInitialized = true;
+
         // Accept this distance
         lastDistance = newDistance;
         lastValidDistance = newDistance;
-        isInitialized = true;
 
         // Calculate position
         lastTargetPos = computePositionFromDistance(lastDistance);
