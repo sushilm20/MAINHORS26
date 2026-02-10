@@ -87,7 +87,7 @@ public class wildexperimentRed extends LinearOpMode {
     private Pose currentPose;
     private Pose lastValidPose;
     private int validPoseCount = 0;
-    private static final int REQUIRED_VALID_POSES = 5;  // Need 5 consecutive valid poses
+    private static final int REQUIRED_VALID_POSES = 5;  // Require 5 consecutive valid poses
 
     @Override
     public void runOpMode() {
@@ -559,9 +559,8 @@ public class wildexperimentRed extends LinearOpMode {
         double dy = newPose.getY() - expectedPose.getY();
         double distance = Math.hypot(dx, dy);
 
-        // Allow up to 20 inches of movement per cycle (generous for driving)
-        // This prevents sudden jumps to wrong positions
-        return distance < 20.0;
+        // Prevent sudden jumps to wrong positions from sensor errors
+        return distance < CalibrationPoints.MAX_POSE_MOVEMENT_PER_CYCLE;
     }
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {

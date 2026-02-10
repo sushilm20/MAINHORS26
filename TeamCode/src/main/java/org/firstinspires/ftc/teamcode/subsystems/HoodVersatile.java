@@ -149,9 +149,9 @@ public class HoodVersatile {
             return lastTargetPos;
         }
 
-        // Check for sudden jumps (more than 50 units is suspicious)
+        // Check for sudden jumps to detect sensor errors
         // BUT allow the first real initialization to set any valid distance
-        if (isInitialized && Math.abs(newDistance - lastValidDistance) > 50.0) {
+        if (isInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
             return lastTargetPos;
         }
 

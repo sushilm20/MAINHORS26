@@ -158,9 +158,9 @@ public class FlywheelVersatile {
             return lastBaseRpm;
         }
 
-        // Check for sudden jumps (more than 50 units in one cycle is suspicious)
+        // Check for sudden jumps to detect sensor errors
         // BUT allow the first real initialization to set any valid distance
-        if (isInitialized && Math.abs(newDistance - lastValidDistance) > 50.0) {
+        if (isInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
             // Suspicious jump - ignore this reading
             return lastBaseRpm;
         }
