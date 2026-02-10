@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.tracking;
 
+import com.bylazar.configurables.annotations.Sorter;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -11,30 +12,18 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
 /**
- * TurretGoalAimer:
- * - Faces a single field goal point.
- * - Uses robot pose + IMU heading.
- * - Adds lateral-offset correction (side of line from start->goal).
- * - Manual override is respected.
+ * TurretGoalAimer - Simplified Pose-Based Point Tracking
  *
- * Pseudocode for point tracking with Pedro pathing + heading offsets (blue goal):
- * 1) Inputs: robotPose (Pedro Pose), targetPose (blue goal), current heading (from heading adjust system),
- *    turret encoder reference, turret encoder limits.
- * 2) If manual control requested -> apply manual power, exit.
- * 3) If robotPose missing -> heading-hold: desiredAngle = -(heading - headingReference).
- * 4) Else:
- *    a) bearing = atan2(target.y - robot.y, target.x - robot.x)   // field-centric
- *       (lineX = target.x - START.x, lineY = target.y - START.y; robotX = robot.x - START.x, robotY = robot.y - START.y)
- *    b) lateralError = (lineX * robotY - lineY * robotX) / distance(START, target)  // signed perpendicular distance (2D cross normalized by line length)
- *    c) offset = clamp(-lateralError * OFFSET_GAIN, +/- OFFSET_CLAMP) // keeps same point despite drift
- *    d) if aimReference not captured yet (first valid pose): aimReference = normalize(bearing - heading - offset)
- *    e) targetAngleRad = normalize(bearing - heading - offset - aimReference)
- *    f) desiredTicks = clamp(turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN, min, max)
- *    g) error = desiredTicks - currentTicks
- *    h) pid = KP * error + KI * (integral of error) + KD * d(error) / dt
- *    i) ff = -angularVel * FF_GAIN                 // angularVel = robot yaw rate from IMU/pinpoint; oppose spin to hold lock
- *    j) power = clamp(pid + ff, +/- MAX_POWER) with deadband and soft smoothing; zero if at hard stops
- *    k) set turret motor power = power
+ * Aims turret at a fixed field point using:
+ * - Robot pose (X, Y, heading) from GoBilda Pinpoint odometry
+ * - Simple geometric bearing calculation
+ * - PID control with feedforward
+ *
+ * Algorithm:
+ * 1. Calculate field-relative bearing to target: atan2(dy, dx)
+ * 2. Convert to robot-relative angle: bearing - robotHeading
+ * 3. Convert to turret encoder ticks
+ * 4. Apply PID + feedforward control
  */
 public class TurretGoalAimer {
 
@@ -42,64 +31,63 @@ public class TurretGoalAimer {
     private final DcMotor turretMotor;
     private final BNO055IMU imu;                     // fallback
     private final GoBildaPinpointDriver pinpoint;    // preferred
-    private final Telemetry telemetry; // optional
+    private final Telemetry telemetry;
 
-    // Field references
-    private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(135));
-    private Pose targetPose = new Pose(14, 134, Math.toRadians(135)); // default (blue goal)
+    // Target (default to blue goal)
+    private Pose targetPose = new Pose(14, 134, 0);
 
-    // Limits (aligned with TurretController)
-    public static final int TURRET_MIN_POS = -1000;
-    public static final int TURRET_MAX_POS = 1000;
+    // Turret encoder hard limits (configurable)
+    @Sorter(sort = 0)
+    public static int TURRET_MIN_POS = -1000;
+    @Sorter(sort = 1)
+    public static int TURRET_MAX_POS = 1000;
+    @Sorter(sort = 2)
+    public static double TICKS_PER_RADIAN_SCALE = 0.87;
 
-    // Mapping (aligned with TurretController)
-    private static final double TICKS_PER_RADIAN_SCALE = 0.9;
-    private static final double TICKS_PER_RADIAN =
-            ((TURRET_MAX_POS - TURRET_MIN_POS) / (2.0 * Math.PI)) * TICKS_PER_RADIAN_SCALE;
+    // PID like config
+    @Sorter(sort = 3)
+    public static double TURRET_KP = 1.0;
+    @Sorter(sort = 4)
+    public static double TURRET_KI = 0.0;
+    @Sorter(sort = 5)
+    public static double TURRET_KD = 0.235;
+    @Sorter(sort = 6)
+    public static double TURRET_MAX_POWER = 1.0;
 
-    // Gains (aligned with TurretController)
-    private static final double TURRET_KP = 1.15;
-    private static final double TURRET_KI = 0.0;
-    private static final double TURRET_KD = 0.22;
-    private static final double TURRET_MAX_POWER = 1.0;
+    // Feedforward and smoothing/filtering (configurable)
+    @Sorter(sort = 7)
+    public static double FF_GAIN = 5.0;
+    @Sorter(sort = 8)
+    public static double POWER_SMOOTH_ALPHA = 0.9;
+    @Sorter(sort = 9)
+    public static double DERIV_FILTER_ALPHA = 1.0;
 
-    // FF & smoothing
-    private static final double FF_GAIN = 5.0;
-    private static final double POWER_SMOOTH_ALPHA = 0.935;
-    private static final double DERIV_FILTER_ALPHA = 1.25;
+    // Deadband & anti-windup (configurable)
+    @Sorter(sort = 10)
+    public static int SMALL_DEADBAND_TICKS = 3;
+    @Sorter(sort = 11)
+    public static double INTEGRAL_CLAMP = 50.0;
 
-    // Deadband & anti-windup
-    private static final int SMALL_DEADBAND_TICKS = 14;
-    private static final double INTEGRAL_CLAMP = 50.0;
-
-    // Lateral offset tuning
-    private static final double OFFSET_GAIN_RAD_PER_IN = 0.005;               // ~0.29 deg per inch
-    private static final double OFFSET_CLAMP_RAD = Math.toRadians(25.0);      // clamp offset to +/-25 deg
-
-    // State
+    // PID state
     private double turretIntegral = 0.0;
     private int lastErrorTicks = 0;
     private long lastTimeMs = -1L;
     private double lastAppliedPower = 0.0;
     private double lastDerivative = 0.0;
 
+    // Reference state (for heading-hold fallback)
     private double headingReferenceRad = 0.0;
     private double lastHeadingRad = 0.0;
     private int turretEncoderReference = 0;
     private boolean manualActiveLast = false;
 
-    // Aim reference: ensures zero error at the starting pose
-    private boolean aimReferenceCaptured = false;
-    private double aimReferenceRad = 0.0; // (goalBearing - heading - offset) at start
-
-    // Telemetry values
+    // Telemetry
     private int lastDesiredTicks = 0;
     private int lastErrorReported = 0;
     private double lastPidOut = 0.0;
     private double lastFf = 0.0;
-    private double lastOffsetRad = 0.0;
-    private double lastTargetAngleRad = 0.0;
-    private double lastGoalBearingRad = 0.0;
+    private double lastBearingDeg = 0.0;
+    private double lastRobotRelativeAngleDeg = 0.0;
 
     public TurretGoalAimer(DcMotor turretMotor, BNO055IMU imu, GoBildaPinpointDriver pinpoint, Telemetry telemetry) {
         this.turretMotor = turretMotor;
@@ -110,27 +98,26 @@ public class TurretGoalAimer {
         resetPidState();
     }
 
-    // Backward-compatible ctor (no Pinpoint)
+    // Backward-compatible constructor (no Pinpoint)
     public TurretGoalAimer(DcMotor turretMotor, BNO055IMU imu, Telemetry telemetry) {
         this(turretMotor, imu, null, telemetry);
     }
 
-    /** Set the field target to aim at. */
+    /** Set the target field position to aim at */
     public void setTargetPose(Pose target) {
-        if (target != null) this.targetPose = target;
+        if (target != null) {
+            this.targetPose = target;
+        }
     }
 
-    /** Capture IMU heading and turret encoder as reference. */
+    /** Capture current heading and turret encoder as reference */
     public void captureReferences() {
         headingReferenceRad = getHeadingRadians();
         lastHeadingRad = headingReferenceRad;
         turretEncoderReference = turretMotor.getCurrentPosition();
-        // reset aim reference so it will re-capture next time we have a pose
-        aimReferenceCaptured = false;
-        aimReferenceRad = 0.0;
     }
 
-    /** Reset PID internal state. */
+    /** Reset PID internal state */
     public void resetPidState() {
         turretIntegral = 0.0;
         lastErrorTicks = 0;
@@ -140,18 +127,22 @@ public class TurretGoalAimer {
         manualActiveLast = false;
     }
 
-    /** Manual-only overload. */
+    /** Manual-only update (no pose) */
     public void update(boolean manualNow, double manualPower) {
         update(manualNow, manualPower, null);
     }
 
     /**
-     * Main update: aim at targetPose using robotPose, with lateral offset correction.
-     * @param robotPose robot pose (PedroPathing Pose). If null, fall back to heading-hold.
+     * Main update loop - call this every control cycle
+     *
+     * @param manualNow true if driver is manually controlling turret
+     * @param manualPower manual power (-1.0 to 1.0)
+     * @param robotPose current robot pose from Follower.getPose() (can be null)
      */
     public void update(boolean manualNow, double manualPower, Pose robotPose) {
         long nowMs = System.currentTimeMillis();
 
+        // ========== MANUAL OVERRIDE ==========
         if (manualNow) {
             applyManualPower(manualPower);
             turretIntegral = 0.0;
@@ -163,6 +154,7 @@ public class TurretGoalAimer {
             return;
         }
 
+        // ========== TRANSITION FROM MANUAL TO AUTO ==========
         if (manualActiveLast && !manualNow) {
             captureReferences();
             lastTimeMs = nowMs;
@@ -171,126 +163,126 @@ public class TurretGoalAimer {
         }
         manualActiveLast = false;
 
+        // ========== GET CURRENT HEADING ==========
         double currentHeadingRad = getHeadingRadians();
+
+        // ========== CALCULATE TARGET ANGLE ==========
         double targetAngleRad;
-        double goalBearing = 0.0;
-        double offsetRad = 0.0;
 
         if (robotPose != null && targetPose != null) {
+            // POSE-BASED TRACKING: Calculate bearing from robot to target
+
+            // 1. Calculate field-relative bearing to target
             double dx = targetPose.getX() - robotPose.getX();
             double dy = targetPose.getY() - robotPose.getY();
-            goalBearing = Math.atan2(dy, dx);                // field-centric
+            double fieldBearingToTarget = Math.atan2(dy, dx);  // radians, field coordinates
 
-            // Line from START_POSE to targetPose
-            double lineX = targetPose.getX() - START_POSE.getX();
-            double lineY = targetPose.getY() - START_POSE.getY();
-            double lineMag = Math.hypot(lineX, lineY);
+            // 2. Convert to robot-relative angle
+            // The turret is mounted on the robot, so we need angle relative to robot's heading
+            double robotRelativeAngle = normalizeAngle(fieldBearingToTarget - robotPose.getHeading());
 
-            // Vector from START_POSE to robotPose
-            double rX = robotPose.getX() - START_POSE.getX();
-            double rY = robotPose.getY() - START_POSE.getY();
+            // 3. This is the angle the turret needs to be at (relative to its reference)
+            targetAngleRad = robotRelativeAngle;
 
-            // Signed perpendicular distance using 2D cross product (line x robot)
-            double cross = lineX * rY - lineY * rX;
-            double perpDist = (lineMag > 1e-6) ? cross / lineMag : 0.0; // inches, signed
-
-            // Offset magnitude (sign flipped to apply in the opposite direction)
-            offsetRad = -perpDist * OFFSET_GAIN_RAD_PER_IN;
-            if (offsetRad > OFFSET_CLAMP_RAD) offsetRad = OFFSET_CLAMP_RAD;
-            if (offsetRad < -OFFSET_CLAMP_RAD) offsetRad = -OFFSET_CLAMP_RAD;
-
-            // Capture aim reference once (at the first valid pose) so turret doesn't jump at start
-            if (!aimReferenceCaptured) {
-                double startOffsetRad = offsetRad;
-                double startGoalBearing = goalBearing;
-                // Note: subtract offset here to match the flipped effect
-                aimReferenceRad = normalizeAngle(startGoalBearing - currentHeadingRad - startOffsetRad);
-                aimReferenceCaptured = true;
-            }
-
-            // Desired turret angle relative to the captured aim reference
-            // FLIPPED EFFECT: subtract offsetRad (previously added)
-            targetAngleRad = normalizeAngle((goalBearing - currentHeadingRad - offsetRad) - aimReferenceRad);
+            // Save for telemetry
+            lastBearingDeg = Math.toDegrees(fieldBearingToTarget);
+            lastRobotRelativeAngleDeg = Math.toDegrees(robotRelativeAngle);
 
         } else {
-            // Fallback: heading hold like TurretController
+            // FALLBACK: Heading-hold mode (like TurretController)
+            // If no pose data, just compensate for heading changes
             double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
-            targetAngleRad = -headingDelta;
-            aimReferenceCaptured = false; // force re-capture when pose returns
+            targetAngleRad = -headingDelta;  // negative to counter-rotate
+
+            lastBearingDeg = 0.0;
+            lastRobotRelativeAngleDeg = Math.toDegrees(targetAngleRad);
         }
 
-        // Save telemetry values
-        lastOffsetRad = offsetRad;
-        lastGoalBearingRad = goalBearing;
-        lastTargetAngleRad = targetAngleRad;
-
-        // Compute angular velocity for feedforward
+        // ========== CALCULATE ANGULAR VELOCITY (for feedforward) ==========
         double angularVel = 0.0;
         if (lastTimeMs > 0) {
             double dtHeading = Math.max(0.0001, (nowMs - lastTimeMs) / 1000.0);
             double headingDeltaSinceLast = normalizeAngle(currentHeadingRad - lastHeadingRad);
-            angularVel = headingDeltaSinceLast / dtHeading;
+            angularVel = headingDeltaSinceLast / dtHeading;  // rad/s
         }
         lastHeadingRad = currentHeadingRad;
 
-        // Desired ticks from target angle (direction flipped: add instead of subtract)
-        double desiredTicksDouble = turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN;
-        int desiredTicks = (int)Math.round(desiredTicksDouble);
+        // ========== CONVERT ANGLE TO ENCODER TICKS ==========
+        // The turret encoder reference is where we captured it
+        // We want the turret to rotate by targetAngleRad from that reference
+        double desiredTicksDouble = turretEncoderReference + targetAngleRad * TICKS_PER_RADIAN_SCALE;
+        int desiredTicks = (int) Math.round(desiredTicksDouble);
+
+        // Clamp to limits
         if (desiredTicks > TURRET_MAX_POS) desiredTicks = TURRET_MAX_POS;
         if (desiredTicks < TURRET_MIN_POS) desiredTicks = TURRET_MIN_POS;
 
+        // ========== CALCULATE ERROR ==========
         int currentTicks = turretMotor.getCurrentPosition();
         int errorTicks = desiredTicks - currentTicks;
 
-        // Timing
+        // ========== PID CONTROL ==========
         long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
         double dt = dtMs / 1000.0;
         lastTimeMs = nowMs;
 
-        // Integral with sign-change damping
+        // Integral (with sign-change damping and clamping)
         if (Math.abs(errorTicks) > SMALL_DEADBAND_TICKS) {
-            if (lastErrorTicks != 0 && ((errorTicks > 0 && lastErrorTicks < 0) || (errorTicks < 0 && lastErrorTicks > 0))) {
+            // Dampen integral on sign change (reduce overshoot)
+            if (lastErrorTicks != 0 &&
+                    ((errorTicks > 0 && lastErrorTicks < 0) || (errorTicks < 0 && lastErrorTicks > 0))) {
                 turretIntegral *= 0.5;
             }
             turretIntegral += errorTicks * dt;
         } else {
-            turretIntegral *= 0.90;
+            turretIntegral *= 0.90;  // decay when near target
         }
 
         if (turretIntegral > INTEGRAL_CLAMP) turretIntegral = INTEGRAL_CLAMP;
         if (turretIntegral < -INTEGRAL_CLAMP) turretIntegral = -INTEGRAL_CLAMP;
 
-        // Derivative (filtered)
+        // Derivative (filtered to reduce noise)
         double rawDerivative = (errorTicks - lastErrorTicks) / Math.max(1e-4, dt);
-        double derivativeFiltered = DERIV_FILTER_ALPHA * rawDerivative + (1.0 - DERIV_FILTER_ALPHA) * lastDerivative;
+        double derivativeFiltered = DERIV_FILTER_ALPHA * rawDerivative +
+                (1.0 - DERIV_FILTER_ALPHA) * lastDerivative;
 
-        // PID
-        double pidOut = TURRET_KP * errorTicks + TURRET_KI * turretIntegral + TURRET_KD * derivativeFiltered;
+        // PID output
+        double pidOut = TURRET_KP * errorTicks +
+                TURRET_KI * turretIntegral +
+                TURRET_KD * derivativeFiltered;
 
-        // Feedforward: oppose robot yaw rate
+        // Feedforward: oppose robot rotation to maintain lock
         double ff = -angularVel * FF_GAIN;
 
+        // ========== COMMAND POWER ==========
         double cmdPower = pidOut + ff;
 
+        // Deadband (avoid jitter near target)
         if (Math.abs(errorTicks) <= SMALL_DEADBAND_TICKS) {
             cmdPower = 0.0;
         }
 
+        // Clamp to max power
         if (cmdPower > TURRET_MAX_POWER) cmdPower = TURRET_MAX_POWER;
         if (cmdPower < -TURRET_MAX_POWER) cmdPower = -TURRET_MAX_POWER;
 
-        double applied = POWER_SMOOTH_ALPHA * lastAppliedPower + (1.0 - POWER_SMOOTH_ALPHA) * cmdPower;
+        // Smooth power changes
+        double applied = POWER_SMOOTH_ALPHA * lastAppliedPower +
+                (1.0 - POWER_SMOOTH_ALPHA) * cmdPower;
 
-        if ((currentTicks >= TURRET_MAX_POS && applied > 0.0) || (currentTicks <= TURRET_MIN_POS && applied < 0.0)) {
+        // Stop at hard limits
+        if ((currentTicks >= TURRET_MAX_POS && applied > 0.0) ||
+                (currentTicks <= TURRET_MIN_POS && applied < 0.0)) {
             applied = 0.0;
         }
 
+        // ========== APPLY TO MOTOR ==========
         turretMotor.setPower(applied);
 
+        // ========== UPDATE STATE ==========
         lastErrorTicks = errorTicks;
         lastAppliedPower = applied;
         lastDerivative = derivativeFiltered;
-
         lastDesiredTicks = desiredTicks;
         lastErrorReported = errorTicks;
         lastPidOut = pidOut;
@@ -303,29 +295,34 @@ public class TurretGoalAimer {
         int currentTicks = turretMotor.getCurrentPosition();
 
         double requested = manualPower;
-        if ((currentTicks >= TURRET_MAX_POS && requested > 0.0) || (currentTicks <= TURRET_MIN_POS && requested < 0.0)) {
+
+        // Stop at limits
+        if ((currentTicks >= TURRET_MAX_POS && requested > 0.0) ||
+                (currentTicks <= TURRET_MIN_POS && requested < 0.0)) {
             requested = 0.0;
         }
+
+        // Clamp
         if (requested > 1.0) requested = 1.0;
         if (requested < -1.0) requested = -1.0;
 
         turretMotor.setPower(requested);
+
         lastDesiredTicks = turretEncoderReference;
         lastErrorReported = lastDesiredTicks - currentTicks;
         lastPidOut = 0.0;
         lastFf = 0.0;
-        lastOffsetRad = 0.0;
-        lastTargetAngleRad = 0.0;
-        aimReferenceCaptured = false; // re-capture after manual
     }
 
     private double getHeadingRadians() {
-        // Prefer Pinpoint; invert to match previous BNO sign convention. Fallback to BNO.
+        // Prefer Pinpoint; invert to match BNO055 sign convention
         if (pinpoint != null) {
             try {
                 return -pinpoint.getHeading(AngleUnit.RADIANS);
             } catch (Exception ignored) { }
         }
+
+        // Fallback to BNO055 IMU
         if (imu == null) return 0.0;
         Orientation o = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
         return -o.firstAngle;
@@ -337,25 +334,23 @@ public class TurretGoalAimer {
         return angle;
     }
 
-    // Telemetry getters
+    // ========== TELEMETRY GETTERS ==========
     public int getLastDesiredTicks() { return lastDesiredTicks; }
     public int getLastErrorTicks() { return lastErrorReported; }
     public double getLastPidOut() { return lastPidOut; }
     public double getLastFf() { return lastFf; }
     public double getLastAppliedPower() { return lastAppliedPower; }
-    public double getLastOffsetDeg() { return Math.toDegrees(lastOffsetRad); }
-    public double getLastGoalBearingDeg() { return Math.toDegrees(lastGoalBearingRad); }
-    public double getLastTargetAngleDeg() { return Math.toDegrees(lastTargetAngleRad); }
+    public double getLastBearingDeg() { return lastBearingDeg; }
+    public double getLastRobotRelativeAngleDeg() { return lastRobotRelativeAngleDeg; }
 
     private void publishTelemetry() {
         if (telemetry == null) return;
-        // telemetry.addData("turret.desired", lastDesiredTicks);
-        // telemetry.addData("turret.error", lastErrorReported);
-        // telemetry.addData("turret.pid", String.format("%.4f", lastPidOut));
-        // telemetry.addData("turret.ff", String.format("%.4f", lastFf));
-        // telemetry.addData("turret.applied", String.format("%.4f", lastAppliedPower));
-        // telemetry.addData("turret.offset(deg)", String.format("%.2f", Math.toDegrees(lastOffsetRad)));
-        // telemetry.addData("turret.goalBearing(deg)", String.format("%.2f", Math.toDegrees(lastGoalBearingRad)));
-        // telemetry.addData("turret.targetAngle(deg)", String.format("%.2f", Math.toDegrees(lastTargetAngleRad)));
+
+        telemetry.addData("Turret.Desired", lastDesiredTicks);
+        telemetry.addData("Turret.Current", turretMotor.getCurrentPosition());
+        telemetry.addData("Turret.Error", lastErrorReported);
+        telemetry.addData("Turret.FieldBearing", String.format("%.1f°", lastBearingDeg));
+        telemetry.addData("Turret.RobotRelative", String.format("%.1f°", lastRobotRelativeAngleDeg));
+        telemetry.addData("Turret.Power", String.format("%.3f", lastAppliedPower));
     }
 }
