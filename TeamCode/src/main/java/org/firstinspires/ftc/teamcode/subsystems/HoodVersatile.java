@@ -151,6 +151,8 @@ public class HoodVersatile {
 
         // Mark as initialized on first valid distance
         // This must happen before the jump check so subsequent calls will check for jumps
+        // Note: Even if this call's distance is rejected due to a jump, we're still initialized
+        // because we have a lastValidDistance from a previous accepted reading
         boolean wasInitialized = isInitialized;
         isInitialized = true;
 
