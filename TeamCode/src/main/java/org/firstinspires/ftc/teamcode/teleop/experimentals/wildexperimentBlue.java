@@ -517,9 +517,8 @@ public class wildexperimentBlue extends LinearOpMode {
         double dy = newPose.getY() - expectedPose.getY();
         double distance = Math.hypot(dx, dy);
 
-        // Allow up to 20 inches of movement per cycle (generous for driving)
-        // This prevents sudden jumps to wrong positions
-        return distance < 20.0;
+        // Prevent sudden jumps to wrong positions from sensor errors
+        return distance < CalibrationPoints.MAX_POSE_MOVEMENT_PER_CYCLE;
     }
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {

@@ -84,10 +84,16 @@ public class wildexperimentRed extends LinearOpMode {
 
     // Pose tracking
     private Follower follower;
-    private Pose currentPose = new Pose();
+    private Pose currentPose;
+    private Pose lastValidPose;
+    private int validPoseCount = 0;
+    private static final int REQUIRED_VALID_POSES = 5;  // Require 5 consecutive valid poses
 
     @Override
     public void runOpMode() {
+
+        currentPose = START_POSE;
+        lastValidPose = START_POSE;
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
@@ -234,12 +240,23 @@ public class wildexperimentRed extends LinearOpMode {
         hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
         // ==================== INITIAL STATE ====================
+        // Set initial values using START_POSE
+        double initialRpm = flywheelVersatile.getFinalTargetRPM(START_POSE);
+        double initialHood = hoodVersatile.getFinalTargetPosition(START_POSE);
+        double startDistance = CalibrationPoints.distanceToGoal(START_POSE, IS_RED_ALLIANCE);
+
+        flywheel.setTargetRPM(initialRpm);
+        hoodController.setRightPosition(initialHood);
+
         gateController.setGateClosed(true);
 
         telemetry.addData("Status", "Initialized");
         telemetry.addData("Alliance", "RED 🔴");
         telemetry.addData("Start Pose", "(%.1f, %.1f, %.1f°)",
                 START_POSE.getX(), START_POSE.getY(), Math.toDegrees(START_POSE.getHeading()));
+        telemetry.addData("Start Distance", "%.1f", startDistance);
+        telemetry.addData("Initial RPM", "%.0f", initialRpm);
+        telemetry.addData("Initial Hood", "%.3f", initialHood);
         telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
 
@@ -255,6 +272,7 @@ public class wildexperimentRed extends LinearOpMode {
 
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
+        validPoseCount = 0;
 
         // ==================== MAIN LOOP ====================
         while (opModeIsActive()) {
@@ -269,10 +287,22 @@ public class wildexperimentRed extends LinearOpMode {
                 }
             }
 
-            // Update follower and pose
+            // Get and validate pose from follower
             if (follower != null) {
                 follower.update();
-                currentPose = follower.getPose();
+                Pose rawPose = follower.getPose();
+
+                if (isValidPose(rawPose) && isNearExpectedPose(rawPose, lastValidPose)) {
+                    validPoseCount++;
+                    if (validPoseCount >= REQUIRED_VALID_POSES) {
+                        // Pose is stable and valid, use it
+                        currentPose = rawPose;
+                        lastValidPose = rawPose;
+                    }
+                } else {
+                    // Invalid or suspicious pose, reset counter
+                    validPoseCount = 0;
+                }
             }
 
             // ========== TOUCHPAD (GP2) = RESET POSE TO START ==========
@@ -281,6 +311,9 @@ public class wildexperimentRed extends LinearOpMode {
                 if (follower != null) {
                     follower.setStartingPose(START_POSE);
                 }
+                currentPose = START_POSE;
+                lastValidPose = START_POSE;
+                validPoseCount = 0;
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad2.rumble(300);
@@ -293,6 +326,9 @@ public class wildexperimentRed extends LinearOpMode {
                 if (follower != null) {
                     follower.setStartingPose(START_POSE);
                 }
+                currentPose = START_POSE;
+                lastValidPose = START_POSE;
+                validPoseCount = 0;
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad1.rumble(300);
@@ -458,6 +494,13 @@ public class wildexperimentRed extends LinearOpMode {
 
             telemetry.addData("Pose", "(%.1f, %.1f, %.1f°)",
                     currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()));
+            telemetry.addData("Valid Pose Count", validPoseCount);
+
+            // Debug info
+            if (follower != null) {
+                Pose raw = follower.getPose();
+                telemetry.addData("Raw Pose", "(%.1f, %.1f)", raw.getX(), raw.getY());
+            }
 
             // ========== PANELS TELEMETRY ==========
             panelsTelemetry.debug("Alliance", "RED");
@@ -477,6 +520,47 @@ public class wildexperimentRed extends LinearOpMode {
         }
 
         turretController.disable();
+    }
+
+    /**
+     * Check if pose is valid (not null, not at origin, within field)
+     */
+    private boolean isValidPose(Pose pose) {
+        if (pose == null) {
+            return false;
+        }
+
+        double x = pose.getX();
+        double y = pose.getY();
+
+        // Reject origin
+        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
+            return false;
+        }
+
+        // Reject out of field bounds
+        if (x < -5 || x > 150 || y < -5 || y > 150) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if new pose is reasonably close to expected pose
+     * (prevents sudden jumps from sensor errors)
+     */
+    private boolean isNearExpectedPose(Pose newPose, Pose expectedPose) {
+        if (newPose == null || expectedPose == null) {
+            return false;
+        }
+
+        double dx = newPose.getX() - expectedPose.getX();
+        double dy = newPose.getY() - expectedPose.getY();
+        double distance = Math.hypot(dx, dy);
+
+        // Prevent sudden jumps to wrong positions from sensor errors
+        return distance < CalibrationPoints.MAX_POSE_MOVEMENT_PER_CYCLE;
     }
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {

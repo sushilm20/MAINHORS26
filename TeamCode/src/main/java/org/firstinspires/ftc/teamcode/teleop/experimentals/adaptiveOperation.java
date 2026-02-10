@@ -1,15 +1,7 @@
 //package org.firstinspires.ftc.teamcode.teleop;
 //
 //
-///*
-//  thirdexperimentalHORS.java
-//  ---------------------------
-//  - Adds PedroPathing follower for pose tracking only.
-//  - New FlywheelVersatile computes RPM from distance to blue goal (14,134) using calibration points.
-//  - Keeps shooter on/off (dpad_down), RPM trim (dpad_left/right), continuous rumble at-target.
-//  - Removes far/close touchpad mode; RPM auto-adjusts from pose.
-//  - Gate servo toggle stays on dpad_up.
-//*/
+//
 //
 //import com.qualcomm.hardware.bosch.BNO055IMU;
 //import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
