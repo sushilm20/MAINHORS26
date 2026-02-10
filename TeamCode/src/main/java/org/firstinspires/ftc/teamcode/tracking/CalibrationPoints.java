@@ -2,17 +2,14 @@ package org.firstinspires.ftc.teamcode.tracking;
 
 import com.pedropathing.geometry.Pose;
 
-/**
- * Central storage for all calibration data.
- * All poses are in BLUE coordinates - auto mirrors for red alliance.
- */
+
 public class CalibrationPoints {
 
     // ==================== FIELD CONSTANTS ====================
-    public static final double MIRROR_AXIS = 146.0;
+    public static final double MIRROR_AXIS = 142.0;
 
     // ==================== GOAL POSES (BLUE) ====================
-    public static final Pose BLUE_GOAL = new Pose(0, 144, 0);
+    public static final Pose BLUE_GOAL = new Pose(10, 135, 0);
 
     // ==================== START POSES (BLUE) ====================
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
@@ -39,9 +36,9 @@ public class CalibrationPoints {
     public static final double FLYWHEEL_MIN_RPM = 2300;
     public static final double FLYWHEEL_MAX_RPM = 4000;
 
-    // Calibration data: {x, y, heading, rpm}
+    // Calibration data iss: {x, y, heading, rpm}
     public static final double[][] FLYWHEEL_CALIBRATION_DATA = {
-            {20, 122, 130, 2300},   // Start pose - minimum RPM
+            {20, 122, 130, 2300},   //tack heading but it is not used under calculation
             {48, 96, 135, 2350},
             {60, 125, 135, 2400},
             {60, 82, 135, 2500},
