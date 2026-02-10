@@ -98,7 +98,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     @Sorter(sort = 10)
     public static double INTAKE_ON_POWER = -0.75;
     @Sorter(sort = 11)
-    public static double SHOOT_POSE_INTAKE_POWER = -1.0;
+    public static double SHOOT_POSE_INTAKE_POWER = -0.95;
     @Sorter(sort = 12)
     public static double CLOSED_INTAKE_POWER = -0.67;
     @Sorter(sort = 13)
@@ -136,9 +136,9 @@ public class ExperimentalBluePedroAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 58.0;
+    public static double SHOOT_POSE_X = 58.0; //58
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 80.0;
+    public static double SHOOT_POSE_Y = 88.0;//80
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180.0;
     @Sorter(sort = 113)
