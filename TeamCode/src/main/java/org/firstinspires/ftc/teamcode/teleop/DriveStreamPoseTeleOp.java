@@ -38,7 +38,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
     public static double RANGE_BIAS = 0.0;  // additive correction (cm)
 
     @Sorter(sort = 3)
-    public static int STREAM_FPS = 60;      // desired stream FPS
+    public static int STREAM_FPS = 45;      // desired stream FPS
 
     @Sorter(sort = 4)
     public static double CAMERA_HEIGHT_CM = 30.0; // lens height from floor
