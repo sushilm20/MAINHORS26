@@ -2,20 +2,17 @@ package org.firstinspires.ftc.teamcode.tracking;
 
 import com.pedropathing.geometry.Pose;
 
-
+/**
+ * Central storage for all calibration data.
+ * All poses are in BLUE coordinates - auto mirrors for red alliance.
+ */
 public class CalibrationPoints {
 
     // ==================== FIELD CONSTANTS ====================
-    public static final double MIRROR_AXIS = 142.0;
-
-    // ==================== POSE VALIDATION CONSTANTS ====================
-    // Maximum distance jump allowed per cycle (in inches) to detect sensor errors
-    public static final double MAX_DISTANCE_JUMP = 50.0;
-    // Maximum movement allowed per cycle (in inches) for pose validation
-    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 20.0;
+    public static final double MIRROR_AXIS = 146.0;
 
     // ==================== GOAL POSES (BLUE) ====================
-    public static final Pose BLUE_GOAL = new Pose(10, 135, 0);
+    public static final Pose BLUE_GOAL = new Pose(0, 144, 0);
 
     // ==================== START POSES (BLUE) ====================
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
@@ -42,9 +39,10 @@ public class CalibrationPoints {
     public static final double FLYWHEEL_MIN_RPM = 2300;
     public static final double FLYWHEEL_MAX_RPM = 4000;
 
-    // Calibration data iss: {x, y, heading, rpm}
+    // Calibration data: {x, y, heading, rpm}
+    // Note: heading is metadata only - distance calculation uses X, Y only
     public static final double[][] FLYWHEEL_CALIBRATION_DATA = {
-            {20, 122, 130, 2300},   //tack heading but it is not used under calculation
+            {20, 122, 130, 2300},   // Start pose - minimum RPM
             {48, 96, 135, 2350},
             {60, 125, 135, 2400},
             {60, 82, 135, 2500},
@@ -65,6 +63,22 @@ public class CalibrationPoints {
     public static final double CLAW_OPEN = 0.63;
     public static final double CLAW_CLOSED = 0.2;
     public static final long CLAW_CLOSE_MS = 500L;
+
+    // ==================== POSE VALIDATION CONSTANTS ====================
+    /**
+     * Maximum reasonable distance change per control loop cycle (inches).
+     * Used to detect sensor errors - robot can't teleport!
+     * At 50 Hz loop rate, robot moving 60 in/s would move 1.2 inches per cycle.
+     * 30 inches gives plenty of headroom for sensor noise.
+     */
+    public static final double MAX_DISTANCE_JUMP = 30.0;
+
+    /**
+     * Maximum reasonable pose movement per control loop cycle (inches).
+     * Used to validate that new pose readings are plausible.
+     * Prevents accepting corrupted sensor data that shows robot at wrong location.
+     */
+    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 24.0;
 
     // ==================== HELPER METHODS ====================
 
