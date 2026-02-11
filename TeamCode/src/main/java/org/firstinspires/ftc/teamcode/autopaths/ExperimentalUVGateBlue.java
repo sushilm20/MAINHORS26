@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "UV Gate Clear Blue", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "UV Gate Clear Blue", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class ExperimentalUVGateBlue extends OpMode {
 

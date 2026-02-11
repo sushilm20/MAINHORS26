@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue 12 Ball Gate 🔷", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "Blue 12 Ball Gate 🔷", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class BluePedroAuto extends OpMode {
 

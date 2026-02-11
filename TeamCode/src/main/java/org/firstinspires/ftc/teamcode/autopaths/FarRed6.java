@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Far 9?? 🔴 (Mirrored)", group = "Autonomous", preselectTeleOp = "HORS EXPERIMENTAL 🤖")
+@Autonomous(name = "Far 9?? 🔴 (Mirrored)", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class FarRed6 extends OpMode {
 
