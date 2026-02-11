@@ -37,7 +37,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 import java.util.Locale;
 
-@TeleOp(name="Tracking TeleOp 🎯", group="Linear OpMode")
+@TeleOp(name="Camera Tracking TeleOp 🎯", group="Linear OpMode")
 public class TrackingTeleOp extends LinearOpMode {
 
     // ===================== CAMERA SETTINGS =====================

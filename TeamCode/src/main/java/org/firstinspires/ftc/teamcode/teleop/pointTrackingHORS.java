@@ -182,17 +182,14 @@ public class pointTrackingHORS extends LinearOpMode {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(START_POSE);
         } catch (Exception e) {
-            telemetry.addData("Error", "Follower initialization failed!");
+            telemetry.addData("Error", "Follower init failed!");
             follower = null;
         }
 
-        String imuUsed = (pinpoint != null) ? "pinpoint" : (imu != null) ? "imu (expansion hub)" : "none";
-
         // ==================== CONTROLLERS INIT ====================
-        turretAimer = new TurretGoalAimer(turret, imu, pinpoint, telemetry);
+        turretAimer = new TurretGoalAimer(turret, imu, pinpoint, null);  // No telemetry spam
         turretAimer.setTargetPose(isRedAlliance ? RED_GOAL : BLUE_GOAL);
 
-        // Hook limit switch to homing
         if (turretLimitSwitch != null) {
             turretAimer.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
@@ -221,12 +218,8 @@ public class pointTrackingHORS extends LinearOpMode {
         // ==================== INITIAL STATE ====================
         gateController.setGateClosed(true);
 
-        telemetry.addData("Status", "Initialized - Point Tracking Mode 🎯");
-        telemetry.addData("Target", isRedAlliance ? "Red Goal" : "Blue Goal");
-        telemetry.addData("Turret IMU", imuUsed);
-        telemetry.addData("Limit Switch", turretLimitSwitch != null ? "Connected" : "Not Found");
-        telemetry.addData("Start Pose", String.format("(%.1f, %.1f, %.1f°)",
-                START_POSE.getX(), START_POSE.getY(), Math.toDegrees(START_POSE.getHeading())));
+        telemetry.addData("Status", "Ready 🎯");
+        telemetry.addData("Alliance", isRedAlliance ? "RED 🔴" : "BLUE 🔵");
         telemetry.update();
 
         turretAimer.captureReferences();
@@ -234,10 +227,11 @@ public class pointTrackingHORS extends LinearOpMode {
 
         waitForStart();
 
-        if (isStopRequested()) {
-            return;
-        }
+        if (isStopRequested()) return;
 
+        // Force unfreeze and reset at start
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         reZeroTurret();
         flywheel.setShooterOn(true);
 
@@ -254,33 +248,34 @@ public class pointTrackingHORS extends LinearOpMode {
             }
 
             if (follower != null) {
-                follower.update();
-                currentPose = follower.getPose();
+                try {
+                    follower.update();
+                    currentPose = follower.getPose();
+                } catch (Exception ignored) {}
             }
 
-            // ========== BUTTON A: FULL RESET (POSE + HEADING + TURRET ZERO) ==========
+            // Fallback pose if null
+            if (currentPose == null) {
+                currentPose = START_POSE;
+            }
+
+            // ========== BUTTON A: FULL RESET ==========
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                // Reset pose to starting position
                 if (follower != null) {
                     follower.setStartingPose(START_POSE);
                 }
-                // Reset turret encoder to zero and recenter
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad1.rumble(300);
-                telemetry.addData("RESET", "Pose + Heading + Turret Zeroed! ✅");
-                telemetry.update();
             }
             aPressedLast = aNow;
 
-            // ========== GP2 TOUCHPAD: TURRET RECALIBRATE ONLY ==========
+            // ========== GP2 TOUCHPAD: TURRET RECALIBRATE ==========
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
                 reZeroTurret();
-                driveController.stop();
-                telemetry.addData("Reset", "Turret recalibrated (gp2 touchpad)");
-                telemetry.update();
+                gamepad2.rumble(200);
             }
             gamepad2TouchpadLast = gp2Touch;
 
@@ -312,14 +307,14 @@ public class pointTrackingHORS extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // ========== GATE TOGGLE (B) ==========
+            // ========== GATE TOGGLE ==========
             boolean bNow = gamepad1.b || gamepad2.b;
             if (bNow && !bPressedLast && !gateController.isBusy()) {
                 gateController.toggleGate();
             }
             bPressedLast = bNow;
 
-            // ========== INTAKE SEQUENCE (Y) ==========
+            // ========== INTAKE SEQUENCE ==========
             boolean yNow = gamepad1.y || gamepad2.y;
             if (yNow && !yPressedLast && !gateController.isBusy()) {
                 gateController.startIntakeSequence(nowMs);
@@ -349,17 +344,17 @@ public class pointTrackingHORS extends LinearOpMode {
                 try { gamepad2.rumble(200); } catch (Throwable ignored) {}
             }
 
-            // ========== HOMING SWEEP (DPAD UP / GP2 LEFT BUMPER) ==========
+            // ========== HOMING SWEEP ==========
             turretAimer.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             // ========== TURRET CONTROL ==========
             boolean manualNow = false;
             double manualPower = 0.0;
 
-            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
+            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.5) {
                 manualNow = true;
                 manualPower = 0.35;
-            } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
+            } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.5) {
                 manualNow = true;
                 manualPower = -0.35;
             }
@@ -378,7 +373,7 @@ public class pointTrackingHORS extends LinearOpMode {
                 }
             }
 
-            // ========== CLAW (X) ==========
+            // ========== CLAW ==========
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xPressedLast) {
                 clawController.trigger(nowMs);
@@ -387,25 +382,16 @@ public class pointTrackingHORS extends LinearOpMode {
             clawController.update(nowMs);
 
             // ========== HOOD ADJUSTMENTS ==========
-            if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // ========== TELEMETRY ==========
-            telemetry.addData("Mode", "Point Tracking 🎯");
-            telemetry.addData("Target", isRedAlliance ? "Red Goal" : "Blue Goal");
-            telemetry.addData("Flywheel", "%.0f / %.0f rpm",
+            // ========== ESSENTIAL TELEMETRY ONLY ==========
+            telemetry.addData("RPM", "%.0f → %.0f",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
-
-            telemetry.addData("Robot Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)",
-                    currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
-
-            telemetry.addData("Turret Bearing", "%.1f°", turretAimer.getLastBearingDeg());
-            telemetry.addData("Turret Angle", "%.1f°", turretAimer.getLastRobotRelativeAngleDeg());
-            telemetry.addData("Turret Error", "%d ticks", turretAimer.getLastErrorTicks());
-            telemetry.addData("Turret Mode", turretAimer.isFreezeMode() ? "FREEZE 🔒" :
-                    (turretAimer.isHomingMode() ? "HOMING 🔄" : "TRACKING 🎯"));
+            telemetry.addData("Turret", "%s | %d err",
+                    turretAimer.isFreezeMode() ? "HOLD" : (turretAimer.isHomingMode() ? "HOME" : "TRACK"),
+                    turretAimer.getLastErrorTicks());
+            telemetry.addData("Pose", "(%.0f, %.0f, %.0f°)",
+                    currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()));
 
             telemetry.update();
         }
@@ -429,9 +415,6 @@ public class pointTrackingHORS extends LinearOpMode {
         }
     }
 
-    /**
-     * Capture current turret position as reference (no encoder reset)
-     */
     private void reZeroTurret() {
         if (pinpoint != null) {
             try {
@@ -442,9 +425,6 @@ public class pointTrackingHORS extends LinearOpMode {
         turretAimer.resetPidState();
     }
 
-    /**
-     * Reset turret encoder to zero and recenter references
-     */
     private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
         if (pinpoint != null) {
             try {
