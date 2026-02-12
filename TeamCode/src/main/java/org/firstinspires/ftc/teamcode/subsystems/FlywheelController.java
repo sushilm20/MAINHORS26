@@ -18,8 +18,7 @@ public class FlywheelController {
     private final VoltageSensor voltageSensor; // nullable
     private final ElapsedTime timer = new ElapsedTime();
 
-    // --- Panels-configurable constants (public static) ---
-    @Sorter(sort = 0) public static double MAX_RPM = 6000.0;
+
     @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
     // --- RPM threshold for switching between CLOSE and FAR PIDF coefficients ---
