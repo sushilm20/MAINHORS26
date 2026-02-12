@@ -25,7 +25,7 @@ public class AdaptiveRPM {
     @Sorter(sort = 3) public static double DIST_FAR_INCHES = 120.0;
     @Sorter(sort = 4) public static double RPM_FAR = 3000.0;
 
-    @Sorter(sort = 5) public static double RPM_MIN = 2400.0;
+    @Sorter(sort = 5) public static double RPM_MIN = 2600.0;
     @Sorter(sort = 6) public static double RPM_MAX = 3500.0;
     @Sorter(sort = 7) public static double RPM_FALLBACK = 2600.0;
 
