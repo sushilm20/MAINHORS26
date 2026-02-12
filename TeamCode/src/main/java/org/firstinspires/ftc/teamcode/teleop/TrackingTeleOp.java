@@ -46,7 +46,7 @@ public class TrackingTeleOp extends LinearOpMode {
     private static final int STREAM_FPS = 30;
 
     // Target AprilTag ID to track (-1 for any tag)
-    private static final int TARGET_TAG_ID = -1;
+    private static final int TARGET_TAG_ID = 22;
 
     // ===================== HARDWARE =====================
     // Drive motors

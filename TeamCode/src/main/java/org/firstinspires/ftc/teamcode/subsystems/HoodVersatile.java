@@ -144,7 +144,7 @@ public class HoodVersatile {
 
         double newDistance = calculateDistance(robotPose);
 
-        // Validate distance
+
         if (!isReasonableDistance(newDistance)) {
             return lastTargetPos;
         }
