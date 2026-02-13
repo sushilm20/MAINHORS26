@@ -342,12 +342,12 @@ public class wildexperimentBlue extends LinearOpMode {
                 }
             }
 
-            panelsTelemetry.debug("X", String.format("%.1f", distanceTracker.getX()));
-            panelsTelemetry.debug("Y", String.format("%.1f", distanceTracker.getY()));
-            panelsTelemetry.debug("Dist", String.format("%.1f", distanceTracker.getDistance()));
-            panelsTelemetry.debug("RPM", String.format("%.0f", flywheel.getTargetRPM()));
-            panelsTelemetry.debug("Hood", String.format("%.3f", hoodController.getRightPos()));
-            panelsTelemetry.debug("Valid", distanceTracker.wasLastPoseValid() ? "YES" : "NO");
+//            panelsTelemetry.debug("X", String.format("%.1f", distanceTracker.getX()));
+//            panelsTelemetry.debug("Y", String.format("%.1f", distanceTracker.getY()));
+//            panelsTelemetry.debug("Dist", String.format("%.1f", distanceTracker.getDistance()));
+//            panelsTelemetry.debug("RPM", String.format("%.0f", flywheel.getTargetRPM()));
+//            panelsTelemetry.debug("Hood", String.format("%.3f", hoodController.getRightPos()));
+//            panelsTelemetry.debug("Valid", distanceTracker.wasLastPoseValid() ? "YES" : "NO");
 
             telemetry.update();
             panelsTelemetry.update(telemetry);
