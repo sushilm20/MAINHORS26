@@ -34,6 +34,8 @@ public class wildexperimentRed extends LinearOpMode {
     private static final boolean IS_RED_ALLIANCE = true;
     private static final Pose START_POSE = CalibrationPoints.getStartPose(true);
 
+    private static final double POSE_SMOOTHING = 0.3;
+
     // Hardware
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, shooter2, turret, intakeMotor;
@@ -66,21 +68,18 @@ public class wildexperimentRed extends LinearOpMode {
     private BNO055IMU imu;
     private GoBildaPinpointDriver pinpoint;
 
-    // Pose tracking
+    // Pose tracking - smoothed values
     private Follower follower;
-    private Pose currentPose;
-    private Pose lastGoodPose;
-
-    // Pose validation
-    private int loopCount = 0;
-    private static final int WARMUP_LOOPS = 10;
-    private static final double MAX_JUMP_PER_LOOP = 5.0;
+    private double smoothedX;
+    private double smoothedY;
+    private double smoothedHeading;
 
     @Override
     public void runOpMode() {
 
-        currentPose = START_POSE;
-        lastGoodPose = START_POSE;
+        smoothedX = START_POSE.getX();
+        smoothedY = START_POSE.getY();
+        smoothedHeading = START_POSE.getHeading();
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
@@ -184,8 +183,9 @@ public class wildexperimentRed extends LinearOpMode {
         hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
         // Initial values
-        double initRpm = flywheelVersatile.getFinalTargetRPM(START_POSE);
-        double initHood = hoodVersatile.getFinalTargetPosition(START_POSE);
+        Pose initPose = new Pose(smoothedX, smoothedY, smoothedHeading);
+        double initRpm = flywheelVersatile.getFinalTargetRPM(initPose);
+        double initHood = hoodVersatile.getFinalTargetPosition(initPose);
         flywheel.setTargetRPM(initRpm);
         hoodController.setRightPosition(initHood);
         gateController.setGateClosed(true);
@@ -207,31 +207,46 @@ public class wildexperimentRed extends LinearOpMode {
         reZero(imuParams);
         flywheel.setShooterOn(true);
 
-        loopCount = 0;
-        currentPose = START_POSE;
-        lastGoodPose = START_POSE;
+        smoothedX = START_POSE.getX();
+        smoothedY = START_POSE.getY();
+        smoothedHeading = START_POSE.getHeading();
 
         // ===== MAIN LOOP =====
         while (opModeIsActive()) {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
-            loopCount++;
 
             if (pinpoint != null) { try { pinpoint.update(); } catch (Exception ignored) {} }
 
-            // ===== POSE UPDATE WITH VALIDATION =====
-            updatePoseFromFollower();
+            // ===== GET RAW POSE AND SMOOTH IT =====
+            Pose rawPose = null;
+            if (follower != null) {
+                follower.update();
+                rawPose = follower.getPose();
+            }
+
+            if (rawPose != null) {
+                double rawX = rawPose.getX();
+                double rawY = rawPose.getY();
+                double rawH = rawPose.getHeading();
+
+                if (!(Math.abs(rawX) < 0.5 && Math.abs(rawY) < 0.5)) {
+                    smoothedX = POSE_SMOOTHING * rawX + (1.0 - POSE_SMOOTHING) * smoothedX;
+                    smoothedY = POSE_SMOOTHING * rawY + (1.0 - POSE_SMOOTHING) * smoothedY;
+                    smoothedHeading = POSE_SMOOTHING * rawH + (1.0 - POSE_SMOOTHING) * smoothedHeading;
+                }
+            }
+
+            Pose currentPose = new Pose(smoothedX, smoothedY, smoothedHeading);
 
             // Reset controls
             if (getTouchpad(gamepad2) && !gamepad2TouchpadLast) {
                 resetPose(imuParams);
-                loopCount = 0;
             }
             gamepad2TouchpadLast = getTouchpad(gamepad2);
 
             if (gamepad1.a && !aPressedLast) {
                 resetPose(imuParams);
-                loopCount = 0;
             }
             aPressedLast = gamepad1.a;
 
@@ -324,23 +339,18 @@ public class wildexperimentRed extends LinearOpMode {
 
             // ===== TELEMETRY =====
             telemetry.addData("Alliance", "RED 🔴");
-            telemetry.addData("Loop", loopCount);
-            telemetry.addData("Warmup", loopCount < WARMUP_LOOPS ? "YES" : "NO");
             telemetry.addData("Auto", "Fly:%s Hood:%s", autoFlywheelEnabled ? "ON" : "OFF", autoHoodEnabled ? "ON" : "OFF");
             telemetry.addData("Flywheel", "%.0f / %.0f rpm", flywheel.getCurrentRPM(), flywheel.getTargetRPM());
             telemetry.addData("Distance", "%.1f", hoodVersatile.getLastDistance());
             telemetry.addData("Hood", "%.3f", hoodVersatile.getLastTargetPos());
-            telemetry.addData("CurrentPose", "(%.1f, %.1f)", currentPose.getX(), currentPose.getY());
+            telemetry.addData("SmoothedPose", "(%.1f, %.1f)", smoothedX, smoothedY);
 
-            if (follower != null) {
-                Pose raw = follower.getPose();
-                if (raw != null) {
-                    telemetry.addData("RawPose", "(%.1f, %.1f)", raw.getX(), raw.getY());
-                }
+            if (rawPose != null) {
+                telemetry.addData("RawPose", "(%.1f, %.1f)", rawPose.getX(), rawPose.getY());
             }
 
-            panelsTelemetry.debug("X", String.format("%.1f", currentPose.getX()));
-            panelsTelemetry.debug("Y", String.format("%.1f", currentPose.getY()));
+            panelsTelemetry.debug("X", String.format("%.1f", smoothedX));
+            panelsTelemetry.debug("Y", String.format("%.1f", smoothedY));
             panelsTelemetry.debug("Dist", String.format("%.1f", hoodVersatile.getLastDistance()));
             panelsTelemetry.debug("RPM", String.format("%.0f", flywheel.getTargetRPM()));
             panelsTelemetry.debug("Hood", String.format("%.3f", hoodVersatile.getLastTargetPos()));
@@ -352,52 +362,14 @@ public class wildexperimentRed extends LinearOpMode {
         turretController.disable();
     }
 
-    /**
-     * Update pose from follower with validation
-     */
-    private void updatePoseFromFollower() {
-        if (follower == null) {
-            return;
-        }
-
-        follower.update();
-        Pose rawPose = follower.getPose();
-
-        if (rawPose == null) {
-            return;
-        }
-
-        double rawX = rawPose.getX();
-        double rawY = rawPose.getY();
-
-        // During warmup, only accept poses close to START_POSE
-        if (loopCount <= WARMUP_LOOPS) {
-            double distFromStart = Math.hypot(rawX - START_POSE.getX(), rawY - START_POSE.getY());
-
-            if (distFromStart < 10.0) {
-                currentPose = rawPose;
-                lastGoodPose = rawPose;
-            }
-            return;
-        }
-
-        // After warmup, check for reasonable movement
-        double dx = rawX - lastGoodPose.getX();
-        double dy = rawY - lastGoodPose.getY();
-        double movement = Math.hypot(dx, dy);
-
-        if (movement < MAX_JUMP_PER_LOOP) {
-            currentPose = rawPose;
-            lastGoodPose = rawPose;
-        }
-    }
-
     private void resetPose(BNO055IMU.Parameters imuParams) {
         if (follower != null) {
             follower.setStartingPose(START_POSE);
         }
-        currentPose = START_POSE;
-        lastGoodPose = START_POSE;
+        smoothedX = START_POSE.getX();
+        smoothedY = START_POSE.getY();
+        smoothedHeading = START_POSE.getHeading();
+
         if (pinpoint != null) { try { pinpoint.update(); } catch (Exception ignored) {} }
         turretController.recenterAndResume(true);
         driveController.stop();
