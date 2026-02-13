@@ -17,15 +17,13 @@ public class CalibrationPoints {
     // ==================== START POSES (BLUE) ====================
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
 
-    // Pre-calculated start distance (for initialization)
-    public static final double START_DISTANCE = Math.hypot(
-            BLUE_START_POSE.getX() - BLUE_GOAL.getX(),
-            BLUE_START_POSE.getY() - BLUE_GOAL.getY()
-    );  // Should be ~30 units
+    // Pre-calculated start distance: sqrt(20² + 22²) ≈ 29.7
+    public static final double START_DISTANCE = 29.7;
 
     // ==================== HOOD CALIBRATION ====================
-    public static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);
-    public static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);
+    // Close = start pose, Far = max range pose
+    public static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);   // ~30 units from goal
+    public static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);      // ~150 units from goal
 
     // Hood servo positions
     public static final double HOOD_MIN = 0.12;
@@ -45,16 +43,31 @@ public class CalibrationPoints {
     public static final double FLYWHEEL_MIN_RPM = 2300;
     public static final double FLYWHEEL_MAX_RPM = 4000;
 
-    // Calibration data: {x, y, heading, rpm}
+    /**
+     * Calibration data: {x, y, heading, rpm}
+     * MUST be sorted by increasing distance to goal for proper interpolation!
+     *
+     * Distance calculations (goal at 0, 144):
+     * (20, 122)  → sqrt(20² + 22²)  = 29.7  → 2300 RPM
+     * (60, 125)  → sqrt(60² + 19²)  = 62.9  → 2400 RPM
+     * (48, 96)   → sqrt(48² + 48²)  = 67.9  → 2450 RPM (adjusted for monotonic)
+     * (72, 120)  → sqrt(72² + 24²)  = 75.9  → 2550 RPM
+     * (60, 82)   → sqrt(60² + 62²)  = 86.3  → 2650 RPM (adjusted for monotonic)
+     * (95, 120)  → sqrt(95² + 24²)  = 98.0  → 2750 RPM (adjusted for monotonic)
+     * (72, 72)   → sqrt(72² + 72²)  = 101.8 → 2850 RPM (adjusted for monotonic)
+     * (52, 14)   → sqrt(52² + 130²) = 140.0 → 3750 RPM
+     */
     public static final double[][] FLYWHEEL_CALIBRATION_DATA = {
-            {20, 122, 130, 2300},   // Start pose - minimum RPM
-            {48, 96, 135, 2350},
-            {60, 125, 135, 2400},
-            {60, 82, 135, 2500},
-            {72, 120, 167, 2550},
-            {72, 72, 135, 2650},
-            {95, 120, 135, 2850},
-            {52, 14, 135, 3750}
+            // Sorted by distance: closest to farthest
+            // {x, y, heading, rpm}
+            {20, 122, 130, 2300},   // dist ~30
+            {60, 125, 135, 2400},   // dist ~63
+            {48, 96, 135, 2450},    // dist ~68 (was 2350, adjusted to be monotonic)
+            {72, 120, 167, 2550},   // dist ~76
+            {60, 82, 135, 2650},    // dist ~86 (was 2500, adjusted to be monotonic)
+            {95, 120, 135, 2750},   // dist ~98 (was 2850, adjusted to be monotonic)
+            {72, 72, 135, 2850},    // dist ~102 (was 2650, adjusted to be monotonic)
+            {52, 14, 135, 3750}     // dist ~140
     };
 
     // ==================== GATE/INTAKE CONSTANTS ====================
@@ -68,11 +81,6 @@ public class CalibrationPoints {
     public static final double CLAW_OPEN = 0.63;
     public static final double CLAW_CLOSED = 0.2;
     public static final long CLAW_CLOSE_MS = 500L;
-
-    // ==================== POSE VALIDATION CONSTANTS ====================
-    // Maximum distance jump per cycle - VERY generous to allow first reading
-    public static final double MAX_DISTANCE_JUMP = 50.0;
-    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 30.0;
 
     // ==================== HELPER METHODS ====================
 
@@ -91,12 +99,14 @@ public class CalibrationPoints {
     }
 
     public static double distanceToGoal(Pose pose) {
+        if (pose == null) return START_DISTANCE;
         double dx = pose.getX() - BLUE_GOAL.getX();
         double dy = pose.getY() - BLUE_GOAL.getY();
         return Math.hypot(dx, dy);
     }
 
     public static double distanceToGoal(Pose pose, boolean isRedAlliance) {
+        if (pose == null) return START_DISTANCE;
         Pose effectivePose = isRedAlliance ? pose.mirror(MIRROR_AXIS) : pose;
         double dx = effectivePose.getX() - BLUE_GOAL.getX();
         double dy = effectivePose.getY() - BLUE_GOAL.getY();

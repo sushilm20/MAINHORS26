@@ -5,8 +5,11 @@ import com.pedropathing.geometry.Pose;
 import org.firstinspires.ftc.teamcode.tracking.CalibrationPoints;
 
 /**
- * Computes target hood position from robot pose relative to goal.
- * CLOSE to goal = hood at MIN, FAR from goal = hood at MAX
+ * Computes target hood position from robot pose.
+ * CLOSE to goal = hood at MIN (0.12)
+ * FAR from goal = hood at MAX (0.48)
+ *
+ * Uses linear regression between two calibration points.
  */
 public class HoodVersatile {
 
@@ -21,16 +24,13 @@ public class HoodVersatile {
 
     private boolean isRedAlliance = false;
 
+    // Linear regression: pos = slope * distance + intercept
     private double slope = 0.0;
     private double intercept = 0.0;
+
     private double trimPos = 0.0;
     private double lastTargetPos;
     private double lastDistance;
-    private double lastValidDistance;
-
-    // Debug tracking
-    private int updateCount = 0;
-    private String lastRejectReason = "";
 
     public HoodVersatile(HoodController hoodController,
                          Pose goalPose,
@@ -43,15 +43,15 @@ public class HoodVersatile {
         this.minPos = minPos;
         this.maxPos = maxPos;
 
-        // Calculate distances for calibration poses
-        this.closeDistance = calculateDistanceBlue(closePose);
-        this.farDistance = calculateDistanceBlue(farPose);
+        // Calculate distances for the two calibration poses
+        this.closeDistance = calcDistBlue(closePose);  // ~30 units
+        this.farDistance = calcDistBlue(farPose);      // ~150 units
 
-        // Initialize to START_POSE values
+        // Initialize with start values
         this.lastDistance = CalibrationPoints.START_DISTANCE;
-        this.lastValidDistance = CalibrationPoints.START_DISTANCE;
         this.lastTargetPos = minPos;
 
+        // Compute linear regression
         computeRegression();
     }
 
@@ -63,88 +63,89 @@ public class HoodVersatile {
         return isRedAlliance;
     }
 
+    /**
+     * Compute linear regression coefficients
+     * At closeDistance -> minPos
+     * At farDistance -> maxPos
+     */
     private void computeRegression() {
-        double distanceRange = farDistance - closeDistance;
+        double dRange = farDistance - closeDistance;
 
-        if (Math.abs(distanceRange) < 1e-6) {
+        if (Math.abs(dRange) < 0.001) {
             slope = 0.0;
             intercept = minPos;
             return;
         }
 
-        slope = (maxPos - minPos) / distanceRange;
+        // slope = (maxPos - minPos) / (farDist - closeDist)
+        slope = (maxPos - minPos) / dRange;
+
+        // intercept = minPos - slope * closeDist
         intercept = minPos - slope * closeDistance;
     }
 
-    private double computePositionFromDistance(double distance) {
-        double raw = slope * distance + intercept;
+    /**
+     * Calculate hood position from distance
+     */
+    private double posFromDist(double dist) {
+        double raw = slope * dist + intercept;
         return clamp(raw);
     }
 
-    private double calculateDistanceBlue(Pose pose) {
-        if (pose == null) {
-            return lastValidDistance;
-        }
+    /**
+     * Calculate distance from pose to BLUE goal
+     */
+    private double calcDistBlue(Pose pose) {
+        if (pose == null) return lastDistance;
         double dx = pose.getX() - blueGoalPose.getX();
         double dy = pose.getY() - blueGoalPose.getY();
         return Math.hypot(dx, dy);
     }
 
-    private double calculateDistance(Pose robotPose) {
-        if (robotPose == null) {
-            return lastValidDistance;
-        }
+    /**
+     * Calculate distance with alliance mirroring
+     */
+    private double calcDist(Pose robotPose) {
+        if (robotPose == null) return lastDistance;
 
         Pose effectivePose = robotPose;
-
         if (isRedAlliance) {
             effectivePose = robotPose.mirror(MIRROR_AXIS);
         }
 
-        return calculateDistanceBlue(effectivePose);
+        return calcDistBlue(effectivePose);
     }
 
     public double getDistanceToGoal(Pose pose) {
-        return calculateDistance(pose);
+        return calcDist(pose);
     }
 
     /**
-     * Compute base hood position - SIMPLIFIED VERSION
+     * Main computation - SIMPLE and DIRECT
      */
     public double computeBasePosition(Pose robotPose) {
-        updateCount++;
-        lastRejectReason = "";
-
-        // Null check
+        // Handle null
         if (robotPose == null) {
-            lastRejectReason = "null pose";
             return lastTargetPos;
         }
 
+        // Get X, Y
         double x = robotPose.getX();
         double y = robotPose.getY();
 
-        // Only reject obvious bad poses (at origin)
-        if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) {
-            lastRejectReason = "origin pose";
+        // ONLY reject if literally at origin (0,0)
+        if (Math.abs(x) < 0.1 && Math.abs(y) < 0.1) {
             return lastTargetPos;
         }
 
         // Calculate distance
-        double newDistance = calculateDistance(robotPose);
+        double dist = calcDist(robotPose);
 
-        // Basic sanity check
-        if (newDistance < 5.0 || newDistance > 250.0) {
-            lastRejectReason = "distance out of range: " + newDistance;
-            return lastTargetPos;
-        }
+        // Store for telemetry
+        lastDistance = dist;
 
-        // ACCEPT the distance
-        lastDistance = newDistance;
-        lastValidDistance = newDistance;
-
-        // Calculate hood position
-        lastTargetPos = computePositionFromDistance(newDistance);
+        // Calculate hood position from linear regression
+        lastTargetPos = posFromDist(dist);
 
         return lastTargetPos;
     }
@@ -154,6 +155,9 @@ public class HoodVersatile {
         return clamp(base + trimPos);
     }
 
+    /**
+     * Update the hood servo
+     */
     public void update(Pose robotPose) {
         if (hoodController == null) {
             return;
@@ -183,10 +187,6 @@ public class HoodVersatile {
         return lastDistance;
     }
 
-    public double getLastValidDistance() {
-        return lastValidDistance;
-    }
-
     public double getMinPos() {
         return minPos;
     }
@@ -211,15 +211,7 @@ public class HoodVersatile {
         return farDistance;
     }
 
-    public int getUpdateCount() {
-        return updateCount;
-    }
-
-    public String getLastRejectReason() {
-        return lastRejectReason;
-    }
-
-    private double clamp(double value) {
-        return Math.max(minPos, Math.min(maxPos, value));
+    private double clamp(double val) {
+        return Math.max(minPos, Math.min(maxPos, val));
     }
 }
