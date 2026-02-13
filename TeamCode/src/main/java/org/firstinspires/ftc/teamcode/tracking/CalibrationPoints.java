@@ -11,6 +11,12 @@ public class CalibrationPoints {
     // ==================== FIELD CONSTANTS ====================
     public static final double MIRROR_AXIS = 146.0;
 
+    // ==================== POSE VALIDATION CONSTANTS ====================
+    // Maximum distance jump allowed per cycle (in inches) to detect sensor errors
+    public static final double MAX_DISTANCE_JUMP = 50.0;
+    // Maximum movement allowed per cycle (in inches) for pose validation
+    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 20.0;
+
     // ==================== GOAL POSES (BLUE) ====================
     public static final Pose BLUE_GOAL = new Pose(0, 144, 0);
 
