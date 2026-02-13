@@ -17,6 +17,12 @@ public class CalibrationPoints {
     // ==================== START POSES (BLUE) ====================
     public static final Pose BLUE_START_POSE = new Pose(20, 122, Math.toRadians(130));
 
+    // Pre-calculated start distance (for initialization)
+    public static final double START_DISTANCE = Math.hypot(
+            BLUE_START_POSE.getX() - BLUE_GOAL.getX(),
+            BLUE_START_POSE.getY() - BLUE_GOAL.getY()
+    );  // Should be ~30 units
+
     // ==================== HOOD CALIBRATION ====================
     public static final Pose HOOD_CLOSE_POSE = new Pose(20, 122, 0);
     public static final Pose HOOD_FAR_POSE = new Pose(72, 12, 0);
@@ -40,7 +46,6 @@ public class CalibrationPoints {
     public static final double FLYWHEEL_MAX_RPM = 4000;
 
     // Calibration data: {x, y, heading, rpm}
-    // Note: heading is metadata only - distance calculation uses X, Y only
     public static final double[][] FLYWHEEL_CALIBRATION_DATA = {
             {20, 122, 130, 2300},   // Start pose - minimum RPM
             {48, 96, 135, 2350},
@@ -65,20 +70,9 @@ public class CalibrationPoints {
     public static final long CLAW_CLOSE_MS = 500L;
 
     // ==================== POSE VALIDATION CONSTANTS ====================
-    /**
-     * Maximum reasonable distance change per control loop cycle (inches).
-     * Used to detect sensor errors - robot can't teleport!
-     * At 50 Hz loop rate, robot moving 60 in/s would move 1.2 inches per cycle.
-     * 30 inches gives plenty of headroom for sensor noise.
-     */
-    public static final double MAX_DISTANCE_JUMP = 30.0;
-
-    /**
-     * Maximum reasonable pose movement per control loop cycle (inches).
-     * Used to validate that new pose readings are plausible.
-     * Prevents accepting corrupted sensor data that shows robot at wrong location.
-     */
-    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 24.0;
+    // Maximum distance jump per cycle - VERY generous to allow first reading
+    public static final double MAX_DISTANCE_JUMP = 50.0;
+    public static final double MAX_POSE_MOVEMENT_PER_CYCLE = 30.0;
 
     // ==================== HELPER METHODS ====================
 

@@ -25,9 +25,12 @@ public class HoodVersatile {
     private double intercept = 0.0;
     private double trimPos = 0.0;
     private double lastTargetPos;
-    private double lastDistance = 0.0;
-    private double lastValidDistance = 0.0;
-    private boolean isInitialized = false;
+    private double lastDistance;
+    private double lastValidDistance;
+
+    // Debug tracking
+    private int updateCount = 0;
+    private String lastRejectReason = "";
 
     public HoodVersatile(HoodController hoodController,
                          Pose goalPose,
@@ -40,13 +43,13 @@ public class HoodVersatile {
         this.minPos = minPos;
         this.maxPos = maxPos;
 
-        // Calculate distances
+        // Calculate distances for calibration poses
         this.closeDistance = calculateDistanceBlue(closePose);
         this.farDistance = calculateDistanceBlue(farPose);
 
-        // Initialize with close distance
-        this.lastDistance = closeDistance;
-        this.lastValidDistance = closeDistance;
+        // Initialize to START_POSE values
+        this.lastDistance = CalibrationPoints.START_DISTANCE;
+        this.lastValidDistance = CalibrationPoints.START_DISTANCE;
         this.lastTargetPos = minPos;
 
         computeRegression();
@@ -101,73 +104,47 @@ public class HoodVersatile {
         return calculateDistanceBlue(effectivePose);
     }
 
-    /**
-     * Check if a distance value is reasonable
-     */
-    private boolean isReasonableDistance(double distance) {
-        return distance >= 10.0 && distance <= 200.0;
-    }
-
-    /**
-     * Check if a pose is valid
-     */
-    private boolean isValidPose(Pose pose) {
-        if (pose == null) {
-            return false;
-        }
-
-        double x = pose.getX();
-        double y = pose.getY();
-
-        // Reject origin
-        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
-            return false;
-        }
-
-        // Reject out of field bounds
-        if (x < -5 || x > 150 || y < -5 || y > 150) {
-            return false;
-        }
-
-        return true;
-    }
-
     public double getDistanceToGoal(Pose pose) {
         return calculateDistance(pose);
     }
 
+    /**
+     * Compute base hood position - SIMPLIFIED VERSION
+     */
     public double computeBasePosition(Pose robotPose) {
-        // Validate pose
-        if (!isValidPose(robotPose)) {
+        updateCount++;
+        lastRejectReason = "";
+
+        // Null check
+        if (robotPose == null) {
+            lastRejectReason = "null pose";
             return lastTargetPos;
         }
 
+        double x = robotPose.getX();
+        double y = robotPose.getY();
+
+        // Only reject obvious bad poses (at origin)
+        if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) {
+            lastRejectReason = "origin pose";
+            return lastTargetPos;
+        }
+
+        // Calculate distance
         double newDistance = calculateDistance(robotPose);
 
-
-        if (!isReasonableDistance(newDistance)) {
+        // Basic sanity check
+        if (newDistance < 5.0 || newDistance > 250.0) {
+            lastRejectReason = "distance out of range: " + newDistance;
             return lastTargetPos;
         }
 
-        // Mark as initialized on first valid distance
-        // This must happen before the jump check so subsequent calls will check for jumps
-        // Note: Even if this call's distance is rejected due to a jump, we're still initialized
-        // because we have a lastValidDistance from a previous accepted reading
-        boolean wasInitialized = isInitialized;
-        isInitialized = true;
-
-        // Check for sudden jumps to detect sensor errors
-        // Skip this check on first initialization
-        if (wasInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
-            return lastTargetPos;
-        }
-
-        // Accept this distance
+        // ACCEPT the distance
         lastDistance = newDistance;
         lastValidDistance = newDistance;
 
-        // Calculate position
-        lastTargetPos = computePositionFromDistance(lastDistance);
+        // Calculate hood position
+        lastTargetPos = computePositionFromDistance(newDistance);
 
         return lastTargetPos;
     }
@@ -232,6 +209,14 @@ public class HoodVersatile {
 
     public double getFarDistance() {
         return farDistance;
+    }
+
+    public int getUpdateCount() {
+        return updateCount;
+    }
+
+    public String getLastRejectReason() {
+        return lastRejectReason;
     }
 
     private double clamp(double value) {

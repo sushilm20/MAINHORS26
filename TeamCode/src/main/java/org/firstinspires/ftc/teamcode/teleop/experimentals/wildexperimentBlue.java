@@ -34,18 +34,9 @@ public class wildexperimentBlue extends LinearOpMode {
     private static final boolean IS_RED_ALLIANCE = false;
     private static final Pose START_POSE = CalibrationPoints.BLUE_START_POSE;
 
-    private DcMotor frontLeftDrive;
-    private DcMotor backLeftDrive;
-    private DcMotor frontRightDrive;
-    private DcMotor backRightDrive;
-    private DcMotor shooter;
-    private DcMotor shooter2;
-    private DcMotor turret;
-    private DcMotor intakeMotor;
-    private Servo clawServo;
-    private Servo leftHoodServo;
-    private Servo rightHoodServo;
-    private Servo gateServo;
+    private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
+    private DcMotor shooter, shooter2, turret, intakeMotor;
+    private Servo clawServo, leftHoodServo, rightHoodServo, gateServo;
     private DigitalChannel turretLimitSwitch;
 
     private TurretController turretController;
@@ -78,18 +69,15 @@ public class wildexperimentBlue extends LinearOpMode {
 
     private Follower follower;
     private Pose currentPose;
-    private Pose lastValidPose;
-    private int validPoseCount = 0;
-    private static final int REQUIRED_VALID_POSES = 5;  // Need 5 consecutive valid poses
 
     @Override
     public void runOpMode() {
 
         currentPose = START_POSE;
-        lastValidPose = START_POSE;
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
+        // Hardware init
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
@@ -120,9 +108,9 @@ public class wildexperimentBlue extends LinearOpMode {
         VoltageSensor batterySensor = null;
         try {
             batterySensor = hardwareMap.voltageSensor.iterator().next();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
 
+        // Motor setup
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -137,39 +125,31 @@ public class wildexperimentBlue extends LinearOpMode {
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        // IMU setup
         BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
         imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
 
-        try {
-            imu = hardwareMap.get(BNO055IMU.class, "imu");
-        } catch (Exception e) {
-            imu = null;
-        }
+        try { imu = hardwareMap.get(BNO055IMU.class, "imu"); } catch (Exception e) { imu = null; }
         try {
             pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
             if (pinpoint != null) pinpoint.resetPosAndIMU();
-        } catch (Exception e) {
-            pinpoint = null;
-        }
+        } catch (Exception e) { pinpoint = null; }
 
         if (imu != null) {
-            try {
-                imu.initialize(imuParams);
-            } catch (Exception ignored) {
-            }
+            try { imu.initialize(imuParams); } catch (Exception ignored) {}
         }
 
+        // Follower
         try {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(START_POSE);
         } catch (Exception e) {
-            telemetry.addData("Error", "Follower initialization failed!");
+            telemetry.addData("Error", "Follower init failed!");
             follower = null;
         }
 
-        String imuUsed = (pinpoint != null) ? "pinpoint" : (imu != null) ? "imu" : "none";
-
+        // Controllers
         turretController = new TurretController(turret, imu, pinpoint, telemetry);
         if (turretLimitSwitch != null) {
             turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
@@ -203,6 +183,7 @@ public class wildexperimentBlue extends LinearOpMode {
                 CalibrationPoints.HOOD_DEBOUNCE_MS
         );
 
+        // Versatile controllers
         flywheelVersatile = new FlywheelVersatile(
                 flywheel,
                 CalibrationPoints.BLUE_GOAL,
@@ -222,20 +203,18 @@ public class wildexperimentBlue extends LinearOpMode {
         );
         hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
-        // Set initial values using START_POSE
+        // Initial values
         double initialRpm = flywheelVersatile.getFinalTargetRPM(START_POSE);
         double initialHood = hoodVersatile.getFinalTargetPosition(START_POSE);
-        double startDistance = CalibrationPoints.distanceToGoal(START_POSE);
 
         flywheel.setTargetRPM(initialRpm);
         hoodController.setRightPosition(initialHood);
-
         gateController.setGateClosed(true);
 
         telemetry.addData("Status", "Initialized");
         telemetry.addData("Alliance", "BLUE 🔵");
-        telemetry.addData("Start Pose", "(%.1f, %.1f)", START_POSE.getX(), START_POSE.getY());
-        telemetry.addData("Start Distance", "%.1f", startDistance);
+        telemetry.addData("Start", "(%.1f, %.1f)", START_POSE.getX(), START_POSE.getY());
+        telemetry.addData("Start Dist", "%.1f", CalibrationPoints.START_DISTANCE);
         telemetry.addData("Initial RPM", "%.0f", initialRpm);
         telemetry.addData("Initial Hood", "%.3f", initialHood);
         telemetry.update();
@@ -252,68 +231,47 @@ public class wildexperimentBlue extends LinearOpMode {
 
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
-        validPoseCount = 0;
 
+        // Main loop
         while (opModeIsActive()) {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
 
             if (pinpoint != null) {
-                try {
-                    pinpoint.update();
-                } catch (Exception ignored) {
-                }
+                try { pinpoint.update(); } catch (Exception ignored) {}
             }
 
-            // Get and validate pose from follower
+            // Get pose from follower - DIRECTLY use it
             if (follower != null) {
                 follower.update();
-                Pose rawPose = follower.getPose();
-
-                if (isValidPose(rawPose) && isNearExpectedPose(rawPose, lastValidPose)) {
-                    validPoseCount++;
-                    if (validPoseCount >= REQUIRED_VALID_POSES) {
-                        // Pose is stable and valid, use it
-                        currentPose = rawPose;
-                        lastValidPose = rawPose;
-                    }
-                } else {
-                    // Invalid or suspicious pose, reset counter
-                    validPoseCount = 0;
+                Pose newPose = follower.getPose();
+                if (newPose != null) {
+                    currentPose = newPose;
                 }
             }
 
-            // Touchpad GP2 = Reset pose
+            // Reset controls
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
-                if (follower != null) {
-                    follower.setStartingPose(START_POSE);
-                }
+                if (follower != null) follower.setStartingPose(START_POSE);
                 currentPose = START_POSE;
-                lastValidPose = START_POSE;
-                validPoseCount = 0;
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad2.rumble(300);
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button GP1 = Reset pose
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                if (follower != null) {
-                    follower.setStartingPose(START_POSE);
-                }
+                if (follower != null) follower.setStartingPose(START_POSE);
                 currentPose = START_POSE;
-                lastValidPose = START_POSE;
-                validPoseCount = 0;
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad1.rumble(300);
             }
             aPressedLast = aNow;
 
-            // Touchpad GP1 or RB GP2 = Toggle auto modes
+            // Toggle auto modes
             boolean touchpadNow = getTouchpad(gamepad1) || gamepad2.right_bumper;
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
@@ -333,54 +291,39 @@ public class wildexperimentBlue extends LinearOpMode {
             double yaw = gamepad1.right_stick_x;
             driveController.setDrive(axial, lateral, yaw, 1.0);
 
-            // Flywheel toggles
+            // Flywheel controls
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
-            if (dpadDownNow && !dpadDownLast) {
-                flywheel.toggleShooterOn();
-            }
+            if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
             dpadDownLast = dpadDownNow;
 
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
             if (dpadLeftNow && !dpadLeftLast) {
-                if (autoFlywheelEnabled) {
-                    flywheelVersatile.adjustTrim(-50.0);
-                } else {
-                    flywheel.adjustTargetRPM(-50.0);
-                }
+                if (autoFlywheelEnabled) flywheelVersatile.adjustTrim(-50.0);
+                else flywheel.adjustTargetRPM(-50.0);
             }
             dpadLeftLast = dpadLeftNow;
 
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
             if (dpadRightNow && !dpadRightLast) {
-                if (autoFlywheelEnabled) {
-                    flywheelVersatile.adjustTrim(50.0);
-                } else {
-                    flywheel.adjustTargetRPM(50.0);
-                }
+                if (autoFlywheelEnabled) flywheelVersatile.adjustTrim(50.0);
+                else flywheel.adjustTargetRPM(50.0);
             }
             dpadRightLast = dpadRightNow;
 
-            // Gate toggle
+            // Gate
             boolean bNow = gamepad1.b || gamepad2.b;
-            if (bNow && !bPressedLast && !gateController.isBusy()) {
-                gateController.toggleGate();
-            }
+            if (bNow && !bPressedLast && !gateController.isBusy()) gateController.toggleGate();
             bPressedLast = bNow;
 
             // Intake sequence
             boolean yNow = gamepad1.y || gamepad2.y;
-            if (yNow && !yPressedLast && !gateController.isBusy()) {
-                gateController.startIntakeSequence(nowMs);
-            }
+            if (yNow && !yPressedLast && !gateController.isBusy()) gateController.startIntakeSequence(nowMs);
             yPressedLast = yNow;
 
-            // Gate update
             boolean shouldTriggerClaw = gateController.update(nowMs);
-            if (shouldTriggerClaw) {
-                clawController.trigger(nowMs);
-            }
+            if (shouldTriggerClaw) clawController.trigger(nowMs);
 
-            // Auto flywheel - uses internal validation
+            // AUTO FLYWHEEL
             if (autoFlywheelEnabled) {
                 double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
                 flywheel.setTargetRPM(targetRpm);
@@ -391,21 +334,18 @@ public class wildexperimentBlue extends LinearOpMode {
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Auto hood - uses internal validation
+            // AUTO HOOD
             if (autoHoodEnabled) {
                 hoodVersatile.update(currentPose);
             }
 
             // Hood trim
             if (autoHoodEnabled) {
-                if (gamepad2.left_stick_y < -0.5) {
-                    hoodVersatile.adjustTrim(CalibrationPoints.HOOD_TRIM_STEP);
-                } else if (gamepad2.left_stick_y > 0.5) {
-                    hoodVersatile.adjustTrim(-CalibrationPoints.HOOD_TRIM_STEP);
-                }
+                if (gamepad2.left_stick_y < -0.5) hoodVersatile.adjustTrim(CalibrationPoints.HOOD_TRIM_STEP);
+                else if (gamepad2.left_stick_y > 0.5) hoodVersatile.adjustTrim(-CalibrationPoints.HOOD_TRIM_STEP);
             }
 
-            // Rumble at target
+            // Rumble
             if (flywheel.isAtTarget()) {
                 try { gamepad1.rumble(200); } catch (Throwable ignored) {}
                 try { gamepad2.rumble(200); } catch (Throwable ignored) {}
@@ -413,58 +353,52 @@ public class wildexperimentBlue extends LinearOpMode {
 
             // Turret
             turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
-
             boolean manualNow = false;
             double manualPower = 0.0;
-            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
-                manualNow = true;
-                manualPower = 0.35;
-            } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
-                manualNow = true;
-                manualPower = -0.35;
-            }
+            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) { manualNow = true; manualPower = 0.35; }
+            else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) { manualNow = true; manualPower = -0.35; }
             turretController.update(manualNow, manualPower);
 
             // Intake manual
             if (!gateController.isBusy()) {
                 boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
-                if (leftTriggerNow) {
-                    intakeMotor.setPower(-1.0);
-                } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
-                    intakeMotor.setPower(1.0);
-                } else {
-                    intakeMotor.setPower(0.0);
-                }
+                if (leftTriggerNow) intakeMotor.setPower(-1.0);
+                else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) intakeMotor.setPower(1.0);
+                else intakeMotor.setPower(0.0);
             }
 
             // Claw
             boolean xNow = gamepad1.x || gamepad2.x;
-            if (xNow && !xPressedLast) {
-                clawController.trigger(nowMs);
-            }
+            if (xNow && !xPressedLast) clawController.trigger(nowMs);
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Telemetry
+            // ========== TELEMETRY ==========
             telemetry.addData("Alliance", "BLUE 🔵");
-            telemetry.addData("Flywheel", "%.0f / %.0f rpm %s",
-                    flywheel.getCurrentRPM(), flywheel.getTargetRPM(),
-                    autoFlywheelEnabled ? "(AUTO)" : "(MANUAL)");
+            telemetry.addData("Auto", "Fly:%s Hood:%s",
+                    autoFlywheelEnabled ? "ON" : "OFF",
+                    autoHoodEnabled ? "ON" : "OFF");
+
+            telemetry.addData("Flywheel", "%.0f / %.0f rpm",
+                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
             telemetry.addData("Fly Trim", "%.0f rpm", flywheelVersatile.getTrimRpm());
-            telemetry.addData("Hood", "%.3f | Dist: %.1f | Trim: %.3f",
+
+            telemetry.addData("Hood", "%.3f | Dist: %.1f",
                     hoodVersatile.getLastTargetPos(),
-                    hoodVersatile.getLastDistance(),
-                    hoodVersatile.getTrimPos());
+                    hoodVersatile.getLastDistance());
+            telemetry.addData("Hood Trim", "%.3f", hoodVersatile.getTrimPos());
+
             telemetry.addData("Pose", "(%.1f, %.1f, %.1f°)",
                     currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()));
-            telemetry.addData("Valid Pose Count", validPoseCount);
 
-            // Debug info
-            if (follower != null) {
-                Pose raw = follower.getPose();
-                telemetry.addData("Raw Pose", "(%.1f, %.1f)", raw.getX(), raw.getY());
-            }
+            // DEBUG INFO
+            telemetry.addLine("--- DEBUG ---");
+            telemetry.addData("Fly Updates", flywheelVersatile.getUpdateCount());
+            telemetry.addData("Fly Reject", flywheelVersatile.getLastRejectReason());
+            telemetry.addData("Hood Updates", hoodVersatile.getUpdateCount());
+            telemetry.addData("Hood Reject", hoodVersatile.getLastRejectReason());
 
+            // Panels
             panelsTelemetry.debug("Alliance", "BLUE");
             panelsTelemetry.debug("X", String.format("%.1f", currentPose.getX()));
             panelsTelemetry.debug("Y", String.format("%.1f", currentPose.getY()));
@@ -480,75 +414,24 @@ public class wildexperimentBlue extends LinearOpMode {
         turretController.disable();
     }
 
-    /**
-     * Check if pose is valid (not null, not at origin, within field)
-     */
-    private boolean isValidPose(Pose pose) {
-        if (pose == null) {
-            return false;
-        }
-
-        double x = pose.getX();
-        double y = pose.getY();
-
-        // Reject origin
-        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
-            return false;
-        }
-
-        // Reject out of field bounds
-        if (x < -5 || x > 150 || y < -5 || y > 150) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check if new pose is reasonably close to expected pose
-     * (prevents sudden jumps from sensor errors)
-     */
-    private boolean isNearExpectedPose(Pose newPose, Pose expectedPose) {
-        if (newPose == null || expectedPose == null) {
-            return false;
-        }
-
-        double dx = newPose.getX() - expectedPose.getX();
-        double dy = newPose.getY() - expectedPose.getY();
-        double distance = Math.hypot(dx, dy);
-
-        // Prevent sudden jumps to wrong positions from sensor errors
-        return distance < CalibrationPoints.MAX_POSE_MOVEMENT_PER_CYCLE;
-    }
-
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {
-        try {
-            return gp.touchpad;
-        } catch (Throwable t) {
-            return gp.left_stick_button && gp.right_stick_button;
-        }
+        try { return gp.touchpad; }
+        catch (Throwable t) { return gp.left_stick_button && gp.right_stick_button; }
     }
 
     private LED getLedSafe(String name) {
-        try {
-            return hardwareMap.get(LED.class, name);
-        } catch (Exception ignored) {
-            return null;
-        }
+        try { return hardwareMap.get(LED.class, name); }
+        catch (Exception ignored) { return null; }
     }
 
     private void reZeroHeadingAndTurret(BNO055IMU.Parameters imuParams) {
-        if (pinpoint != null) {
-            try { pinpoint.update(); } catch (Exception ignored) {}
-        }
+        if (pinpoint != null) { try { pinpoint.update(); } catch (Exception ignored) {} }
         turretController.captureReferences();
         turretController.resetPidState();
     }
 
     private void resetTurretEncoderAndReferences(BNO055IMU.Parameters imuParams) {
-        if (pinpoint != null) {
-            try { pinpoint.update(); } catch (Exception ignored) {}
-        }
+        if (pinpoint != null) { try { pinpoint.update(); } catch (Exception ignored) {} }
         turretController.recenterAndResume(true);
     }
 }

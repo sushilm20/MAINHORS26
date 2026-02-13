@@ -31,16 +31,17 @@ public class FlywheelVersatile {
     private final List<DistancePoint> sortedPoints;
     private final double minRpm;
     private final double maxRpm;
-    private final double minDistance;  // Closest calibration distance
-    private final double maxDistance;  // Farthest calibration distance
 
     private boolean isRedAlliance = false;
 
     private double trimRpm = 0.0;
     private double lastBaseRpm;
-    private double lastDistance = 0.0;
-    private double lastValidDistance = 0.0;
-    private boolean isInitialized = false;
+    private double lastDistance;
+    private double lastValidDistance;
+
+    // Track number of updates for debugging
+    private int updateCount = 0;
+    private String lastRejectReason = "";
 
     public FlywheelVersatile(FlywheelController flywheel,
                              Pose goalPose,
@@ -50,6 +51,10 @@ public class FlywheelVersatile {
         this.blueGoalPose = goalPose;
         this.minRpm = minRpm;
         this.maxRpm = maxRpm;
+
+        // Initialize to START_POSE distance
+        this.lastDistance = CalibrationPoints.START_DISTANCE;
+        this.lastValidDistance = CalibrationPoints.START_DISTANCE;
         this.lastBaseRpm = minRpm;
 
         // Convert raw data to distance points
@@ -64,17 +69,6 @@ public class FlywheelVersatile {
         }
 
         Collections.sort(sortedPoints, Comparator.comparingDouble(a -> a.distance));
-
-        // Store min/max distances from calibration
-        if (!sortedPoints.isEmpty()) {
-            this.minDistance = sortedPoints.get(0).distance;
-            this.maxDistance = sortedPoints.get(sortedPoints.size() - 1).distance;
-            this.lastValidDistance = minDistance;
-        } else {
-            this.minDistance = 0;
-            this.maxDistance = 200;
-            this.lastValidDistance = 30;
-        }
     }
 
     public void setRedAlliance(boolean isRed) {
@@ -108,83 +102,62 @@ public class FlywheelVersatile {
         return calculateDistanceBlue(effectivePose);
     }
 
-    /**
-     * Check if a distance value is reasonable
-     */
-    private boolean isReasonableDistance(double distance) {
-        // Distance should be between 10 and 200 units (field is ~144 inches)
-        // Reject very small or very large distances as sensor errors
-        return distance >= 10.0 && distance <= 200.0;
-    }
-
-    /**
-     * Check if a pose is valid and makes sense
-     */
-    private boolean isValidPose(Pose pose) {
-        if (pose == null) {
-            return false;
-        }
-
-        double x = pose.getX();
-        double y = pose.getY();
-
-        // Reject origin
-        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
-            return false;
-        }
-
-        // Reject out of field bounds (with margin)
-        if (x < -5 || x > 150 || y < -5 || y > 150) {
-            return false;
-        }
-
-        return true;
-    }
-
     public double getDistanceToGoal(Pose pose) {
         return calculateDistance(pose);
     }
 
+    /**
+     * Compute base RPM from pose - SIMPLIFIED VERSION
+     * Removes overly aggressive validation that was blocking updates
+     */
     public double computeBaseRpm(Pose robotPose) {
-        // Validate pose
-        if (!isValidPose(robotPose)) {
+        updateCount++;
+        lastRejectReason = "";
+
+        // Null check
+        if (robotPose == null) {
+            lastRejectReason = "null pose";
             return lastBaseRpm;
         }
 
+        double x = robotPose.getX();
+        double y = robotPose.getY();
+
+        // Only reject obvious bad poses (at origin)
+        if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) {
+            lastRejectReason = "origin pose";
+            return lastBaseRpm;
+        }
+
+        // Calculate distance
         double newDistance = calculateDistance(robotPose);
 
-        // Validate distance is reasonable
-        if (!isReasonableDistance(newDistance)) {
+        // Basic sanity check - distance should be positive and reasonable
+        if (newDistance < 5.0 || newDistance > 250.0) {
+            lastRejectReason = "distance out of range: " + newDistance;
             return lastBaseRpm;
         }
 
-        // Mark as initialized on first valid distance
-        // This must happen before the jump check so subsequent calls will check for jumps
-        // Note: Even if this call's distance is rejected due to a jump, we're still initialized
-        // because we have a lastValidDistance from a previous accepted reading
-        boolean wasInitialized = isInitialized;
-        isInitialized = true;
-
-        // Check for sudden jumps to detect sensor errors
-        // Skip this check on first initialization
-        if (wasInitialized && Math.abs(newDistance - lastValidDistance) > CalibrationPoints.MAX_DISTANCE_JUMP) {
-            // Suspicious jump - ignore this reading
-            return lastBaseRpm;
-        }
-
-        // Accept this distance
+        // ACCEPT the distance - update tracking
         lastDistance = newDistance;
         lastValidDistance = newDistance;
 
-        // Calculate RPM
+        // Calculate RPM from distance using interpolation
+        lastBaseRpm = interpolateRpm(newDistance);
+
+        return lastBaseRpm;
+    }
+
+    /**
+     * Interpolate RPM from distance using calibration points
+     */
+    private double interpolateRpm(double distance) {
         if (sortedPoints.isEmpty()) {
-            lastBaseRpm = minRpm;
-            return lastBaseRpm;
+            return minRpm;
         }
 
         if (sortedPoints.size() == 1) {
-            lastBaseRpm = clamp(sortedPoints.get(0).rpm);
-            return lastBaseRpm;
+            return clamp(sortedPoints.get(0).rpm);
         }
 
         // Find bracketing points
@@ -192,21 +165,20 @@ public class FlywheelVersatile {
         DistancePoint upper = null;
 
         for (DistancePoint p : sortedPoints) {
-            if (p.distance <= lastDistance) {
+            if (p.distance <= distance) {
                 lower = p;
             }
-            if (p.distance >= lastDistance && upper == null) {
+            if (p.distance >= distance && upper == null) {
                 upper = p;
             }
         }
 
-        // Below all calibration points - use minimum RPM
+        // Below all calibration points
         if (lower == null) {
-            lastBaseRpm = clamp(sortedPoints.get(0).rpm);
-            return lastBaseRpm;
+            return clamp(sortedPoints.get(0).rpm);
         }
 
-        // Above all calibration points - extrapolate carefully
+        // Above all calibration points - extrapolate
         if (upper == null) {
             int n = sortedPoints.size();
             DistancePoint p1 = sortedPoints.get(n - 2);
@@ -214,26 +186,23 @@ public class FlywheelVersatile {
 
             double distRange = p2.distance - p1.distance;
             if (Math.abs(distRange) < 1e-6) {
-                lastBaseRpm = clamp(p2.rpm);
-            } else {
-                double slope = (p2.rpm - p1.rpm) / distRange;
-                double extrapolated = p2.rpm + slope * (lastDistance - p2.distance);
-                lastBaseRpm = clamp(extrapolated);
+                return clamp(p2.rpm);
             }
-            return lastBaseRpm;
+
+            double slope = (p2.rpm - p1.rpm) / distRange;
+            double extrapolated = p2.rpm + slope * (distance - p2.distance);
+            return clamp(extrapolated);
         }
 
         // Interpolate between lower and upper
         double distRange = upper.distance - lower.distance;
         if (Math.abs(distRange) < 1e-6) {
-            lastBaseRpm = clamp(lower.rpm);
-        } else {
-            double t = (lastDistance - lower.distance) / distRange;
-            double interpolated = lower.rpm + t * (upper.rpm - lower.rpm);
-            lastBaseRpm = clamp(interpolated);
+            return clamp(lower.rpm);
         }
 
-        return lastBaseRpm;
+        double t = (distance - lower.distance) / distRange;
+        double interpolated = lower.rpm + t * (upper.rpm - lower.rpm);
+        return clamp(interpolated);
     }
 
     public double getFinalTargetRPM(Pose robotPose) {
@@ -263,6 +232,14 @@ public class FlywheelVersatile {
 
     public double getLastValidDistance() {
         return lastValidDistance;
+    }
+
+    public int getUpdateCount() {
+        return updateCount;
+    }
+
+    public String getLastRejectReason() {
+        return lastRejectReason;
     }
 
     private double clamp(double value) {
