@@ -26,6 +26,7 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodVersatile;
 import org.firstinspires.ftc.teamcode.tracking.CalibrationPoints;
+import org.firstinspires.ftc.teamcode.tracking.DistanceTracker;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @TeleOp(name = "HORS RED 🔴", group = "Linear OpMode")
@@ -53,11 +54,12 @@ public class wildexperimentRed extends LinearOpMode {
     private TurretController turretController;
     private DriveController driveController;
     private FlywheelController flywheel;
-    private FlywheelVersatile flywheelVersatile;
     private GateController gateController;
     private ClawController clawController;
     private HoodController hoodController;
-    private HoodVersatile hoodVersatile;
+
+    // DistanceTracker orchestrates pose -> distance -> RPM -> hood
+    private DistanceTracker distanceTracker;
 
     // Telemetry
     private TelemetryManager panelsTelemetry;
@@ -84,16 +86,9 @@ public class wildexperimentRed extends LinearOpMode {
 
     // Pose tracking
     private Follower follower;
-    private Pose currentPose;
-    private Pose lastValidPose;
-    private int validPoseCount = 0;
-    private static final int REQUIRED_VALID_POSES = 5;  // Require 5 consecutive valid poses
 
     @Override
     public void runOpMode() {
-
-        currentPose = START_POSE;
-        lastValidPose = START_POSE;
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
@@ -218,8 +213,8 @@ public class wildexperimentRed extends LinearOpMode {
                 CalibrationPoints.HOOD_DEBOUNCE_MS
         );
 
-        // ==================== FLYWHEEL VERSATILE (AUTO MIRRORS FOR RED) ====================
-        flywheelVersatile = new FlywheelVersatile(
+        // ==================== FLYWHEEL VERSATILE (auto RPM, mirrors for RED) ====================
+        FlywheelVersatile flywheelVersatile = new FlywheelVersatile(
                 flywheel,
                 CalibrationPoints.BLUE_GOAL,
                 CalibrationPoints.FLYWHEEL_CALIBRATION_DATA,
@@ -228,8 +223,8 @@ public class wildexperimentRed extends LinearOpMode {
         );
         flywheelVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
-        // ==================== HOOD VERSATILE (AUTO MIRRORS FOR RED) ====================
-        hoodVersatile = new HoodVersatile(
+        // ==================== HOOD VERSATILE (auto hood, mirrors for RED) ====================
+        HoodVersatile hoodVersatile = new HoodVersatile(
                 hoodController,
                 CalibrationPoints.BLUE_GOAL,
                 CalibrationPoints.HOOD_CLOSE_POSE,
@@ -239,14 +234,15 @@ public class wildexperimentRed extends LinearOpMode {
         );
         hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
-        // ==================== INITIAL STATE ====================
-        // Set initial values using START_POSE
-        double initialRpm = flywheelVersatile.getFinalTargetRPM(START_POSE);
-        double initialHood = hoodVersatile.getFinalTargetPosition(START_POSE);
-        double startDistance = CalibrationPoints.distanceToGoal(START_POSE, IS_RED_ALLIANCE);
+        // ==================== DISTANCE TRACKER (orchestrates pose -> distance -> RPM -> hood) ====================
+        distanceTracker = new DistanceTracker(
+                START_POSE, IS_RED_ALLIANCE,
+                flywheelVersatile, hoodVersatile, flywheel
+        );
 
-        flywheel.setTargetRPM(initialRpm);
-        hoodController.setRightPosition(initialHood);
+        // ==================== INITIAL STATE ====================
+        flywheel.setTargetRPM(distanceTracker.getLastTargetRpm());
+        hoodController.setRightPosition(distanceTracker.getLastTargetHood());
 
         gateController.setGateClosed(true);
 
@@ -254,9 +250,9 @@ public class wildexperimentRed extends LinearOpMode {
         telemetry.addData("Alliance", "RED 🔴");
         telemetry.addData("Start Pose", "(%.1f, %.1f, %.1f°)",
                 START_POSE.getX(), START_POSE.getY(), Math.toDegrees(START_POSE.getHeading()));
-        telemetry.addData("Start Distance", "%.1f", startDistance);
-        telemetry.addData("Initial RPM", "%.0f", initialRpm);
-        telemetry.addData("Initial Hood", "%.3f", initialHood);
+        telemetry.addData("Start Distance", "%.1f", distanceTracker.getDistanceToGoal());
+        telemetry.addData("Initial RPM", "%.0f", distanceTracker.getLastTargetRpm());
+        telemetry.addData("Initial Hood", "%.3f", distanceTracker.getLastTargetHood());
         telemetry.addData("Turret IMU", imuUsed);
         telemetry.update();
 
@@ -272,7 +268,7 @@ public class wildexperimentRed extends LinearOpMode {
 
         reZeroHeadingAndTurret(imuParams);
         flywheel.setShooterOn(true);
-        validPoseCount = 0;
+        distanceTracker.resetValidPoseCount();
 
         // ==================== MAIN LOOP ====================
         while (opModeIsActive()) {
@@ -287,33 +283,17 @@ public class wildexperimentRed extends LinearOpMode {
                 }
             }
 
-            // Get and validate pose from follower
+            // DistanceTracker: validate pose, compute distance, auto RPM, auto hood
             if (follower != null) {
                 follower.update();
-                Pose rawPose = follower.getPose();
-
-                if (isValidPose(rawPose) && isNearExpectedPose(rawPose, lastValidPose)) {
-                    validPoseCount++;
-                    if (validPoseCount >= REQUIRED_VALID_POSES) {
-                        // Pose is stable and valid, use it
-                        currentPose = rawPose;
-                        lastValidPose = rawPose;
-                    }
-                } else {
-                    // Invalid or suspicious pose, reset counter
-                    validPoseCount = 0;
-                }
+                distanceTracker.update(follower, autoFlywheelEnabled, autoHoodEnabled);
             }
+            Pose currentPose = distanceTracker.getCurrentPose();
 
             // ========== TOUCHPAD (GP2) = RESET POSE TO START ==========
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
-                if (follower != null) {
-                    follower.setStartingPose(START_POSE);
-                }
-                currentPose = START_POSE;
-                lastValidPose = START_POSE;
-                validPoseCount = 0;
+                distanceTracker.resetToStart(follower);
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad2.rumble(300);
@@ -323,12 +303,7 @@ public class wildexperimentRed extends LinearOpMode {
             // ========== A BUTTON (GP1) = RESET POSE ==========
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                if (follower != null) {
-                    follower.setStartingPose(START_POSE);
-                }
-                currentPose = START_POSE;
-                lastValidPose = START_POSE;
-                validPoseCount = 0;
+                distanceTracker.resetToStart(follower);
                 resetTurretEncoderAndReferences(imuParams);
                 driveController.stop();
                 gamepad1.rumble(300);
@@ -365,7 +340,7 @@ public class wildexperimentRed extends LinearOpMode {
             boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
             if (dpadLeftNow && !dpadLeftLast) {
                 if (autoFlywheelEnabled) {
-                    flywheelVersatile.adjustTrim(-50.0);
+                    distanceTracker.getFlywheelVersatile().adjustTrim(-50.0);
                 } else {
                     flywheel.adjustTargetRPM(-50.0);
                 }
@@ -375,7 +350,7 @@ public class wildexperimentRed extends LinearOpMode {
             boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
             if (dpadRightNow && !dpadRightLast) {
                 if (autoFlywheelEnabled) {
-                    flywheelVersatile.adjustTrim(50.0);
+                    distanceTracker.getFlywheelVersatile().adjustTrim(50.0);
                 } else {
                     flywheel.adjustTargetRPM(50.0);
                 }
@@ -402,28 +377,17 @@ public class wildexperimentRed extends LinearOpMode {
                 clawController.trigger(nowMs);
             }
 
-            // ========== AUTO FLYWHEEL RPM ==========
-            if (autoFlywheelEnabled && follower != null && currentPose != null) {
-                double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
-                flywheel.setTargetRPM(targetRpm);
-            }
-
-            // ========== FLYWHEEL UPDATE ==========
+            // ========== FLYWHEEL UPDATE (RPM target already set by DistanceTracker when auto) ==========
             boolean calibPressed = gamepad1.back || gamepad2.back;
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // ========== AUTO HOOD ==========
-            if (autoHoodEnabled && follower != null && currentPose != null) {
-                hoodVersatile.update(currentPose);
-            }
-
             // ========== HOOD TRIM ==========
             if (autoHoodEnabled) {
                 if (gamepad2.left_stick_y < -0.5) {
-                    hoodVersatile.adjustTrim(CalibrationPoints.HOOD_TRIM_STEP);
+                    distanceTracker.getHoodVersatile().adjustTrim(CalibrationPoints.HOOD_TRIM_STEP);
                 } else if (gamepad2.left_stick_y > 0.5) {
-                    hoodVersatile.adjustTrim(-CalibrationPoints.HOOD_TRIM_STEP);
+                    distanceTracker.getHoodVersatile().adjustTrim(-CalibrationPoints.HOOD_TRIM_STEP);
                 }
             }
 
@@ -480,21 +444,22 @@ public class wildexperimentRed extends LinearOpMode {
                     autoFlywheelEnabled ? "(AUTO)" : "(MANUAL)");
 
             if (autoFlywheelEnabled) {
-                telemetry.addData("Fly Trim", "%.0f rpm", flywheelVersatile.getTrimRpm());
+                telemetry.addData("Fly Trim", "%.0f rpm",
+                        distanceTracker.getFlywheelVersatile().getTrimRpm());
             }
 
             if (autoHoodEnabled) {
                 telemetry.addData("Hood (AUTO)", "%.3f | Dist: %.1f | Trim: %.3f",
-                        hoodVersatile.getLastTargetPos(),
-                        hoodVersatile.getLastDistance(),
-                        hoodVersatile.getTrimPos());
+                        distanceTracker.getLastTargetHood(),
+                        distanceTracker.getDistanceToGoal(),
+                        distanceTracker.getHoodVersatile().getTrimPos());
             } else {
                 telemetry.addData("Hood (MANUAL)", "%.3f", hoodController.getRightPos());
             }
 
             telemetry.addData("Pose", "(%.1f, %.1f, %.1f°)",
                     currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()));
-            telemetry.addData("Valid Pose Count", validPoseCount);
+            telemetry.addData("Valid Pose Count", distanceTracker.getValidPoseCount());
 
             // Debug info
             if (follower != null) {
@@ -509,10 +474,12 @@ public class wildexperimentRed extends LinearOpMode {
             panelsTelemetry.debug("Heading", String.format("%.1f", Math.toDegrees(currentPose.getHeading())));
             panelsTelemetry.debug("Fly RPM", String.format("%.0f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.0f", flywheel.getTargetRPM()));
-            panelsTelemetry.debug("Fly Trim", String.format("%.0f", flywheelVersatile.getTrimRpm()));
-            panelsTelemetry.debug("Hood", String.format("%.3f", hoodVersatile.getLastTargetPos()));
-            panelsTelemetry.debug("Hood Trim", String.format("%.3f", hoodVersatile.getTrimPos()));
-            panelsTelemetry.debug("Distance", String.format("%.1f", hoodVersatile.getLastDistance()));
+            panelsTelemetry.debug("Fly Trim", String.format("%.0f",
+                    distanceTracker.getFlywheelVersatile().getTrimRpm()));
+            panelsTelemetry.debug("Hood", String.format("%.3f", distanceTracker.getLastTargetHood()));
+            panelsTelemetry.debug("Hood Trim", String.format("%.3f",
+                    distanceTracker.getHoodVersatile().getTrimPos()));
+            panelsTelemetry.debug("Distance", String.format("%.1f", distanceTracker.getDistanceToGoal()));
             panelsTelemetry.debug("Auto Mode", autoFlywheelEnabled ? "ON" : "OFF");
 
             telemetry.update();
@@ -520,47 +487,6 @@ public class wildexperimentRed extends LinearOpMode {
         }
 
         turretController.disable();
-    }
-
-    /**
-     * Check if pose is valid (not null, not at origin, within field)
-     */
-    private boolean isValidPose(Pose pose) {
-        if (pose == null) {
-            return false;
-        }
-
-        double x = pose.getX();
-        double y = pose.getY();
-
-        // Reject origin
-        if (Math.abs(x) < 1.0 && Math.abs(y) < 1.0) {
-            return false;
-        }
-
-        // Reject out of field bounds
-        if (x < -5 || x > 150 || y < -5 || y > 150) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check if new pose is reasonably close to expected pose
-     * (prevents sudden jumps from sensor errors)
-     */
-    private boolean isNearExpectedPose(Pose newPose, Pose expectedPose) {
-        if (newPose == null || expectedPose == null) {
-            return false;
-        }
-
-        double dx = newPose.getX() - expectedPose.getX();
-        double dy = newPose.getY() - expectedPose.getY();
-        double distance = Math.hypot(dx, dy);
-
-        // Prevent sudden jumps to wrong positions from sensor errors
-        return distance < CalibrationPoints.MAX_POSE_MOVEMENT_PER_CYCLE;
     }
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {
