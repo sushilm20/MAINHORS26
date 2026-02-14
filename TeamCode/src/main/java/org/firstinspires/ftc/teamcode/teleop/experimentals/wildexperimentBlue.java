@@ -56,7 +56,7 @@ public class wildexperimentBlue extends LinearOpMode {
     private ClawController clawController;
     private HoodController hoodController;
 
-    // DistanceTracker orchestrates pose→distance→RPM→hood
+    // DistanceTracker orchestrates pose -> distance -> RPM -> hood
     private DistanceTracker distanceTracker;
 
     private TelemetryManager panelsTelemetry;
@@ -224,7 +224,7 @@ public class wildexperimentBlue extends LinearOpMode {
         );
         hoodVersatile.setRedAlliance(IS_RED_ALLIANCE);
 
-        // ==================== DISTANCE TRACKER (orchestrates pose→distance→RPM→hood) ====================
+        // ==================== DISTANCE TRACKER (orchestrates pose -> distance -> RPM -> hood) ====================
         distanceTracker = new DistanceTracker(
                 START_POSE, IS_RED_ALLIANCE,
                 flywheelVersatile, hoodVersatile, flywheel

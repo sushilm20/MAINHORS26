@@ -26,8 +26,8 @@ public class DistanceTracker {
 
     // Subsystems for auto RPM and auto hood
     private final FlywheelVersatile flywheelVersatile;
-    private final HoodVersatile hoodVersatile;
-    private final FlywheelController flywheel;
+    private final HoodVersatile hoodVersatile;       // update() internally sets hood position
+    private final FlywheelController flywheelController;
 
     private Pose currentPose;
     private Pose lastValidPose;
@@ -44,17 +44,17 @@ public class DistanceTracker {
      * @param isRedAlliance     true for red, false for blue
      * @param flywheelVersatile Computes target RPM from distance (null to disable auto RPM)
      * @param hoodVersatile     Computes target hood from distance (null to disable auto hood)
-     * @param flywheel          FlywheelController to set target RPM on (null to skip)
+     * @param flywheelController FlywheelController to set target RPM on (null to skip)
      */
     public DistanceTracker(Pose startPose, boolean isRedAlliance,
                            FlywheelVersatile flywheelVersatile,
                            HoodVersatile hoodVersatile,
-                           FlywheelController flywheel) {
+                           FlywheelController flywheelController) {
         this.startPose = startPose;
         this.isRedAlliance = isRedAlliance;
         this.flywheelVersatile = flywheelVersatile;
         this.hoodVersatile = hoodVersatile;
-        this.flywheel = flywheel;
+        this.flywheelController = flywheelController;
         this.currentPose = startPose;
         this.lastValidPose = startPose;
 
@@ -96,8 +96,8 @@ public class DistanceTracker {
         // Compute and apply auto RPM
         if (autoFlywheel && flywheelVersatile != null) {
             lastTargetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
-            if (flywheel != null) {
-                flywheel.setTargetRPM(lastTargetRpm);
+            if (flywheelController != null) {
+                flywheelController.setTargetRPM(lastTargetRpm);
             }
         }
 
