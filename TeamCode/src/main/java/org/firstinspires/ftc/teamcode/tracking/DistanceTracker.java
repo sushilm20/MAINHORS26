@@ -3,9 +3,16 @@ package org.firstinspires.ftc.teamcode.tracking;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
+import org.firstinspires.ftc.teamcode.subsystems.HoodController;
+import org.firstinspires.ftc.teamcode.subsystems.HoodVersatile;
+
 /**
- * Centralizes pose validation, distance-to-goal calculation,
- * and provides validated pose updates from a PedroPathing Follower.
+ * Central orchestrator: gets position, validates it, calculates distance/RPM/hood.
+ *
+ * Combines pose tracking with FlywheelVersatile (auto RPM) and HoodVersatile (auto hood)
+ * so the teleop only needs one update call to get everything computed.
  *
  * Pose validation:
  *   - Rejects null, origin, and out-of-field poses
@@ -17,23 +24,58 @@ public class DistanceTracker {
     private final Pose startPose;
     private final boolean isRedAlliance;
 
+    // Subsystems for auto RPM and auto hood
+    private final FlywheelVersatile flywheelVersatile;
+    private final HoodVersatile hoodVersatile;
+    private final FlywheelController flywheel;
+
     private Pose currentPose;
     private Pose lastValidPose;
     private int validPoseCount = 0;
     private static final int REQUIRED_VALID_POSES = 5;
 
-    public DistanceTracker(Pose startPose, boolean isRedAlliance) {
+    // Last computed values
+    private double lastTargetRpm = 0.0;
+    private double lastTargetHood = 0.0;
+    private double lastDistance = 0.0;
+
+    /**
+     * @param startPose         Robot starting pose for this alliance
+     * @param isRedAlliance     true for red, false for blue
+     * @param flywheelVersatile Computes target RPM from distance (null to disable auto RPM)
+     * @param hoodVersatile     Computes target hood from distance (null to disable auto hood)
+     * @param flywheel          FlywheelController to set target RPM on (null to skip)
+     */
+    public DistanceTracker(Pose startPose, boolean isRedAlliance,
+                           FlywheelVersatile flywheelVersatile,
+                           HoodVersatile hoodVersatile,
+                           FlywheelController flywheel) {
         this.startPose = startPose;
         this.isRedAlliance = isRedAlliance;
+        this.flywheelVersatile = flywheelVersatile;
+        this.hoodVersatile = hoodVersatile;
+        this.flywheel = flywheel;
         this.currentPose = startPose;
         this.lastValidPose = startPose;
+
+        // Compute initial values from start pose
+        if (flywheelVersatile != null) {
+            lastTargetRpm = flywheelVersatile.getFinalTargetRPM(startPose);
+        }
+        if (hoodVersatile != null) {
+            lastTargetHood = hoodVersatile.getFinalTargetPosition(startPose);
+        }
+        lastDistance = CalibrationPoints.distanceToGoal(startPose, isRedAlliance);
     }
 
     /**
-     * Update pose from follower with validation.
+     * Update pose from follower with validation, then compute RPM and hood.
      * Call this each loop iteration after follower.update().
+     *
+     * @param autoFlywheel if true, compute and apply auto RPM
+     * @param autoHood     if true, compute and apply auto hood
      */
-    public void update(Follower follower) {
+    public void update(Follower follower, boolean autoFlywheel, boolean autoHood) {
         if (follower == null) return;
 
         Pose rawPose = follower.getPose();
@@ -46,6 +88,23 @@ public class DistanceTracker {
             }
         } else {
             validPoseCount = 0;
+        }
+
+        // Compute distance
+        lastDistance = CalibrationPoints.distanceToGoal(currentPose, isRedAlliance);
+
+        // Compute and apply auto RPM
+        if (autoFlywheel && flywheelVersatile != null) {
+            lastTargetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
+            if (flywheel != null) {
+                flywheel.setTargetRPM(lastTargetRpm);
+            }
+        }
+
+        // Compute and apply auto hood
+        if (autoHood && hoodVersatile != null) {
+            hoodVersatile.update(currentPose);
+            lastTargetHood = hoodVersatile.getLastTargetPos();
         }
     }
 
@@ -62,15 +121,22 @@ public class DistanceTracker {
         validPoseCount = 0;
     }
 
-    /**
-     * Get distance from current validated pose to the goal.
-     */
-    public double getDistanceToGoal() {
-        return CalibrationPoints.distanceToGoal(currentPose, isRedAlliance);
-    }
+    // ==================== GETTERS ====================
 
     public Pose getCurrentPose() {
         return currentPose;
+    }
+
+    public double getDistanceToGoal() {
+        return lastDistance;
+    }
+
+    public double getLastTargetRpm() {
+        return lastTargetRpm;
+    }
+
+    public double getLastTargetHood() {
+        return lastTargetHood;
     }
 
     public int getValidPoseCount() {
@@ -80,6 +146,16 @@ public class DistanceTracker {
     public void resetValidPoseCount() {
         validPoseCount = 0;
     }
+
+    public FlywheelVersatile getFlywheelVersatile() {
+        return flywheelVersatile;
+    }
+
+    public HoodVersatile getHoodVersatile() {
+        return hoodVersatile;
+    }
+
+    // ==================== POSE VALIDATION ====================
 
     /**
      * Check if pose is valid (not null, not at origin, within field bounds).
