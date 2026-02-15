@@ -142,9 +142,9 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 60.0; //58
+    public static double SHOOT_POSE_X = 55.0; //60
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 88.0;//80
+    public static double SHOOT_POSE_Y = 86.0;//80
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180.0;
     @Sorter(sort = 113)
@@ -175,7 +175,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 20.0;
+    public static double GATE_CLEAR_X = 14.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
@@ -193,7 +193,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT SECOND 3 POSITION
     // ========================================
     @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 16.0;
+    public static double COLLECT_SECOND3_X = 12.0;
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 58.0;
     @Sorter(sort = 152)
@@ -211,7 +211,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 16.0;
+    public static double COLLECT_THIRD3_X = 12.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 35.0;
     @Sorter(sort = 172)
