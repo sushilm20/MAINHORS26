@@ -18,6 +18,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
@@ -72,7 +73,6 @@ public class FarBlue6 extends OpMode {
     // Timing
     // ============================
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6; // was 0.6, +1s
-    @Sorter(sort = 1)  public static long   CLAW_CLOSE_MS = 190L;
     @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
@@ -207,7 +207,7 @@ public class FarBlue6 extends OpMode {
 
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
-            if (clawServo != null) clawServo.setPosition(0.63);
+            if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo map failed: " + e.getMessage());
         }
@@ -308,7 +308,7 @@ public class FarBlue6 extends OpMode {
         }
         stopIntake();
         if (gateServo != null) { gateServo.setPosition(GATE_CLOSED); gateClosed = true; }
-        if (clawServo != null) clawServo.setPosition(0.63);
+        if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
         if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
         if (turretMotor != null) { try { turretMotor.setPower(0.0); } catch (Exception ignored) {} }
     }
@@ -374,7 +374,7 @@ public class FarBlue6 extends OpMode {
                 // Watchdog: proceed after timer
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM); // slight drop while feeding
-                    if (clawServo != null) clawServo.setPosition(0.2);
+                    if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }
@@ -382,8 +382,8 @@ public class FarBlue6 extends OpMode {
             }
 
             case CLAW_ACTION: {
-                if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    if (clawServo != null) clawServo.setPosition(0.63);
+                if (System.currentTimeMillis() >= clawActionStartMs + ClawController.CLAW_CLOSE_MS) {
+                    if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
                     if (nextPathIndex > 0 && nextPathIndex <= 6) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;

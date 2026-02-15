@@ -72,11 +72,6 @@ public class OfficialHORS extends LinearOpMode {
     private static final long CLAW_TRIGGER_BEFORE_END_MS = 400;
     private static final double INTKE_SEQUENCE_POWER = 1.0;
 
-    // Claw constants
-    private static final double CLAW_OPEN = 0.6;
-    private static final double CLAW_CLOSED = 0.3;//like that
-    private static final long CLAW_CLOSE_MS = 500L;
-
     // Hood constants
     private static final double HOOD_MIN = 0.12;
     private static final double HOOD_MAX = 0.45;
@@ -193,7 +188,7 @@ public class OfficialHORS extends LinearOpMode {
                 INTKE_SEQUENCE_POWER
         );
 
-        clawController = new ClawController(clawServo, CLAW_OPEN, CLAW_CLOSED, CLAW_CLOSE_MS);
+        clawController = new ClawController(clawServo, ClawController.CLAW_OPEN, ClawController.CLAW_CLOSED, ClawController.CLAW_CLOSE_MS);
         hoodController = new HoodController(
                 leftHoodServo, rightHoodServo,
                 HOOD_MIN, RIGHT_HOOD_CLOSE,

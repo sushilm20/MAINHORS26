@@ -17,6 +17,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
@@ -88,9 +89,6 @@ public class RedMirrorAuto extends OpMode {
 
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.1;
-
-    @Sorter(sort = 2)
-    public static long CLAW_CLOSE_MS = 190L;
 
     @Sorter(sort = 3)
     public static double PRE_ACTION_WAIT_SECONDS = 0.9;
@@ -392,7 +390,7 @@ public class RedMirrorAuto extends OpMode {
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
             if (clawServo != null) {
-                clawServo.setPosition(0.63);
+                clawServo.setPosition(ClawController.CLAW_OPEN);
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
@@ -538,7 +536,7 @@ public class RedMirrorAuto extends OpMode {
         }
         // Claw to init
         if (clawServo != null) {
-            clawServo.setPosition(0.63);
+            clawServo.setPosition(ClawController.CLAW_OPEN);
         }
         // Hood to init
         if (rightHoodServo != null) {
@@ -752,15 +750,15 @@ public class RedMirrorAuto extends OpMode {
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     startIntake(INTAKE_ON_POWER);
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                    if (clawServo != null) clawServo.setPosition(0.2);
+                    if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }
                 break;
 
             case CLAW_ACTION:
-                if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    if (clawServo != null) clawServo.setPosition(0.63);
+                if (System.currentTimeMillis() >= clawActionStartMs + ClawController.CLAW_CLOSE_MS) {
+                    if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
                     if (nextPathIndex > 0 && nextPathIndex <= 12) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
