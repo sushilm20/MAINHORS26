@@ -129,12 +129,6 @@ public class RedTurretAuto extends OpMode {
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
 
     // ========================================
-    // TURRET SETTINGS
-    // ========================================
-    @Sorter(sort = 40)
-    public static int TURRET_INITIAL_TARGET = -230;
-
-    // ========================================
     // PATH POSES - START POSITION
     // ========================================
     @Sorter(sort = 100)
@@ -321,7 +315,6 @@ public class RedTurretAuto extends OpMode {
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
-                // Use the constructor with Pinpoint support
                 turretController = new TurretController(turretMotor, imu, pinpoint, telemetry);
             }
 
@@ -401,8 +394,8 @@ public class RedTurretAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        // Turn turret to initial position (negative for red side)
-        turretHoldTarget = TURRET_INITIAL_TARGET;
+        // Turret starts at 0
+        turretHoldTarget = 0;
 
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;

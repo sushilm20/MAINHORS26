@@ -121,12 +121,6 @@ public class BlueTurretAuto extends OpMode {
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
 
     // ========================================
-    // TURRET SETTINGS
-    // ========================================
-    @Sorter(sort = 40)
-    public static int TURRET_INITIAL_TARGET = 240;
-
-    // ========================================
     // PATH POSES - START POSITION
     // ========================================
     @Sorter(sort = 100)
@@ -312,7 +306,6 @@ public class BlueTurretAuto extends OpMode {
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
-                // Use the constructor with Pinpoint support
                 turretController = new TurretController(turretMotor, imu, pinpoint, telemetry);
             }
             if (turretController != null) {
@@ -388,8 +381,8 @@ public class BlueTurretAuto extends OpMode {
         }
         shooterWaitStartMs = System.currentTimeMillis();
 
-        // Turn turret to initial position (positive for blue side)
-        turretHoldTarget = TURRET_INITIAL_TARGET;
+        // Turret starts at 0
+        turretHoldTarget = 0;
 
         state = AutoState.WAIT_FOR_SHOOTER;
     }
