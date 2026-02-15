@@ -321,7 +321,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
             if (clawServo != null) {
-                clawServo.setPosition(0.63);
+                clawServo.setPosition(0.6);
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
@@ -452,7 +452,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
             gateClosed = true;
         }
         if (clawServo != null) {
-            clawServo.setPosition(0.63);
+            clawServo.setPosition(0.6);
         }
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
@@ -601,14 +601,14 @@ public class ExperimentalBluePedroAuto extends OpMode {
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     startIntake(INTAKE_ON_POWER);
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                    if (clawServo != null) clawServo.setPosition(0.2);
+                    if (clawServo != null) clawServo.setPosition(0.3);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }
                 break;
             case CLAW_ACTION:
                 if (System.currentTimeMillis() >= clawActionStartMs + CLAW_CLOSE_MS) {
-                    if (clawServo != null) clawServo.setPosition(0.63);
+                    if (clawServo != null) clawServo.setPosition(0.6);
                     if (nextPathIndex > 0 && nextPathIndex <= 12) { startPath(nextPathIndex); nextPathIndex = -1; }
                     else { state = AutoState.FINISHED; }
                 }

@@ -379,7 +379,7 @@ public class BluePedroAuto extends OpMode {
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
             if (clawServo != null) {
-                clawServo.setPosition(0.63);
+                clawServo.setPosition(0.60);
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
@@ -520,7 +520,7 @@ public class BluePedroAuto extends OpMode {
         }
         // Claw to init
         if (clawServo != null) {
-            clawServo.setPosition(0.63);
+            clawServo.setPosition(0.60);
         }
         // Hood to init
         if (rightHoodServo != null) {
@@ -730,7 +730,7 @@ public class BluePedroAuto extends OpMode {
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     startIntake(INTAKE_ON_POWER);
                     flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
-                    if (clawServo != null) clawServo.setPosition(0.2);
+                    if (clawServo != null) clawServo.setPosition(0.45);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
                 }

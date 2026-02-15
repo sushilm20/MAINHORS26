@@ -112,8 +112,8 @@ public class TrackingTeleOp extends LinearOpMode {
     private static final double INTAKE_SEQUENCE_POWER = 1.0;
 
     // Claw
-    private static final double CLAW_OPEN = 0.63;
-    private static final double CLAW_CLOSED = 0.2;
+    private static final double CLAW_OPEN = 0.6;
+    private static final double CLAW_CLOSED = 0.45;//like that
     private static final long CLAW_CLOSE_MS = 500L;
 
     // Hood
