@@ -17,6 +17,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
@@ -53,8 +54,6 @@ public class BlueTurretAuto extends OpMode {
     private DcMotor shooterMotor2;
     private DcMotor turretMotor;
 
-    private BNO055IMU pinpointImu = null;
-    private BNO055IMU hubImu = null;
     private BNO055IMU imu = null;
     private GoBildaPinpointDriver pinpoint = null;
 
@@ -68,16 +67,9 @@ public class BlueTurretAuto extends OpMode {
     private Servo gateServo;
     private boolean gateClosed = false;
 
-    private int intakeSegmentEnd = -1;
-
     private long autoStartMs = -1;
     private boolean shutdownDone = false;
 
-    private int turretHoldTarget = 0;
-
-    // ========================================
-    // TIMING PARAMETERS
-    // ========================================
     @Sorter(sort = 0)
     public static double INTAKE_RUN_SECONDS = 0.7;
     @Sorter(sort = 1)
@@ -88,9 +80,7 @@ public class BlueTurretAuto extends OpMode {
     public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
-    // ========================================
-    // INTAKE POWER SETTINGS
-    // ========================================
+
     @Sorter(sort = 10)
     public static double INTAKE_ON_POWER = -0.75;
     @Sorter(sort = 11)
@@ -99,14 +89,10 @@ public class BlueTurretAuto extends OpMode {
     public static double CLOSED_INTAKE_POWER = -0.67;
     @Sorter(sort = 13)
     public static double CLOSED_INTAKE_TOLERANCE_IN = 9.0;
-    // ========================================
-    // TOLERANCE SETTINGS
-    // ========================================
+
     @Sorter(sort = 20)
     public static double START_POSE_TOLERANCE_IN = 5.0;
-    // ========================================
-    // GATE SETTINGS
-    // ========================================
+
     @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31)
@@ -120,18 +106,13 @@ public class BlueTurretAuto extends OpMode {
     @Sorter(sort = 35)
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
 
-    // ========================================
-    // PATH POSES - START POSITION
-    // ========================================
     @Sorter(sort = 100)
     public static double START_X = 20.0;
     @Sorter(sort = 101)
     public static double START_Y = 122.0;
     @Sorter(sort = 102)
     public static double START_HEADING = 130.0;
-    // ========================================
-    // PATH POSES - SHOOT POSITION (Primary)
-    // ========================================
+
     @Sorter(sort = 110)
     public static double SHOOT_POSE_X = 60.0;
     @Sorter(sort = 111)
@@ -144,72 +125,56 @@ public class BlueTurretAuto extends OpMode {
     public static double SHOOT_SECOND3_HEADING = 180.0;
     @Sorter(sort = 115)
     public static double SHOOT_FINAL_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - COLLECT FIRST 3 POSITION
-    // ========================================
+
     @Sorter(sort = 120)
     public static double COLLECT_FIRST3_X = 21.0;
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 80.0;
     @Sorter(sort = 122)
     public static double COLLECT_FIRST3_HEADING = 175.0;
-    // ========================================
-    // PATH POSES - GATE ALIGN POSITION
-    // ========================================
+
     @Sorter(sort = 125)
     public static double GATE_ALIGN_X = 24.0;
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 179.0;
-    // ========================================
-    // PATH POSES - GATE CLEAR POSITION
-    // ========================================
+
     @Sorter(sort = 130)
     public static double GATE_CLEAR_X = 20.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 179.0;
-    // ========================================
-    // PATH POSES - ALIGN SECOND 3 POSITION
-    // ========================================
+
     @Sorter(sort = 140)
     public static double ALIGN_SECOND3_X = 50.0;
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 58.0;
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = -175.0;
-    // ========================================
-    // PATH POSES - COLLECT SECOND 3 POSITION
-    // ========================================
+
     @Sorter(sort = 150)
     public static double COLLECT_SECOND3_X = 16.0;
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 58.0;
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = -180.0;
-    // ========================================
-    // PATH POSES - ALIGN THIRD 3 POSITION
-    // ========================================
+
     @Sorter(sort = 160)
     public static double ALIGN_THIRD3_X = 50.0;
     @Sorter(sort = 161)
     public static double ALIGN_THIRD3_Y = 35.0;
     @Sorter(sort = 162)
     public static double ALIGN_THIRD3_HEADING = -180.0;
-    // ========================================
-    // PATH POSES - COLLECT THIRD 3 POSITION
-    // ========================================
+
     @Sorter(sort = 170)
     public static double COLLECT_THIRD3_X = 16.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 35.0;
     @Sorter(sort = 172)
     public static double COLLECT_THIRD3_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - MOVE FOR RP POSITION
-    // ========================================
+
     @Sorter(sort = 180)
     public static double MOVE_RP_X = 36.0;
     @Sorter(sort = 181)
@@ -233,7 +198,6 @@ public class BlueTurretAuto extends OpMode {
         gateAlignWaitTimer = new Timer();
         gateClearWaitTimer = new Timer();
         nextPathIndex = -1;
-        intakeSegmentEnd = -1;
         preActionTimerStarted = false;
         preActionEntered = false;
         timedIntakeActive = false;
@@ -261,48 +225,26 @@ public class BlueTurretAuto extends OpMode {
             panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
         }
 
-        // Initialize IMU (try Pinpoint first, then expansion hub)
         try {
-            try {
-                pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
-                panelsTelemetry.debug("Init", "Found GoBilda Pinpoint as 'pinpoint'");
-            } catch (Exception e) {
-                pinpoint = null;
-                panelsTelemetry.debug("Init", "GoBilda Pinpoint 'pinpoint' not found: " + e.getMessage());
-            }
-
-            try {
-                pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint");
-                panelsTelemetry.debug("Init", "Found PinPoint IMU as 'pinpoint'");
-            } catch (Exception e) {
-                pinpointImu = null;
-                panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
-            }
-
-            try {
-                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
-                panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
-            } catch (Exception e) {
-                hubImu = null;
-                panelsTelemetry.debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
-            }
-
-            imu = (pinpointImu != null) ? pinpointImu : hubImu;
-
-            if (imu != null) {
-                BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
-                imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-                imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-                imu.initialize(imuParams);
-                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" : "Expansion Hub") + ")");
-            } else {
-                panelsTelemetry.debug("Init", "No IMU found (neither 'pinpoint' nor 'imu'). Turret will not have heading data.");
-            }
+            pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+            panelsTelemetry.debug("Init", "Found Pinpoint odometry");
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "IMU not found or failed to init: " + e.getMessage());
+            pinpoint = null;
+            panelsTelemetry.debug("Init", "Pinpoint odometry not found: " + e.getMessage());
         }
 
-        // Initialize Flywheel and TurretController
+        try {
+            imu = hardwareMap.get(BNO055IMU.class, "pinpoint");
+            BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
+            imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+            imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+            imu.initialize(imuParams);
+            panelsTelemetry.debug("Init", "Pinpoint IMU initialized");
+        } catch (Exception e) {
+            imu = null;
+            panelsTelemetry.debug("Init", "Pinpoint IMU not found: " + e.getMessage());
+        }
+
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
@@ -318,6 +260,7 @@ public class BlueTurretAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
         }
+
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
@@ -325,6 +268,7 @@ public class BlueTurretAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake Motor mapping failed: " + e.getMessage());
         }
+
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
             if (clawServo != null) {
@@ -333,6 +277,7 @@ public class BlueTurretAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
         }
+
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
@@ -342,6 +287,7 @@ public class BlueTurretAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Right hood servo mapping failed: " + e.getMessage());
         }
+
         try {
             gateServo = hardwareMap.get(Servo.class, "gateServo");
             if (gateServo != null) {
@@ -354,17 +300,14 @@ public class BlueTurretAuto extends OpMode {
 
         panelsTelemetry.debug("Status", "Initialized (shooter remains OFF until start())");
         panelsTelemetry.update(telemetry);
-
-        turretHoldTarget = 0;
     }
 
     @Override
     public void init_loop() {
         if (flywheel != null) {
-            // flywheel.update(System.currentTimeMillis(), false);
         }
         if (turretController != null) {
-            turretController.holdPositionTicks(turretHoldTarget);
+            turretController.update(false, 0.0);
         }
     }
 
@@ -380,10 +323,6 @@ public class BlueTurretAuto extends OpMode {
             turretController.resetPidState();
         }
         shooterWaitStartMs = System.currentTimeMillis();
-
-        // Turret starts at 0
-        turretHoldTarget = 0;
-
         state = AutoState.WAIT_FOR_SHOOTER;
     }
 
@@ -397,9 +336,8 @@ public class BlueTurretAuto extends OpMode {
             flywheel.update(nowMs, false);
         }
 
-        // Update turret controller to hold position
         if (turretController != null) {
-            turretController.holdPositionTicks(turretHoldTarget);
+            turretController.update(false, 0.0);
         }
 
         runStateMachine(nowMs);
@@ -419,8 +357,7 @@ public class BlueTurretAuto extends OpMode {
         }
         if (turretController != null) {
             panelsTelemetry.debug("Turret Virtual", turretController.getVirtualPosition());
-            panelsTelemetry.debug("Turret Raw", turretController.getRawPosition());
-            panelsTelemetry.debug("Turret Target", turretHoldTarget);
+            panelsTelemetry.debug("Turret Desired", turretController.getLastDesiredTicks());
             panelsTelemetry.debug("Turret Error", turretController.getLastErrorTicks());
             panelsTelemetry.debug("Turret Power", String.format("%.3f", turretController.getLastAppliedPower()));
         }
@@ -433,6 +370,13 @@ public class BlueTurretAuto extends OpMode {
         double dist = distanceToShootPose();
         panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
         panelsTelemetry.debug("GateClosed", String.valueOf(gateClosed));
+
+        if (pinpoint != null) {
+            panelsTelemetry.debug("Heading Source", "Pinpoint");
+            panelsTelemetry.debug("Pinpoint Heading", String.format("%.2f", Math.toDegrees(pinpoint.getHeading(AngleUnit.RADIANS))));
+        } else {
+            panelsTelemetry.debug("Heading Source", "None");
+        }
 
         panelsTelemetry.update(telemetry);
 
@@ -459,10 +403,6 @@ public class BlueTurretAuto extends OpMode {
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
         }
-        if (turretController != null) {
-            turretHoldTarget = 0;
-            turretController.holdPositionTicks(turretHoldTarget);
-        }
         if (turretMotor != null) {
             try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
         }
@@ -480,11 +420,14 @@ public class BlueTurretAuto extends OpMode {
         try { if (intakeMotor != null) intakeMotor.setPower(power); }
         catch (Exception e) { panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage()); }
     }
+
     private void stopIntake() {
         try { if (intakeMotor != null) intakeMotor.setPower(0.0); }
         catch (Exception e) { panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage()); }
     }
+
     private boolean endsAtShoot(int pathIndex) { return pathIndex == 1 || pathIndex == 5 || pathIndex == 8 || pathIndex == 11; }
+
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
@@ -520,6 +463,7 @@ public class BlueTurretAuto extends OpMode {
         currentPathIndex = idx;
         state = AutoState.RUNNING_PATH;
     }
+
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
@@ -615,13 +559,13 @@ public class BlueTurretAuto extends OpMode {
                 }
                 break;
             case FINISHED:
-                if (turretController != null) { turretHoldTarget = 0; }
                 break;
             case IDLE:
             default:
                 break;
         }
     }
+
     private void updateGate() {
         try {
             double dist = distanceToShootPose();
