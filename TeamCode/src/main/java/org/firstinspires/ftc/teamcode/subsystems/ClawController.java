@@ -3,9 +3,9 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.qualcomm.robotcore.hardware.Servo;
 
 public class ClawController {
-    public static final double CLAW_OPEN = 0.6;
+    public static final double CLAW_OPEN = 0.62;
     public static final double CLAW_CLOSED = 0.3;
-    public static final long CLAW_CLOSE_MS = 500L;
+    public static final long CLAW_CLOSE_MS = 400L;
 
     private final Servo claw;
     private final double openPos;
