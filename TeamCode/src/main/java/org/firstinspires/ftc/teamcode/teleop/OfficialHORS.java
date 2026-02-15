@@ -161,7 +161,7 @@ public class OfficialHORS extends LinearOpMode {
         try { //Follower
             // Initialize PedroPathing follower for pose tracking and drivetrain control
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(130)));  // Default starting pose (adjust as needed)
+            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));  // Default starting pose (adjust as needed)
         } catch (Exception e) {
             telemetry.addData("Error", "Follower initialization failed!");
             follower = null;
