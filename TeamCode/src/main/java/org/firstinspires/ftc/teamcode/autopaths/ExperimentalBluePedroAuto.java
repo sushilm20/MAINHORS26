@@ -130,7 +130,7 @@ public class ExperimentalBluePedroAuto extends OpMode {
     @Sorter(sort = 101)
     public static double START_Y = 122.0;
     @Sorter(sort = 102)
-    public static double START_HEADING = 135.0;
+    public static double START_HEADING = 130.0;
     // ========================================
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
