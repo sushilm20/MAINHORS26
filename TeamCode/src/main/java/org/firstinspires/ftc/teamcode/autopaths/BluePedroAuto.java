@@ -89,9 +89,9 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.2;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.3;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.5;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.7;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
