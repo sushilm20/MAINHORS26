@@ -56,7 +56,6 @@ public class OfficialHORS extends LinearOpMode {
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false; // gamepad1 A reset latch
     private boolean dpadUpLast = false;
-    private boolean gamepad2RightBumperLast = false; // For RPM mode toggle on gamepad2
 
     private boolean isFarMode = false;
     private boolean lastPidfMode = false; // Track PIDF mode changes for telemetry
@@ -254,8 +253,8 @@ public class OfficialHORS extends LinearOpMode {
             }
             aPressedLast = aNow;
 
-            // Far/close toggle on gamepad1 touchpad OR gamepad2 right bumper
-            boolean touchpadNow = getTouchpad(gamepad1) || gamepad2.right_bumper;
+            // Far/close toggle on gamepad1 touchpad only
+            boolean touchpadNow = getTouchpad(gamepad1);
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
                 flywheel.setModeFar(isFarMode);
