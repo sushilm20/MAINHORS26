@@ -61,7 +61,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2650;
+    private static final double AUTO_SHOOTER_RPM = 2620;
 
     private DcMotor intakeMotor;
 
@@ -89,9 +89,9 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.3;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.5;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.7;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.8;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -142,9 +142,9 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 60.0; //60
+    public static double SHOOT_POSE_X = 58; //60
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 80.0;//80
+    public static double SHOOT_POSE_Y = 84;//80
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180.0;
     @Sorter(sort = 113)
@@ -159,9 +159,9 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 120)
     public static double COLLECT_FIRST3_X = 21.0;
     @Sorter(sort = 121)
-    public static double COLLECT_FIRST3_Y = 80.0;
+    public static double COLLECT_FIRST3_Y = 84.0;
     @Sorter(sort = 122)
-    public static double COLLECT_FIRST3_HEADING = 175.0;
+    public static double COLLECT_FIRST3_HEADING = 180.0;
     // ========================================
     // PATH POSES - GATE ALIGN POSITION
     // ========================================
@@ -170,16 +170,16 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
     @Sorter(sort = 127)
-    public static double GATE_ALIGN_HEADING = 179.0;
+    public static double GATE_ALIGN_HEADING = 180.0;
     // ========================================
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 14.0;
+    public static double GATE_CLEAR_X = 16.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 179.0;
+    public static double GATE_CLEAR_HEADING = 180.0;
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION
     // ========================================
@@ -336,7 +336,7 @@ public class BluePedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.26);
+                rightHoodServo.setPosition(0.16);
                 panelsTelemetry.debug("Init", "Right hood servo initialized to 0.16");
             }
         } catch (Exception e) {

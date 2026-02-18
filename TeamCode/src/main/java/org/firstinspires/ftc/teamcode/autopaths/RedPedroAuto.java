@@ -60,7 +60,7 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2640;
+    private static final double AUTO_SHOOTER_RPM = 2620;
 
     private DcMotor intakeMotor;
 
@@ -88,9 +88,9 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.2;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.5;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.5;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.8;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
