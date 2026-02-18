@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretGoalAimer;
 
 @TeleOp(name="Point Tracking HORS 🎯", group="Linear OpMode")
-public class pointTrackingHORS extends LinearOpMode {
+public class DynamicTrackingTurret extends LinearOpMode {
 
     // Drive + subsystems
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;

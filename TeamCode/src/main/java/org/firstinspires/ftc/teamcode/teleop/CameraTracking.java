@@ -38,7 +38,7 @@ import java.util.List;
 import java.util.Locale;
 
 @TeleOp(name="Camera Tracking TeleOp 🎯", group="Linear OpMode")
-public class TrackingTeleOp extends LinearOpMode {
+public class CameraTracking extends LinearOpMode {
 
     // ===================== CAMERA SETTINGS =====================
     private static final int CAM_RES_WIDTH = 640;

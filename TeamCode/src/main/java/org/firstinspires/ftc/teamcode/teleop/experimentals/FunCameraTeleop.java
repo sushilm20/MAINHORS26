@@ -41,7 +41,7 @@ import java.util.Locale;
 
 @Configurable
 @TeleOp(name="Virtual Slime Out 🎮📷", group="Linear OpMode")
-public class VirtualSlimeOut extends LinearOpMode {
+public class FunCameraTeleop extends LinearOpMode {
 
     // ========== Camera Stream & Vision Parameters (from DriveStreamPoseTeleOp) ==========
     @Sorter(sort = 1)
