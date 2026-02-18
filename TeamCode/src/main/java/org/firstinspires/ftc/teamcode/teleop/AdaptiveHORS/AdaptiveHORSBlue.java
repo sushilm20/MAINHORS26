@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.teleop;
+package org.firstinspires.ftc.teamcode.teleop.AdaptiveHORS;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -42,7 +42,7 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  */
 @Configurable
 @TeleOp(name = "ADAPTIVE HORS 🧨", group = "Linear OpMode")
-public class AdaptiveHORS extends LinearOpMode {
+public class AdaptiveHORSBlue extends LinearOpMode {
 
     // ── Hardware ──────────────────────────────────────────────
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
