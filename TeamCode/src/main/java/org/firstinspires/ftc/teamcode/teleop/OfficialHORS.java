@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@TeleOp(name="HORS OFFICIAL ⭐", group="Linear OpMode")
+@TeleOp(name="A HORS OFFICIAL ⭐", group="Linear OpMode")
 public class OfficialHORS extends LinearOpMode {
 
     // Drive + subsystems

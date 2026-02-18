@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp ="HORS OFFICIAL ⭐")
+@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
 @Configurable
 public class BluePedroAuto extends OpMode {
 

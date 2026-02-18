@@ -41,7 +41,7 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  * </ul>
  */
 @Configurable
-@TeleOp(name = "ADAPTIVE HORS ⚡", group = "Linear OpMode")
+@TeleOp(name = "ADAPTIVE HORS 🧨", group = "Linear OpMode")
 public class AdaptiveHORS extends LinearOpMode {
 
     // ── Hardware ──────────────────────────────────────────────

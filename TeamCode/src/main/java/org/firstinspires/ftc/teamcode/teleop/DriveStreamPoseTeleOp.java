@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Configurable
-@TeleOp(name = "DriveStreamPoseTeleOp", group = "TeleOp")
+@TeleOp(name = "Z Drive and Stream it", group = "TeleOp")
 public class DriveStreamPoseTeleOp extends OpMode {
 
     // Dashboard-configurable parameters
