@@ -27,7 +27,7 @@ public class Constants {
             0.99,
             90,
             0.92,
-            0.9);
+            0.85);
 
     // ✅ Drivetrain constants (aligned with TeleOp motor names/directions)
     public static MecanumConstants driveConstants = new MecanumConstants()
