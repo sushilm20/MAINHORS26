@@ -61,7 +61,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2640;
+    private static final double AUTO_SHOOTER_RPM = 2650;
 
     private DcMotor intakeMotor;
 
@@ -137,14 +137,14 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 101)
     public static double START_Y = 122.0;
     @Sorter(sort = 102)
-    public static double START_HEADING = 130.0;
+    public static double START_HEADING = 135.0;
     // ========================================
     // PATH POSES - SHOOT POSITION (Primary)
     // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 55.0; //60
+    public static double SHOOT_POSE_X = 60.0; //60
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 86.0;//80
+    public static double SHOOT_POSE_Y = 80.0;//80
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180.0;
     @Sorter(sort = 113)
@@ -336,7 +336,7 @@ public class BluePedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.16);
+                rightHoodServo.setPosition(0.26);
                 panelsTelemetry.debug("Init", "Right hood servo initialized to 0.16");
             }
         } catch (Exception e) {
