@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.autopaths;
 
-// (all your imports — unchanged)
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.bylazar.telemetry.PanelsTelemetry;
@@ -30,7 +29,7 @@ public class BluePedroAuto extends OpMode {
     public Follower follower;
     private Paths paths;
 
-    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, WAIT_GATE_CLEAR, FINISHED }
+    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, WAIT_FIRST_SHOOT, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, WAIT_GATE_CLEAR, FINISHED }
     private AutoState state = AutoState.IDLE;
 
     private int currentPathIndex = 0;
@@ -45,6 +44,8 @@ public class BluePedroAuto extends OpMode {
     private Timer preActionTimer;
     private Timer poseWaitTimer;
     private Timer gateClearWaitTimer;
+
+    private Timer firstShootWaitTimer;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
@@ -61,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2630;
+    private static final double AUTO_SHOOTER_RPM = 2620;
 
     private DcMotor intakeMotor;
 
@@ -72,12 +73,11 @@ public class BluePedroAuto extends OpMode {
 
     private final boolean turretForceManualNoMove = false;
     private boolean turretForceHold = true;
-    private int turretHoldTarget = 0; // in virtual ticks
+    private int turretHoldTarget = 0;
 
     private Servo gateServo;
     private boolean gateClosed = false;
 
-    // Timing/telemetry helpers
     private long autoStartMs = -1;
     private boolean shutdownDone = false;
 
@@ -85,13 +85,15 @@ public class BluePedroAuto extends OpMode {
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.7;
+    public static double INTAKE_RUN_SECONDS = 0.4;
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.0;
+    public static double TIMED_INTAKE_SECONDS = 0.5;
+    @Sorter(sort = 2)
+    public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.76;  // wait after startToShoot before any shoot actions
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.7;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.65;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.95;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.85;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -138,87 +140,60 @@ public class BluePedroAuto extends OpMode {
     public static double START_Y = 122.0;
     @Sorter(sort = 102)
     public static double START_HEADING = 135.0;
-    // ========================================
-    // PATH POSES - SHOOT POSITION (Primary)
-    // ========================================
     @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 54; //58
+    public static double SHOOT_POSE_X = 54;
     @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 84;//80
+    public static double SHOOT_POSE_Y = 84;
     @Sorter(sort = 112)
-    public static double SHOOT_HEADING_INITIAL = 180.0;
+    public static double SHOOT_HEADING_INITIAL = 180;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 180.0;
+    public static double SHOOT_HEADING_FIRST3 = 180;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 180.0;
+    public static double SHOOT_SECOND3_HEADING = 180;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - COLLECT FIRST 3 POSITION
-    // ========================================
+    public static double SHOOT_FINAL_HEADING = 180;
     @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 21.0;
+    public static double COLLECT_FIRST3_X = 22.0;
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 84.0;
     @Sorter(sort = 122)
     public static double COLLECT_FIRST3_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - GATE ALIGN POSITION
-    // ========================================
     @Sorter(sort = 125)
     public static double GATE_ALIGN_X = 24.0;
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - GATE CLEAR POSITION
-    // ========================================
     @Sorter(sort = 130)
     public static double GATE_CLEAR_X = 18.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - ALIGN SECOND 3 POSITION
-    // ========================================
     @Sorter(sort = 140)
     public static double ALIGN_SECOND3_X = 50.0;
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 58.0;
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = -175.0;
-    // ========================================
-    // PATH POSES - COLLECT SECOND 3 POSITION
-    // ========================================
     @Sorter(sort = 150)
     public static double COLLECT_SECOND3_X = 12.0;
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 58.0;
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = -180.0;
-    // ========================================
-    // PATH POSES - ALIGN THIRD 3 POSITION
-    // ========================================
     @Sorter(sort = 160)
     public static double ALIGN_THIRD3_X = 50.0;
     @Sorter(sort = 161)
     public static double ALIGN_THIRD3_Y = 35.0;
     @Sorter(sort = 162)
     public static double ALIGN_THIRD3_HEADING = -180.0;
-    // ========================================
-    // PATH POSES - COLLECT THIRD 3 POSITION
-    // ========================================
     @Sorter(sort = 170)
     public static double COLLECT_THIRD3_X = 12.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 35.0;
     @Sorter(sort = 172)
     public static double COLLECT_THIRD3_HEADING = 180.0;
-    // ========================================
-    // PATH POSES - MOVE FOR RP POSITION
-    // ========================================
     @Sorter(sort = 180)
     public static double MOVE_RP_X = 36.0;
     @Sorter(sort = 181)
@@ -241,6 +216,7 @@ public class BluePedroAuto extends OpMode {
         poseWaitTimer = new Timer();
         gateAlignWaitTimer = new Timer();
         gateClearWaitTimer = new Timer();
+        firstShootWaitTimer = new Timer();
         nextPathIndex = -1;
         intakeSegmentEnd = -1;
         preActionTimerStarted = false;
@@ -359,7 +335,6 @@ public class BluePedroAuto extends OpMode {
     @Override
     public void init_loop() {
         if (flywheel != null) {
-            // flywheel.update(System.currentTimeMillis(), false);
         }
         if (turretController != null && turretForceHold) {
             turretController.holdPositionTicks(turretHoldTarget);
@@ -379,8 +354,7 @@ public class BluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        // Turn turret before any paths run
-        turretHoldTarget = 230;   // target position for turret (positive for blue side)
+        turretHoldTarget = 230;
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
@@ -401,7 +375,11 @@ public class BluePedroAuto extends OpMode {
         }
 
         runStateMachine(nowMs);
-        updateGate();
+
+        // ── Skip gate updates while in WAIT_FIRST_SHOOT so the gate stays closed ──
+        if (state != AutoState.WAIT_FIRST_SHOOT) {
+            updateGate();
+        }
 
         double elapsedSec = (autoStartMs > 0) ? (nowMs - autoStartMs) / 1000.0 : 0.0;
         panelsTelemetry.debug("Elapsed(s)", String.format("%.2f", elapsedSec));
@@ -574,7 +552,6 @@ public class BluePedroAuto extends OpMode {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
-                    // turret turning now happens before paths start; no adjustment after collectFirst3
                     if (finished == 3) {
                         gateAlignWaitTimer.resetTimer();
                         nextPathIndex = 4;
@@ -593,7 +570,21 @@ public class BluePedroAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
-                        state = AutoState.CLOSED_INTAKE_SEQUENCE;
+
+                        // ── Only for startToShoot (path 1): stop everything and wait before shooting ──
+                        if (finished == 1) {
+                            stopIntake();
+                            // Force gate closed during the wait
+                            if (gateServo != null && !gateClosed) {
+                                gateServo.setPosition(GATE_CLOSED);
+                                gateClosed = true;
+                            }
+                            firstShootWaitTimer.resetTimer();
+                            state = AutoState.WAIT_FIRST_SHOOT;
+                            panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Path 1 done, waiting " + PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS + "s (intake off, gate closed)");
+                        } else {
+                            state = AutoState.CLOSED_INTAKE_SEQUENCE;
+                        }
                     } else {
                         int next = finished + 1;
                         if (next > 12) {
@@ -602,6 +593,17 @@ public class BluePedroAuto extends OpMode {
                             startPath(next);
                         }
                     }
+                }
+                break;
+
+            // ── WAIT_FIRST_SHOOT: pure wait — no intake, no gate — then hand off to normal shoot sequence ──
+            case WAIT_FIRST_SHOOT:
+                double waitElapsed = firstShootWaitTimer.getElapsedTimeSeconds();
+                panelsTelemetry.debug("WAIT_FIRST_SHOOT", String.format("remaining=%.2fs", PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS - waitElapsed));
+                if (waitElapsed >= PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS) {
+                    // Wait is over — now let the normal shoot sequence handle gate opening & intake
+                    state = AutoState.CLOSED_INTAKE_SEQUENCE;
+                    panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Wait complete, entering CLOSED_INTAKE_SEQUENCE");
                 }
                 break;
 
@@ -734,7 +736,6 @@ public class BluePedroAuto extends OpMode {
         public PathChain moveForRP;
 
         public Paths(Follower follower) {
-            // ---- Start to Primary Shoot Pose ----
             startToShoot = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(START_X, START_Y),
@@ -742,7 +743,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(START_HEADING), Math.toRadians(SHOOT_HEADING_INITIAL))
                     .build();
 
-            // ---- Shoot to Collect First 3 ----
             collectFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -750,7 +750,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_INITIAL), Math.toRadians(COLLECT_FIRST3_HEADING))
                     .build();
 
-            // ---- Collect First 3 to Gate Align ----
             gateAlign = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
@@ -758,7 +757,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_FIRST3_HEADING), Math.toRadians(GATE_ALIGN_HEADING))
                     .build();
 
-            // ---- Gate Align to Gate Clear ----
             gateClear = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_ALIGN_X, GATE_ALIGN_Y),
@@ -766,7 +764,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_ALIGN_HEADING), Math.toRadians(GATE_CLEAR_HEADING))
                     .build();
 
-            // ---- Gate Clear to Shoot (for First 3) ----
             backToShootFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_CLEAR_X, GATE_CLEAR_Y),
@@ -774,7 +771,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_CLEAR_HEADING), Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
-            // ---- Shoot to Align for Second 3 ----
             alignToCollectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -782,7 +778,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_FIRST3), Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 
-            // ---- Align to Collect Second 3 ----
             collectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y),
@@ -790,7 +785,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_SECOND3_HEADING), Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
-            // ---- Collect Second 3 to Shoot ----
             backToShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
@@ -798,7 +792,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_SECOND3_HEADING), Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
-            // ---- Shoot to Align for Third 3 ----
             alignToCollectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -806,7 +799,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_SECOND3_HEADING), Math.toRadians(ALIGN_THIRD3_HEADING))
                     .build();
 
-            // ---- Align to Collect Third 3 ----
             collectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y),
@@ -814,7 +806,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_THIRD3_HEADING), Math.toRadians(COLLECT_THIRD3_HEADING))
                     .build();
 
-            // ---- Collect Third 3 to Shoot ----
             backToShootThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
@@ -822,7 +813,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_THIRD3_HEADING), Math.toRadians(SHOOT_FINAL_HEADING))
                     .build();
 
-            // ---- Shoot to RP Move ----
             moveForRP = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
