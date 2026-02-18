@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Far 9?? 🔷", group = "Autonomous", preselectTeleOp ="HORS OFFICIAL ⭐")
+@Autonomous(name = "Far 9?? 🔷", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class FarBlue6 extends OpMode {
 
@@ -72,7 +72,7 @@ public class FarBlue6 extends OpMode {
     // ============================
     // Timing
     // ============================
-    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6; // was 0.6, +1s
+    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
     @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
@@ -81,8 +81,8 @@ public class FarBlue6 extends OpMode {
     // Intake power rules
     // ============================
     @Sorter(sort = 10) public static double INTAKE_IDLE_POWER   = -0.50;
-    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.55; // slowed feed
-    @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER= -1.00;
+    @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER  = -0.55;
+    @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER = -1.00;
 
     // ============================
     // Gate settings
@@ -333,8 +333,8 @@ public class FarBlue6 extends OpMode {
                         preActionTimerStarted = false;
                         preActionEntered = false;
                         poseWaitTimer.resetTimer();
-                        rpmStableTimer.resetTimer();
-                        if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM); // ensure full spin before volley
+                        rpmStableTimer.resetTimer(); // One clean reset per volley
+                        if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
                         state = AutoState.PRE_ACTION;
                     } else if (next <= 6) {
                         startPath(next);
@@ -373,7 +373,7 @@ public class FarBlue6 extends OpMode {
             case INTAKE_RUN: {
                 // Watchdog: proceed after timer
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM); // slight drop while feeding
+                    // Keep flywheel at full target RPM so it stays stable for the next gate open
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
@@ -421,8 +421,9 @@ public class FarBlue6 extends OpMode {
 
     // ---------- Intake policy ----------
     private void applyIntakePolicy() {
-        double desired = INTAKE_IDLE_POWER;
-        boolean inShootPhase = (state == AutoState.PRE_ACTION || state == AutoState.INTAKE_RUN || state == AutoState.CLAW_ACTION || endsAtShoot(currentPathIndex));
+        double desired;
+        boolean inShootPhase = (state == AutoState.PRE_ACTION || state == AutoState.INTAKE_RUN
+                || state == AutoState.CLAW_ACTION || endsAtShoot(currentPathIndex));
         boolean inCollectPath = currentPathIndex == 2 || currentPathIndex == 3 || currentPathIndex == 5;
 
         if (inCollectPath) {
@@ -466,29 +467,61 @@ public class FarBlue6 extends OpMode {
     private void updateGate() {
         try {
             double dist = distanceToShootPose();
-            boolean rpmStable = false;
+
+            // Only attempt to open the gate during shoot phases
+            boolean inShootPhase = (state == AutoState.PRE_ACTION
+                    || state == AutoState.INTAKE_RUN
+                    || state == AutoState.CLAW_ACTION);
+
+            // Track RPM stability — but DON'T reset the timer when we're
+            // already in a shoot phase. This prevents momentary RPM flickers
+            // from blocking the gate indefinitely.
+            boolean rpmCloseEnough = false;
             if (flywheel != null && flywheel.isShooterOn()) {
                 double err = Math.abs(flywheel.getCurrentRPM() - flywheel.getTargetRPM());
                 if (err <= GATE_RPM_TOLERANCE) {
-                    if (rpmStableTimer.getElapsedTimeSeconds() >= GATE_RPM_STABLE_SECONDS) {
-                        rpmStable = true;
-                    }
-                } else {
+                    rpmCloseEnough = true;
+                    // Timer keeps accumulating — don't reset here
+                } else if (!inShootPhase) {
+                    // Only reset while NOT in a shoot phase, so the timer
+                    // isn't constantly zeroed during approach oscillations
                     rpmStableTimer.resetTimer();
                 }
             } else {
                 rpmStableTimer.resetTimer();
             }
 
-            if (dist <= GATE_OPEN_TOLERANCE_IN && rpmStable && gateServo != null && gateClosed) {
+            boolean rpmStable = rpmCloseEnough
+                    && rpmStableTimer.getElapsedTimeSeconds() >= GATE_RPM_STABLE_SECONDS;
+
+            // Determine if the gate should be open or closed
+            boolean shouldBeOpen = inShootPhase
+                    && dist <= GATE_OPEN_TOLERANCE_IN
+                    && rpmStable;
+
+            boolean shouldBeClosed = !inShootPhase
+                    || dist >= GATE_CLOSE_TOLERANCE_IN;
+
+            if (shouldBeOpen && gateClosed && gateServo != null) {
                 gateServo.setPosition(GATE_OPEN);
                 gateClosed = false;
-                panelsTelemetry.debug("Gate", "Opened (dist=" + String.format("%.2f", dist) + ", rpmStable=" + rpmStable + ")");
-            } else if ((dist >= GATE_CLOSE_TOLERANCE_IN || !rpmStable) && gateServo != null && !gateClosed) {
+                panelsTelemetry.debug("Gate", "Opened (dist=" + String.format("%.2f", dist)
+                        + ", rpmStable=" + rpmStable + ")");
+            } else if (shouldBeClosed && !gateClosed && gateServo != null) {
                 gateServo.setPosition(GATE_CLOSED);
                 gateClosed = true;
-                panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ", rpmStable=" + rpmStable + ")");
+                panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ")");
             }
+
+            // Debug telemetry — see exactly why the gate isn't opening on the field
+            panelsTelemetry.debug("Gate_dist", String.format("%.2f", dist));
+            panelsTelemetry.debug("Gate_rpmErr", flywheel != null
+                    ? String.format("%.1f", Math.abs(flywheel.getCurrentRPM() - flywheel.getTargetRPM()))
+                    : "N/A");
+            panelsTelemetry.debug("Gate_rpmStableT", String.format("%.2f", rpmStableTimer.getElapsedTimeSeconds()));
+            panelsTelemetry.debug("Gate_inShoot", String.valueOf(inShootPhase));
+            panelsTelemetry.debug("Gate_closed", String.valueOf(gateClosed));
+
         } catch (Exception e) {
             panelsTelemetry.debug("Gate", "updateGate error: " + e.getMessage());
         }
