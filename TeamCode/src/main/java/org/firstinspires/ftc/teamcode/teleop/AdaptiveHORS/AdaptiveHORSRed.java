@@ -19,10 +19,10 @@ import com.bylazar.telemetry.TelemetryManager;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
-import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
+import org.firstinspires.ftc.teamcode.subsystems.AutoShooter.FlywheelVersatile;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterCalibration;
+import org.firstinspires.ftc.teamcode.subsystems.AutoShooter.ShooterCalibration;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 /**

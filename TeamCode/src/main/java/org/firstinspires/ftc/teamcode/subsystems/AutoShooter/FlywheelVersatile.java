@@ -1,8 +1,10 @@
-package org.firstinspires.ftc.teamcode.subsystems;
+package org.firstinspires.ftc.teamcode.subsystems.AutoShooter;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
 import com.pedropathing.geometry.Pose;
+
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 /**
  * FlywheelVersatile — Pose-adaptive RPM wrapper around {@link FlywheelController}.

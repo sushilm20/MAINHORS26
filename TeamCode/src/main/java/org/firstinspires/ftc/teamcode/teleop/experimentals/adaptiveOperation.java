@@ -21,8 +21,8 @@
 //import org.firstinspires.ftc.teamcode.tracking.TurretController;
 //import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 //import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
-//import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile;
-//import org.firstinspires.ftc.teamcode.subsystems.FlywheelVersatile.CalibrationPoint;
+//import org.firstinspires.ftc.teamcode.subsystems.AutoShooter.FlywheelVersatile;
+//import org.firstinspires.ftc.teamcode.subsystems.AutoShooter.FlywheelVersatile.CalibrationPoint;
 //import org.firstinspires.ftc.teamcode.pedroPathing.Constants; // ensure this exists in your project
 //
 //@TeleOp(name="Adaptive HORS", group="Linear OpMode")
