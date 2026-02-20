@@ -33,8 +33,8 @@ public class ShooterCalibration {
     // ──────────────────────────────────────────────────────────
     //  RPM clamp bounds
     // ──────────────────────────────────────────────────────────
-    @Sorter(sort = 2)  public static double MIN_RPM = 2300.0;
-    @Sorter(sort = 3)  public static double MAX_RPM = 4000.0;
+    @Sorter(sort = 2)  public static double MIN_RPM = 2400;
+    @Sorter(sort = 3)  public static double MAX_RPM = 3000;
 
     // ──────────────────────────────────────────────────────────
     //  Calibration point 1
