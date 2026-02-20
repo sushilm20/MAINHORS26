@@ -147,11 +147,11 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 180;
+    public static double SHOOT_HEADING_FIRST3 = 185;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 180;
+    public static double SHOOT_SECOND3_HEADING = 185;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 180;
+    public static double SHOOT_FINAL_HEADING = 185;
     @Sorter(sort = 120)
     public static double COLLECT_FIRST3_X = 22.0;
     @Sorter(sort = 121)

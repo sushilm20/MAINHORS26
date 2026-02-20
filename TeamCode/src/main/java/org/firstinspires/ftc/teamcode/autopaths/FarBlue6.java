@@ -58,7 +58,7 @@ public class FarBlue6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = -95;
+    private static final int TURRET_START_POS = -105;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -109,7 +109,7 @@ public class FarBlue6 extends OpMode {
     @Sorter(sort = 110) public static double SHOOT_X = 58.0;
     @Sorter(sort = 111) public static double SHOOT_Y = 14.0;
     @Sorter(sort = 112) public static double SHOOT_HEADING_DEG = 90.0;
-    @Sorter(sort = 113) public static double SHOOT_RETURN_HEADING_DEG = 180.0;
+    @Sorter(sort = 113) public static double SHOOT_RETURN_HEADING_DEG = 90.0;
 
     @Sorter(sort = 120) public static double COLLECT_CTRL_X = 27.0;
     @Sorter(sort = 121) public static double COLLECT_CTRL_Y = 18.0;
@@ -117,7 +117,7 @@ public class FarBlue6 extends OpMode {
     @Sorter(sort = 123) public static double COLLECT_END_Y = 14.0;
     @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195.0;
 
-    @Sorter(sort = 130) public static double EXTEND_END_Y = 10.392;
+    @Sorter(sort = 130) public static double EXTEND_END_Y = 12;
 
     @Sorter(sort = 140) public static double BACK_COLLECT_X = 16.0;
     @Sorter(sort = 141) public static double BACK_COLLECT_Y = 14.0;
