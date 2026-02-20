@@ -115,7 +115,7 @@ public class FarBlue6 extends OpMode {
     @Sorter(sort = 121) public static double COLLECT_CTRL_Y = 18.0;
     @Sorter(sort = 122) public static double COLLECT_END_X = 16.0;
     @Sorter(sort = 123) public static double COLLECT_END_Y = 14.0;
-    @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195.0;
+    @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195;
 
     @Sorter(sort = 130) public static double EXTEND_END_Y = 12;
 

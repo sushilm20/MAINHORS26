@@ -60,7 +60,7 @@ public class ExperimentalUVGateBlue extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2670;
+    private static final double AUTO_SHOOTER_RPM = 2630;
 
     private DcMotor intakeMotor;
 
@@ -85,10 +85,10 @@ public class ExperimentalUVGateBlue extends OpMode {
     public static double INTAKE_RUN_SECONDS = 0.7;
 
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.1;
+    public static double TIMED_INTAKE_SECONDS = 0.7;
 
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.4;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.7;
 
     @Sorter(sort = 4)
     public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
