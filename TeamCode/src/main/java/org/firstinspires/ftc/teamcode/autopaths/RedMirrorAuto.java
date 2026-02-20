@@ -271,11 +271,11 @@ public class RedMirrorAuto extends OpMode {
 
     /* Helpers to mirror poses/headings using the Pose.mirror() helper already available on Pose. */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror(146);
+        return new Pose(x, y).mirror(142);
     }
 
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(146);
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(142);
     }
 
     private static double mirrorHeading(double headingDeg) {
