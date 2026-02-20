@@ -26,7 +26,7 @@ public class Constants {
     public static PathConstraints pathConstraints = new PathConstraints(
             0.99,
             90,
-            0.92,
+            0.925,
             0.85);
 
     // ✅ Drivetrain constants (aligned with TeleOp motor names/directions)
