@@ -271,7 +271,7 @@ public class RedMirrorAuto extends OpMode {
 //i is sushil
     /* Helpers to mirror poses/headings using the Pose.mirror() helper already available on Pose. */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror(142);
+        return new Pose(x, y).mirror(144);
     }
 
     private static Pose mirrorPose(double x, double y, double headingDeg) {

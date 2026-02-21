@@ -1225,15 +1225,13 @@ class Drawing {
     private static final FieldManager panelsField = PanelsField.INSTANCE.getField();
 
     private static final Style robotLook = new Style(
-            "", "#3F51B5", 0.75
+            "", "#3F51B5", 0.7
     );
     private static final Style historyLook = new Style(
-            "", "#4CAF50", 0.75
+            "", "#4CAF50", 0.7
     );
 
-    /**
-     * This prepares Panels Field for using Pedro Offsets
-     */
+
     public static void init() {
         panelsField.setOffsets(PanelsField.INSTANCE.getPresets().getPEDRO_PATHING());
     }
