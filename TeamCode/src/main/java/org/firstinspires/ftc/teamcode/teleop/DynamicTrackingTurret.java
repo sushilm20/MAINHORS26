@@ -79,7 +79,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
 
     // Target tracking
     private static final Pose BLUE_GOAL = new Pose(14, 134, 0);
-    private static final Pose RED_GOAL = new Pose(132, 134, 0);
+    private static final Pose RED_GOAL = new Pose(135, 134, 0);
     private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(130));
 
     private boolean isRedAlliance = false;  // Set to true for red side
