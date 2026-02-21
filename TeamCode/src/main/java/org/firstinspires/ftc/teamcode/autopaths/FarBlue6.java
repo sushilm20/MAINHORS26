@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Far 9?? 🔷", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
+@Autonomous(name = "Far 9? 🔷", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class FarBlue6 extends OpMode {
 
@@ -73,7 +73,7 @@ public class FarBlue6 extends OpMode {
     // Timing
     // ============================
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
-    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
+    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 4;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
