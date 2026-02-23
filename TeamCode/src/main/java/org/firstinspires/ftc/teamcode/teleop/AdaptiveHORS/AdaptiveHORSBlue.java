@@ -26,12 +26,8 @@ import org.firstinspires.ftc.teamcode.subsystems.AutoShooter.ShooterCalibration;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 /**
- * AdaptiveHORS — drop-in replacement for OfficialHORS that uses
- * {@link FlywheelVersatile} for pose-based auto-adjusting RPM.
- *
- * The flywheel target RPM is continuously computed from a linear regression
- * of distance-to-goal vs RPM, using calibration points defined in
- * {@link ShooterCalibration} (all {@code @Configurable} for Panels).
+ * AdaptiveHORS Blue — pose-based auto-adjusting RPM using
+ * {@link FlywheelVersatile} and {@link ShooterCalibration}.
  *
  * <ul>
  *   <li><b>dpad left/right</b> — trim RPM ±50 on top of auto RPM</li>
@@ -99,10 +95,18 @@ public class AdaptiveHORSBlue extends LinearOpMode {
     // ── Pinpoint / Pose ──────────────────────────────────────
     private GoBildaPinpointDriver pinpoint;
     private Follower follower;
-    private Pose currentPose = new Pose();
+
+    // FIX: Start pose constant — used for both follower init and pose fallback
+    private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(135));
+
+    // FIX: Initialize to START_POSE so first-frame RPM calc uses real position, not (0,0,0)
+    private Pose currentPose = START_POSE;
 
     // Blue goal target pose (only x, y matter for distance)
     private static final Pose BLUE_GOAL = new Pose(12, 135, 0);
+
+    // FIX: Guard against localizer returning (0,0) before it has a real fix
+    private boolean followerPoseValid = false;
 
     @Override
     public void runOpMode() {
@@ -161,7 +165,7 @@ public class AdaptiveHORSBlue extends LinearOpMode {
         // ════════════ Follower ════════════
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135))); // start pose
+            follower.setStartingPose(START_POSE);
         } catch (Exception e) {
             telemetry.addData("Error", "Follower init failed!");
             follower = null;
@@ -171,11 +175,9 @@ public class AdaptiveHORSBlue extends LinearOpMode {
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
-        // Build calibration + regression
         ShooterCalibration calibration = new ShooterCalibration();
         calibration.computeRegression();
 
-        // Wrap flywheel in FlywheelVersatile for auto-adjusting RPM
         flywheelVersatile = new FlywheelVersatile(
                 flywheel, BLUE_GOAL, calibration, 2300, 4000
         );
@@ -212,9 +214,14 @@ public class AdaptiveHORSBlue extends LinearOpMode {
         // ════════════ Initial state ════════════
         gateController.setGateClosed(true);
 
+        // FIX: Show regression debug info at init
+        double startDist = Math.hypot(START_POSE.getX() - BLUE_GOAL.getX(),
+                START_POSE.getY() - BLUE_GOAL.getY());
         telemetry.addData("Status", "Initialized — Adaptive RPM (shooter OFF)");
-//        telemetry.addData("Regression slope",  "%.4f", calibration.getSlope());
-//        telemetry.addData("Regression intcpt", "%.2f", calibration.getIntercept());
+        telemetry.addData("Start→Goal dist", "%.1f in", startDist);
+        telemetry.addData("Regression", "slope=%.2f, intercept=%.1f",
+                calibration.getSlope(), calibration.getIntercept());
+        telemetry.addData("RPM at start", "%.0f", calibration.rpmForDistance(startDist));
         telemetry.update();
 
         turretController.captureReferences();
@@ -234,7 +241,25 @@ public class AdaptiveHORSBlue extends LinearOpMode {
             long nowMs = System.currentTimeMillis();
 
             try { pinpoint.update(); } catch (Exception ignored) {}
-            if (follower != null) { follower.update(); currentPose = follower.getPose(); }
+
+            // FIX: Guard against (0,0) frames before localizer has a real fix
+            if (follower != null) {
+                follower.update();
+                Pose rawPose = follower.getPose();
+                if (rawPose != null) {
+                    if (!followerPoseValid) {
+                        // Check if the localizer is returning real data (not stuck at origin)
+                        double distFromOrigin = Math.hypot(rawPose.getX(), rawPose.getY());
+                        if (distFromOrigin > 5.0) {
+                            followerPoseValid = true;
+                            currentPose = rawPose;
+                        }
+                        // else: keep using START_POSE as currentPose
+                    } else {
+                        currentPose = rawPose;
+                    }
+                }
+            }
 
             // ── Touchpad reset (gp2) ──
             boolean gp2Touch = getTouchpad(gamepad2);
@@ -365,11 +390,14 @@ public class AdaptiveHORSBlue extends LinearOpMode {
                     flywheelVersatile.getLastDistance());
             telemetry.addData("Base RPM",   "%.0f", flywheelVersatile.getLastBaseRpm());
             telemetry.addData("Trim RPM",   "%.0f", flywheelVersatile.getTrimRpm());
-            telemetry.addData("Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)",
-                    currentPose.getX(), currentPose.getY(),
-                    Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
+            // FIX: Show pose validity status
+            telemetry.addData("Pose", "%s %s",
+                    followerPoseValid ? "✅" : "⏳",
+                    currentPose != null
+                            ? String.format("(%.1f, %.1f, %.1f°)",
+                            currentPose.getX(), currentPose.getY(),
+                            Math.toDegrees(currentPose.getHeading()))
+                            : "N/A");
             telemetry.update();
         }
 
@@ -377,7 +405,7 @@ public class AdaptiveHORSBlue extends LinearOpMode {
     }
 
     // ═════════════════════════════════════════════════════════
-    //  Helpers (same as OfficialHORS)
+    //  Helpers
     // ═════════════════════════════════════════════════════════
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {
