@@ -62,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2620;
+    private static final double AUTO_SHOOTER_RPM = 2610;
 
     private DcMotor intakeMotor;
 
