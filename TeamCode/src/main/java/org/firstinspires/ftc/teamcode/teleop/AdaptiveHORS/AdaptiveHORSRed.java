@@ -29,13 +29,10 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  * AdaptiveHORSRed — Red-side mirror of {@link AdaptiveHORSBlue}.
  *
  * All calibration points, the goal pose, and the starting pose are
- * mirrored across the field center line (x = 73, i.e. mirror axis 146)
- * using the same {@code Pose.mirror(146)} helper used in your autos.
+ * mirrored across the field center line using {@code Pose.mirror(146)}.
  *
- * The {@link ShooterCalibration} still holds the blue-side calibration
- * data (single source of truth). This TeleOp mirrors each point at
- * init time before computing the regression, so any Panels edits to
- * the blue calibration automatically propagate to red.
+ * The {@link ShooterCalibration} holds blue-side data (single source of truth).
+ * This TeleOp mirrors each point at init time before computing the regression.
  */
 @Configurable
 @TeleOp(name = "ADAPTIVE HORS RED 🔴⚡", group = "Linear OpMode")
@@ -96,25 +93,38 @@ public class AdaptiveHORSRed extends LinearOpMode {
     // ── Pinpoint / Pose ──────────────────────────────────────
     private GoBildaPinpointDriver pinpoint;
     private Follower follower;
-    private Pose currentPose = new Pose();
 
     // ── Mirror axis (same as your autos) ─────────────────────
     private static final double MIRROR_AXIS = 146.0;
 
+    // FIX: Red start pose computed at class level so it can initialize currentPose
+    private static final Pose RED_START_POSE = mirrorPoseStatic(20, 122, 135);
+
+    // FIX: Initialize to RED_START_POSE so first-frame RPM calc uses real position, not (0,0,0)
+    private Pose currentPose = RED_START_POSE;
+
+    // FIX: Guard against localizer returning (0,0) before it has a real fix
+    private boolean followerPoseValid = false;
+
     // =========================================================================
-    //  Mirror helpers  (identical to RedMirrorAuto)
+    //  Mirror helpers
     // =========================================================================
 
-    private static Pose mirrorPose(double x, double y) {
+    private static Pose mirrorPoseStatic(double x, double y) {
         return new Pose(x, y).mirror(MIRROR_AXIS);
     }
 
-    private static Pose mirrorPose(double x, double y, double headingDeg) {
+    private static Pose mirrorPoseStatic(double x, double y, double headingDeg) {
         return new Pose(x, y, Math.toRadians(headingDeg)).mirror(MIRROR_AXIS);
     }
 
-    private static double mirrorHeading(double headingDeg) {
-        return new Pose(0.0, 0.0, Math.toRadians(headingDeg)).mirror().getHeading();
+    // Instance versions (for readability in runOpMode)
+    private Pose mirrorPose(double x, double y) {
+        return mirrorPoseStatic(x, y);
+    }
+
+    private Pose mirrorPose(double x, double y, double headingDeg) {
+        return mirrorPoseStatic(x, y, headingDeg);
     }
 
     @Override
@@ -152,7 +162,7 @@ public class AdaptiveHORSRed extends LinearOpMode {
         try { batterySensor = hardwareMap.voltageSensor.iterator().next(); }
         catch (Exception ignored) {}
 
-        // ═══��════════ Motor directions ════════════
+        // ════════════ Motor directions ════════════
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -172,10 +182,9 @@ public class AdaptiveHORSRed extends LinearOpMode {
         pinpoint.resetPosAndIMU();
 
         // ════════════ Follower (mirrored start pose) ════════════
-        Pose redStartPose = mirrorPose(20, 122, 135);
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(redStartPose);
+            follower.setStartingPose(RED_START_POSE);
         } catch (Exception e) {
             telemetry.addData("Error", "Follower init failed!");
             follower = null;
@@ -185,17 +194,14 @@ public class AdaptiveHORSRed extends LinearOpMode {
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
-        // Build calibration from the blue-side ShooterCalibration data,
-        // but override the goal and calibration points with mirrored versions.
         ShooterCalibration calibration = new ShooterCalibration();
 
         // Mirror the blue goal to get the red goal
-        Pose redGoal = mirrorPose(ShooterCalibration.GOAL_X, ShooterCalibration.GOAL_Y);
-        // Temporarily set the goal statics so regression uses mirrored goal
-        ShooterCalibration.GOAL_X = redGoal.getX();
-        ShooterCalibration.GOAL_Y = redGoal.getY();
+        Pose redGoalMirrored = mirrorPose(ShooterCalibration.GOAL_X, ShooterCalibration.GOAL_Y);
+        ShooterCalibration.GOAL_X = redGoalMirrored.getX();
+        ShooterCalibration.GOAL_Y = redGoalMirrored.getY();
 
-        // Mirror every calibration point pose (the RPMs stay the same — only distance matters)
+        // Mirror every calibration point pose (RPMs stay the same — only distance matters)
         Pose m1 = mirrorPose(ShooterCalibration.CAL1_X, ShooterCalibration.CAL1_Y);
         ShooterCalibration.CAL1_X = m1.getX(); ShooterCalibration.CAL1_Y = m1.getY();
 
@@ -217,11 +223,11 @@ public class AdaptiveHORSRed extends LinearOpMode {
         Pose m7 = mirrorPose(ShooterCalibration.CAL7_X, ShooterCalibration.CAL7_Y);
         ShooterCalibration.CAL7_X = m7.getX(); ShooterCalibration.CAL7_Y = m7.getY();
 
-        // Now compute regression using the mirrored data
+        // Compute regression using the mirrored data
         calibration.computeRegression();
 
         // Red goal pose for FlywheelVersatile distance computation
-        Pose RED_GOAL = new Pose(redGoal.getX(), redGoal.getY(), 0);
+        Pose RED_GOAL = new Pose(redGoalMirrored.getX(), redGoalMirrored.getY(), 0);
 
         flywheelVersatile = new FlywheelVersatile(
                 flywheel, RED_GOAL, calibration, 2300, 4000
@@ -259,13 +265,18 @@ public class AdaptiveHORSRed extends LinearOpMode {
         // ════════════ Initial state ════════════
         gateController.setGateClosed(true);
 
+        // FIX: Show regression debug info at init
+        double startDist = Math.hypot(RED_START_POSE.getX() - RED_GOAL.getX(),
+                RED_START_POSE.getY() - RED_GOAL.getY());
         telemetry.addData("Status", "Initialized — RED Adaptive RPM (shooter OFF)");
         telemetry.addData("Red Goal", "(%.1f, %.1f)", RED_GOAL.getX(), RED_GOAL.getY());
         telemetry.addData("Red Start", "(%.1f, %.1f, %.1f°)",
-                redStartPose.getX(), redStartPose.getY(),
-                Math.toDegrees(redStartPose.getHeading()));
-        telemetry.addData("Regression slope",  "%.4f", calibration.getSlope());
-        telemetry.addData("Regression intcpt", "%.2f", calibration.getIntercept());
+                RED_START_POSE.getX(), RED_START_POSE.getY(),
+                Math.toDegrees(RED_START_POSE.getHeading()));
+        telemetry.addData("Start→Goal dist", "%.1f in", startDist);
+        telemetry.addData("Regression", "slope=%.2f, intercept=%.1f",
+                calibration.getSlope(), calibration.getIntercept());
+        telemetry.addData("RPM at start", "%.0f", calibration.rpmForDistance(startDist));
         telemetry.update();
 
         turretController.captureReferences();
@@ -285,7 +296,24 @@ public class AdaptiveHORSRed extends LinearOpMode {
             long nowMs = System.currentTimeMillis();
 
             try { pinpoint.update(); } catch (Exception ignored) {}
-            if (follower != null) { follower.update(); currentPose = follower.getPose(); }
+
+            // FIX: Guard against (0,0) frames before localizer has a real fix
+            if (follower != null) {
+                follower.update();
+                Pose rawPose = follower.getPose();
+                if (rawPose != null) {
+                    if (!followerPoseValid) {
+                        double distFromOrigin = Math.hypot(rawPose.getX(), rawPose.getY());
+                        if (distFromOrigin > 5.0) {
+                            followerPoseValid = true;
+                            currentPose = rawPose;
+                        }
+                        // else: keep using RED_START_POSE as currentPose
+                    } else {
+                        currentPose = rawPose;
+                    }
+                }
+            }
 
             // ── Touchpad reset (gp2) ──
             boolean gp2Touch = getTouchpad(gamepad2);
@@ -416,11 +444,14 @@ public class AdaptiveHORSRed extends LinearOpMode {
                     flywheelVersatile.getLastDistance());
             telemetry.addData("Base RPM",   "%.0f", flywheelVersatile.getLastBaseRpm());
             telemetry.addData("Trim RPM",   "%.0f", flywheelVersatile.getTrimRpm());
-            telemetry.addData("Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)",
-                    currentPose.getX(), currentPose.getY(),
-                    Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
+            // FIX: Show pose validity status
+            telemetry.addData("Pose", "%s %s",
+                    followerPoseValid ? "✅" : "⏳",
+                    currentPose != null
+                            ? String.format("(%.1f, %.1f, %.1f°)",
+                            currentPose.getX(), currentPose.getY(),
+                            Math.toDegrees(currentPose.getHeading()))
+                            : "N/A");
             telemetry.update();
         }
 
