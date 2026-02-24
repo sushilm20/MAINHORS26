@@ -35,25 +35,25 @@ public class TurretController {
 
     // PID like config
     @Sorter(sort = 3)
-    public static double TURRET_KP = 1.0;
+    public static double TURRET_KP = 0.55;
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.235;
+    public static double TURRET_KD = 0.05;
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
     // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
-    public static double FF_GAIN = 5.0;
+    public static double FF_GAIN = 3.0;
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.9;
+    public static double POWER_SMOOTH_ALPHA = 0.8;
     @Sorter(sort = 9)
     public static double DERIV_FILTER_ALPHA = 1.0;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 3;
+    public static int SMALL_DEADBAND_TICKS = 7;
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0;
 
@@ -69,7 +69,7 @@ public class TurretController {
     @Sorter(sort = 15)
     public static double HOMING_POWER = 0.5;
     @Sorter(sort = 16)
-    public static int HOMING_TARGET_DEADBAND = 12;
+    public static int HOMING_TARGET_DEADBAND = 15;
 
     // Safety timeout (ms) to exit homing if switch never triggers
     @Sorter(sort = 17)
