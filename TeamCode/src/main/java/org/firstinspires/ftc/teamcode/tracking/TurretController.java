@@ -39,21 +39,21 @@ public class TurretController {
     @Sorter(sort = 4)
     public static double TURRET_KI = 0.0;
     @Sorter(sort = 5)
-    public static double TURRET_KD = 0.05;
+    public static double TURRET_KD = 0.35;
     @Sorter(sort = 6)
     public static double TURRET_MAX_POWER = 1.0;
 
     // Feedforward and smoothing/filtering (configurable)
     @Sorter(sort = 7)
-    public static double FF_GAIN = 3.0;
+    public static double FF_GAIN = 2.0;
     @Sorter(sort = 8)
-    public static double POWER_SMOOTH_ALPHA = 0.8;
+    public static double POWER_SMOOTH_ALPHA = 0.67;
     @Sorter(sort = 9)
-    public static double DERIV_FILTER_ALPHA = 1.0;
+    public static double DERIV_FILTER_ALPHA = 1.4;
 
     // Deadband & anti-windup (configurable)
     @Sorter(sort = 10)
-    public static int SMALL_DEADBAND_TICKS = 7;
+    public static int SMALL_DEADBAND_TICKS = 4;
     @Sorter(sort = 11)
     public static double INTEGRAL_CLAMP = 50.0;
 
