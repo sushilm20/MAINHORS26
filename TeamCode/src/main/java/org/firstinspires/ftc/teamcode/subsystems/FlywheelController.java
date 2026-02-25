@@ -54,12 +54,8 @@ public class FlywheelController {
     @Sorter(sort = 25) public static double closeRPM = 2600;
     @Sorter(sort = 26) public static double farRPM = 3390;
 
-    // Legacy below
-    @Sorter(sort = 27) public static double kP = 0.00145;
-    @Sorter(sort = 28) public static double kI = 0.0027;
-    @Sorter(sort = 29) public static double kD = 0.00002;
-    @Sorter(sort = 30) public static double kF = 1.72;
-    @Sorter(sort = 31) public static double rpmTolerance = 47.0;
+
+    @Sorter(sort = 31) public static double rpmTolerance = 45.0;
 
 
     // Legacy variable mapped to new
