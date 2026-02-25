@@ -23,7 +23,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue Turret Auto 🔷", group = "Autonomous", preselectTeleOp ="HORS OFFICIAL ⭐")
+@Autonomous(name = "Blue Turret Auto ", group = "Autonomous", preselectTeleOp ="HORS OFFICIAL ⭐")
 @Configurable
 public class BlueTurretAuto extends OpMode {
 
