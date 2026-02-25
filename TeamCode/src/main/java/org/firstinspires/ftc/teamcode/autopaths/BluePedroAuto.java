@@ -256,13 +256,7 @@ public class BluePedroAuto extends OpMode {
                 panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
             }
 
-            try {
-                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
-                panelsTelemetry.debug("Init", "Found expansion hub IMU as 'imu'");
-            } catch (Exception e) {
-                hubImu = null;
-                panelsTelemetry.debug("Init", "Expansion hub IMU 'imu' not found: " + e.getMessage());
-            }
+
 
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
 
