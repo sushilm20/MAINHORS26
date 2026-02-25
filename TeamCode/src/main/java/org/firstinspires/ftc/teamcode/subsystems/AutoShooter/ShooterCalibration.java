@@ -27,13 +27,13 @@ public class ShooterCalibration {
     // ──────────────────────────────────────────────────────────
     //  Blue goal target (field coordinates)
     // ──────────────────────────────────────────────────────────
-    @Sorter(sort = 0)  public static double GOAL_X = 12.0;
+    @Sorter(sort = 0)  public static double GOAL_X = 15.0;
     @Sorter(sort = 1)  public static double GOAL_Y = 135.0;
 
     // ──────────────────────────────────────────────────────────
     //  RPM clamp bounds
     // ──────────────────────────────────────────────────────────
-    @Sorter(sort = 2)  public static double MIN_RPM = 2400;
+    @Sorter(sort = 2)  public static double MIN_RPM = 2500;
     @Sorter(sort = 3)  public static double MAX_RPM = 3000;
 
     // ──────────────────────────────────────────────────────────
