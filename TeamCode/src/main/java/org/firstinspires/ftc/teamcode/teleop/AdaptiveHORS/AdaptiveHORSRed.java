@@ -33,6 +33,10 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  *
  * The {@link ShooterCalibration} holds blue-side data (single source of truth).
  * This TeleOp mirrors each point at init time before computing the regression.
+ *
+ * <p><b>FIX:</b> Blue-side defaults are explicitly restored before mirroring,
+ * and the original values are restored in a {@code finally} block when the
+ * OpMode exits, so that a subsequent Blue run is not corrupted.</p>
  */
 @Configurable
 @TeleOp(name = "ADAPTIVE HORS RED 🔴⚡", group = "Linear OpMode")
@@ -97,10 +101,21 @@ public class AdaptiveHORSRed extends LinearOpMode {
     // ── Mirror axis (same as your autos) ─────────────────────
     private static final double MIRROR_AXIS = 146.0;
 
+    // ── Blue-side default calibration values (canonical source of truth) ──
+    private static final double DEFAULT_GOAL_X = 15.0;
+    private static final double DEFAULT_GOAL_Y = 135.0;
+    private static final double DEFAULT_CAL1_X = 48.0;  private static final double DEFAULT_CAL1_Y = 96.0;
+    private static final double DEFAULT_CAL2_X = 60.0;  private static final double DEFAULT_CAL2_Y = 125.0;
+    private static final double DEFAULT_CAL3_X = 60.0;  private static final double DEFAULT_CAL3_Y = 82.0;
+    private static final double DEFAULT_CAL4_X = 72.0;  private static final double DEFAULT_CAL4_Y = 72.0;
+    private static final double DEFAULT_CAL5_X = 72.0;  private static final double DEFAULT_CAL5_Y = 120.0;
+    private static final double DEFAULT_CAL6_X = 95.0;  private static final double DEFAULT_CAL6_Y = 120.0;
+    private static final double DEFAULT_CAL7_X = 52.0;  private static final double DEFAULT_CAL7_Y = 14.0;
+
     // FIX: Red start pose computed at class level so it can initialize currentPose
     private static final Pose RED_START_POSE = mirrorPoseStatic(20, 122, 135);
 
-    // FIX: Initialize to RED_START_POSE so first-frame RPM calc uses real position, not (0,0,0)
+    // FIX: Initialize to RED_START_POSE so first-frame RPM calc uses real position
     private Pose currentPose = RED_START_POSE;
 
     // FIX: Guard against localizer returning (0,0) before it has a real fix
@@ -125,6 +140,23 @@ public class AdaptiveHORSRed extends LinearOpMode {
 
     private Pose mirrorPose(double x, double y, double headingDeg) {
         return mirrorPoseStatic(x, y, headingDeg);
+    }
+
+    /**
+     * Restores all ShooterCalibration statics to their blue-side defaults.
+     * Called at the start of runOpMode (to undo a previous Red run) and
+     * in the finally block (to leave clean state for a subsequent Blue run).
+     */
+    private void restoreBlueDefaults() {
+        ShooterCalibration.GOAL_X = DEFAULT_GOAL_X;
+        ShooterCalibration.GOAL_Y = DEFAULT_GOAL_Y;
+        ShooterCalibration.CAL1_X = DEFAULT_CAL1_X;  ShooterCalibration.CAL1_Y = DEFAULT_CAL1_Y;
+        ShooterCalibration.CAL2_X = DEFAULT_CAL2_X;  ShooterCalibration.CAL2_Y = DEFAULT_CAL2_Y;
+        ShooterCalibration.CAL3_X = DEFAULT_CAL3_X;  ShooterCalibration.CAL3_Y = DEFAULT_CAL3_Y;
+        ShooterCalibration.CAL4_X = DEFAULT_CAL4_X;  ShooterCalibration.CAL4_Y = DEFAULT_CAL4_Y;
+        ShooterCalibration.CAL5_X = DEFAULT_CAL5_X;  ShooterCalibration.CAL5_Y = DEFAULT_CAL5_Y;
+        ShooterCalibration.CAL6_X = DEFAULT_CAL6_X;  ShooterCalibration.CAL6_Y = DEFAULT_CAL6_Y;
+        ShooterCalibration.CAL7_X = DEFAULT_CAL7_X;  ShooterCalibration.CAL7_Y = DEFAULT_CAL7_Y;
     }
 
     @Override
@@ -177,7 +209,7 @@ public class AdaptiveHORSRed extends LinearOpMode {
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // ════════════ Pinpoint ════════════
+        // ════════════ Pinpoint ════���═══════
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.resetPosAndIMU();
 
@@ -194,268 +226,280 @@ public class AdaptiveHORSRed extends LinearOpMode {
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
-        ShooterCalibration calibration = new ShooterCalibration();
+        // FIX: First restore blue defaults (in case a previous Red run left
+        //      them dirty), THEN mirror for red. Wrap the entire OpMode in
+        //      try/finally so we always restore blue defaults on exit.
+        restoreBlueDefaults();
 
-        // Mirror the blue goal to get the red goal
-        Pose redGoalMirrored = mirrorPose(ShooterCalibration.GOAL_X, ShooterCalibration.GOAL_Y);
-        ShooterCalibration.GOAL_X = redGoalMirrored.getX();
-        ShooterCalibration.GOAL_Y = redGoalMirrored.getY();
+        try {
+            // Mirror the blue goal to get the red goal
+            Pose redGoalMirrored = mirrorPose(DEFAULT_GOAL_X, DEFAULT_GOAL_Y);
+            ShooterCalibration.GOAL_X = redGoalMirrored.getX();
+            ShooterCalibration.GOAL_Y = redGoalMirrored.getY();
 
-        // Mirror every calibration point pose (RPMs stay the same — only distance matters)
-        Pose m1 = mirrorPose(ShooterCalibration.CAL1_X, ShooterCalibration.CAL1_Y);
-        ShooterCalibration.CAL1_X = m1.getX(); ShooterCalibration.CAL1_Y = m1.getY();
+            // Mirror every calibration point pose (RPMs stay the same — only distance matters)
+            Pose m1 = mirrorPose(DEFAULT_CAL1_X, DEFAULT_CAL1_Y);
+            ShooterCalibration.CAL1_X = m1.getX(); ShooterCalibration.CAL1_Y = m1.getY();
 
-        Pose m2 = mirrorPose(ShooterCalibration.CAL2_X, ShooterCalibration.CAL2_Y);
-        ShooterCalibration.CAL2_X = m2.getX(); ShooterCalibration.CAL2_Y = m2.getY();
+            Pose m2 = mirrorPose(DEFAULT_CAL2_X, DEFAULT_CAL2_Y);
+            ShooterCalibration.CAL2_X = m2.getX(); ShooterCalibration.CAL2_Y = m2.getY();
 
-        Pose m3 = mirrorPose(ShooterCalibration.CAL3_X, ShooterCalibration.CAL3_Y);
-        ShooterCalibration.CAL3_X = m3.getX(); ShooterCalibration.CAL3_Y = m3.getY();
+            Pose m3 = mirrorPose(DEFAULT_CAL3_X, DEFAULT_CAL3_Y);
+            ShooterCalibration.CAL3_X = m3.getX(); ShooterCalibration.CAL3_Y = m3.getY();
 
-        Pose m4 = mirrorPose(ShooterCalibration.CAL4_X, ShooterCalibration.CAL4_Y);
-        ShooterCalibration.CAL4_X = m4.getX(); ShooterCalibration.CAL4_Y = m4.getY();
+            Pose m4 = mirrorPose(DEFAULT_CAL4_X, DEFAULT_CAL4_Y);
+            ShooterCalibration.CAL4_X = m4.getX(); ShooterCalibration.CAL4_Y = m4.getY();
 
-        Pose m5 = mirrorPose(ShooterCalibration.CAL5_X, ShooterCalibration.CAL5_Y);
-        ShooterCalibration.CAL5_X = m5.getX(); ShooterCalibration.CAL5_Y = m5.getY();
+            Pose m5 = mirrorPose(DEFAULT_CAL5_X, DEFAULT_CAL5_Y);
+            ShooterCalibration.CAL5_X = m5.getX(); ShooterCalibration.CAL5_Y = m5.getY();
 
-        Pose m6 = mirrorPose(ShooterCalibration.CAL6_X, ShooterCalibration.CAL6_Y);
-        ShooterCalibration.CAL6_X = m6.getX(); ShooterCalibration.CAL6_Y = m6.getY();
+            Pose m6 = mirrorPose(DEFAULT_CAL6_X, DEFAULT_CAL6_Y);
+            ShooterCalibration.CAL6_X = m6.getX(); ShooterCalibration.CAL6_Y = m6.getY();
 
-        Pose m7 = mirrorPose(ShooterCalibration.CAL7_X, ShooterCalibration.CAL7_Y);
-        ShooterCalibration.CAL7_X = m7.getX(); ShooterCalibration.CAL7_Y = m7.getY();
+            Pose m7 = mirrorPose(DEFAULT_CAL7_X, DEFAULT_CAL7_Y);
+            ShooterCalibration.CAL7_X = m7.getX(); ShooterCalibration.CAL7_Y = m7.getY();
 
-        // Compute regression using the mirrored data
-        calibration.computeRegression();
+            // Compute regression using the mirrored data
+            ShooterCalibration calibration = new ShooterCalibration();
+            calibration.computeRegression();
 
-        // Red goal pose for FlywheelVersatile distance computation
-        Pose RED_GOAL = new Pose(redGoalMirrored.getX(), redGoalMirrored.getY(), 0);
+            // Red goal pose for FlywheelVersatile (passed for API compat;
+            // distance is now computed inside ShooterCalibration.distanceToGoal)
+            Pose RED_GOAL = new Pose(redGoalMirrored.getX(), redGoalMirrored.getY(), 0);
 
-        flywheelVersatile = new FlywheelVersatile(
-                flywheel, RED_GOAL, calibration, 2300, 4000
-        );
+            flywheelVersatile = new FlywheelVersatile(
+                    flywheel, RED_GOAL, calibration, 2300, 4000
+            );
 
-        // ════════════ Other controllers ════════════
-        turretController = new TurretController(turret, null, pinpoint, telemetry);
-        if (turretLimitSwitch != null) {
-            turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
-        }
+            // ════════════ Other controllers ════════════
+            turretController = new TurretController(turret, null, pinpoint, telemetry);
+            if (turretLimitSwitch != null) {
+                turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
+            }
 
-        driveController = new DriveController(
-                frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
+            driveController = new DriveController(
+                    frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
 
-        gateController = new GateController(
-                gateServo, intakeMotor,
-                led1Red, led1Green, led2Red, led2Green,
-                GATE_OPEN, GATE_CLOSED,
-                INTAKE_DURATION_MS, CLAW_TRIGGER_BEFORE_END_MS,
-                INTAKE_SEQUENCE_POWER
-        );
+            gateController = new GateController(
+                    gateServo, intakeMotor,
+                    led1Red, led1Green, led2Red, led2Green,
+                    GATE_OPEN, GATE_CLOSED,
+                    INTAKE_DURATION_MS, CLAW_TRIGGER_BEFORE_END_MS,
+                    INTAKE_SEQUENCE_POWER
+            );
 
-        clawController = new ClawController(
-                clawServo, ClawController.CLAW_OPEN,
-                ClawController.CLAW_CLOSED, ClawController.CLAW_CLOSE_MS);
+            clawController = new ClawController(
+                    clawServo, ClawController.CLAW_OPEN,
+                    ClawController.CLAW_CLOSED, ClawController.CLAW_CLOSE_MS);
 
-        hoodController = new HoodController(
-                leftHoodServo, rightHoodServo,
-                HOOD_MIN, RIGHT_HOOD_CLOSE,
-                HOOD_MIN, HOOD_MAX,
-                HOOD_LEFT_STEP, HOOD_RIGHT_STEP,
-                HOOD_DEBOUNCE_MS
-        );
+            hoodController = new HoodController(
+                    leftHoodServo, rightHoodServo,
+                    HOOD_MIN, RIGHT_HOOD_CLOSE,
+                    HOOD_MIN, HOOD_MAX,
+                    HOOD_LEFT_STEP, HOOD_RIGHT_STEP,
+                    HOOD_DEBOUNCE_MS
+            );
 
-        // ════════════ Initial state ════════════
-        gateController.setGateClosed(true);
+            // ════════════ Initial state ════════════
+            gateController.setGateClosed(true);
 
-        // FIX: Show regression debug info at init
-        double startDist = Math.hypot(RED_START_POSE.getX() - RED_GOAL.getX(),
-                RED_START_POSE.getY() - RED_GOAL.getY());
-        telemetry.addData("Status", "Initialized — RED Adaptive RPM (shooter OFF)");
-        telemetry.addData("Red Goal", "(%.1f, %.1f)", RED_GOAL.getX(), RED_GOAL.getY());
-        telemetry.addData("Red Start", "(%.1f, %.1f, %.1f°)",
-                RED_START_POSE.getX(), RED_START_POSE.getY(),
-                Math.toDegrees(RED_START_POSE.getHeading()));
-        telemetry.addData("Start→Goal dist", "%.1f in", startDist);
-        telemetry.addData("Regression", "slope=%.2f, intercept=%.1f",
-                calibration.getSlope(), calibration.getIntercept());
-        telemetry.addData("RPM at start", "%.0f", calibration.rpmForDistance(startDist));
-        telemetry.update();
+            // FIX: Use calibration's distanceToGoal so distance uses the same
+            //      (now-mirrored) GOAL_X / GOAL_Y as the regression.
+            double startDist = ShooterCalibration.distanceToGoal(
+                    RED_START_POSE.getX(), RED_START_POSE.getY());
+            telemetry.addData("Status", "Initialized — RED Adaptive RPM (shooter OFF)");
+            telemetry.addData("Red Goal", "(%.1f, %.1f)", RED_GOAL.getX(), RED_GOAL.getY());
+            telemetry.addData("Red Start", "(%.1f, %.1f, %.1f°)",
+                    RED_START_POSE.getX(), RED_START_POSE.getY(),
+                    Math.toDegrees(RED_START_POSE.getHeading()));
+            telemetry.addData("Start→Goal dist", "%.1f in", startDist);
+            telemetry.addData("Regression", "slope=%.2f, intercept=%.1f",
+                    calibration.getSlope(), calibration.getIntercept());
+            telemetry.addData("RPM at start", "%.0f", calibration.rpmForDistance(startDist));
+            telemetry.update();
 
-        turretController.captureReferences();
-        turretController.resetPidState();
+            turretController.captureReferences();
+            turretController.resetPidState();
 
-        waitForStart();
-        if (isStopRequested()) { turretController.disable(); return; }
+            waitForStart();
+            if (isStopRequested()) { turretController.disable(); return; }
 
-        reZeroHeadingAndTurret();
-        flywheel.setShooterOn(true);
+            reZeroHeadingAndTurret();
+            flywheel.setShooterOn(true);
 
-        // ╔═══════════════════════════════════════════════════════╗
-        // ║                     MAIN LOOP                        ║
-        // ╚═══════════════════════════════════════════════════════╝
-        while (opModeIsActive()) {
-            if (isStopRequested()) break;
-            long nowMs = System.currentTimeMillis();
+            // ╔═══════════════════════════════════════════════════════╗
+            // ║                     MAIN LOOP                        ║
+            // ╚═══════════════════════════════════════════════════════╝
+            while (opModeIsActive()) {
+                if (isStopRequested()) break;
+                long nowMs = System.currentTimeMillis();
 
-            try { pinpoint.update(); } catch (Exception ignored) {}
+                try { pinpoint.update(); } catch (Exception ignored) {}
 
-            // FIX: Guard against (0,0) frames before localizer has a real fix
-            if (follower != null) {
-                follower.update();
-                Pose rawPose = follower.getPose();
-                if (rawPose != null) {
-                    if (!followerPoseValid) {
-                        double distFromOrigin = Math.hypot(rawPose.getX(), rawPose.getY());
-                        if (distFromOrigin > 5.0) {
-                            followerPoseValid = true;
+                // FIX: Guard against (0,0) frames before localizer has a real fix
+                if (follower != null) {
+                    follower.update();
+                    Pose rawPose = follower.getPose();
+                    if (rawPose != null) {
+                        if (!followerPoseValid) {
+                            double distFromOrigin = Math.hypot(rawPose.getX(), rawPose.getY());
+                            if (distFromOrigin > 5.0) {
+                                followerPoseValid = true;
+                                currentPose = rawPose;
+                            }
+                            // else: keep using RED_START_POSE as currentPose
+                        } else {
                             currentPose = rawPose;
                         }
-                        // else: keep using RED_START_POSE as currentPose
-                    } else {
-                        currentPose = rawPose;
                     }
                 }
-            }
 
-            // ── Touchpad reset (gp2) ──
-            boolean gp2Touch = getTouchpad(gamepad2);
-            if (gp2Touch && !gamepad2TouchpadLast) {
-                resetTurretEncoderAndReferences();
-                driveController.stop();
-            }
-            gamepad2TouchpadLast = gp2Touch;
-
-            // ── A-button reset (gp1) ──
-            boolean aNow = gamepad1.a;
-            if (aNow && !aPressedLast) {
-                resetTurretEncoderAndReferences();
-                driveController.stop();
-            }
-            aPressedLast = aNow;
-
-            // ── Touchpad gp1: toggle far/close hood ──
-            boolean touchNow = getTouchpad(gamepad1);
-            if (touchNow && !touchpadPressedLast) {
-                isFarMode = !isFarMode;
-                hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
-            }
-            touchpadPressedLast = touchNow;
-
-            // ── Drive ──
-            driveController.setDrive(
-                    -gamepad1.left_stick_y, gamepad1.left_stick_x,
-                    gamepad1.right_stick_x, 1.0);
-
-            // ── Shooter on/off (dpad down) ──
-            boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
-            if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
-            dpadDownLast = dpadDownNow;
-
-            // ── Trim adjust (dpad left/right) ──
-            boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
-            if (dpadLeftNow && !dpadLeftLast) flywheelVersatile.adjustTrim(-50.0);
-            dpadLeftLast = dpadLeftNow;
-
-            boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
-            if (dpadRightNow && !dpadRightLast) flywheelVersatile.adjustTrim(50.0);
-            dpadRightLast = dpadRightNow;
-
-            // ── Reset trim (dpad up) ──
-            boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
-            if (dpadUpNow && !dpadUpLast) flywheelVersatile.resetTrim();
-            dpadUpLast = dpadUpNow;
-
-            // ── Back button: recalibrate regression live ──
-            boolean backNow = gamepad1.back || gamepad2.back;
-            if (backNow && !backPressedLast) flywheelVersatile.recalibrate();
-            backPressedLast = backNow;
-
-            // ── Gate toggle (B) ──
-            boolean bNow = gamepad1.b || gamepad2.b;
-            if (bNow && !bPressedLast && !gateController.isBusy()) gateController.toggleGate();
-            bPressedLast = bNow;
-
-            // ── Intake sequence (Y) ──
-            boolean yNow = gamepad1.y || gamepad2.y;
-            if (yNow && !yPressedLast && !gateController.isBusy())
-                gateController.startIntakeSequence(nowMs);
-            yPressedLast = yNow;
-
-            boolean shouldTriggerClaw = gateController.update(nowMs);
-            if (shouldTriggerClaw) clawController.trigger(nowMs);
-
-            // ══════════════════════════════════════════════════════
-            //  Flywheel: compute auto RPM from pose, apply to motor
-            // ══════════════════════════════════════════════════════
-            flywheel.handleLeftTrigger(
-                    gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
-
-            double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
-            flywheel.setTargetRPM(targetRpm);
-            flywheel.update();
-
-            // ── Hood auto-switch on PIDF mode change ──
-            boolean pidfNow = flywheel.isUsingFarCoefficients();
-            if (pidfNow != lastPidfMode) {
-                hoodController.setRightPosition(pidfNow ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
-                lastPidfMode = pidfNow;
-            }
-
-            // ── Rumble at target ──
-            if (flywheel.isAtTarget()) {
-                try { gamepad1.rumble(200); } catch (Throwable ignored) {}
-                try { gamepad2.rumble(200); } catch (Throwable ignored) {}
-            }
-
-            // ── Turret ──
-            turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
-            boolean manualTurret = false;
-            double manualPower = 0.0;
-            if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
-                manualTurret = true; manualPower = 0.35;
-            } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
-                manualTurret = true; manualPower = -0.35;
-            }
-            turretController.update(manualTurret, manualPower);
-
-            // ── Manual intake ──
-            if (!gateController.isBusy()) {
-                if (gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1) {
-                    intakeMotor.setPower(-1.0);
-                } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
-                    intakeMotor.setPower(1.0);
-                } else {
-                    intakeMotor.setPower(0.0);
+                // ── Touchpad reset (gp2) ──
+                boolean gp2Touch = getTouchpad(gamepad2);
+                if (gp2Touch && !gamepad2TouchpadLast) {
+                    resetTurretEncoderAndReferences();
+                    driveController.stop();
                 }
+                gamepad2TouchpadLast = gp2Touch;
+
+                // ── A-button reset (gp1) ──
+                boolean aNow = gamepad1.a;
+                if (aNow && !aPressedLast) {
+                    resetTurretEncoderAndReferences();
+                    driveController.stop();
+                }
+                aPressedLast = aNow;
+
+                // ── Touchpad gp1: toggle far/close hood ──
+                boolean touchNow = getTouchpad(gamepad1);
+                if (touchNow && !touchpadPressedLast) {
+                    isFarMode = !isFarMode;
+                    hoodController.setRightPosition(isFarMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                }
+                touchpadPressedLast = touchNow;
+
+                // ── Drive ──
+                driveController.setDrive(
+                        -gamepad1.left_stick_y, gamepad1.left_stick_x,
+                        gamepad1.right_stick_x, 1.0);
+
+                // ── Shooter on/off (dpad down) ──
+                boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
+                if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
+                dpadDownLast = dpadDownNow;
+
+                // ── Trim adjust (dpad left/right) ──
+                boolean dpadLeftNow = gamepad1.dpad_left || gamepad2.dpad_left;
+                if (dpadLeftNow && !dpadLeftLast) flywheelVersatile.adjustTrim(-50.0);
+                dpadLeftLast = dpadLeftNow;
+
+                boolean dpadRightNow = gamepad1.dpad_right || gamepad2.dpad_right;
+                if (dpadRightNow && !dpadRightLast) flywheelVersatile.adjustTrim(50.0);
+                dpadRightLast = dpadRightNow;
+
+                // ── Reset trim (dpad up) ──
+                boolean dpadUpNow = gamepad1.dpad_up || gamepad2.dpad_up;
+                if (dpadUpNow && !dpadUpLast) flywheelVersatile.resetTrim();
+                dpadUpLast = dpadUpNow;
+
+                // ── Back button: recalibrate regression live ──
+                boolean backNow = gamepad1.back || gamepad2.back;
+                if (backNow && !backPressedLast) flywheelVersatile.recalibrate();
+                backPressedLast = backNow;
+
+                // ── Gate toggle (B) ──
+                boolean bNow = gamepad1.b || gamepad2.b;
+                if (bNow && !bPressedLast && !gateController.isBusy()) gateController.toggleGate();
+                bPressedLast = bNow;
+
+                // ── Intake sequence (Y) ──
+                boolean yNow = gamepad1.y || gamepad2.y;
+                if (yNow && !yPressedLast && !gateController.isBusy())
+                    gateController.startIntakeSequence(nowMs);
+                yPressedLast = yNow;
+
+                boolean shouldTriggerClaw = gateController.update(nowMs);
+                if (shouldTriggerClaw) clawController.trigger(nowMs);
+
+                // ══════════════════════════════════════════════════════
+                //  Flywheel: compute auto RPM from pose, apply to motor
+                // ══════════════════════════════════════════════════════
+                flywheel.handleLeftTrigger(
+                        gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
+
+                double targetRpm = flywheelVersatile.getFinalTargetRPM(currentPose);
+                flywheel.setTargetRPM(targetRpm);
+                flywheel.update();
+
+                // ── Hood auto-switch on PIDF mode change ──
+                boolean pidfNow = flywheel.isUsingFarCoefficients();
+                if (pidfNow != lastPidfMode) {
+                    hoodController.setRightPosition(pidfNow ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                    lastPidfMode = pidfNow;
+                }
+
+                // ── Rumble at target ──
+                if (flywheel.isAtTarget()) {
+                    try { gamepad1.rumble(200); } catch (Throwable ignored) {}
+                    try { gamepad2.rumble(200); } catch (Throwable ignored) {}
+                }
+
+                // ── Turret ──
+                turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
+                boolean manualTurret = false;
+                double manualPower = 0.0;
+                if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
+                    manualTurret = true; manualPower = 0.35;
+                } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
+                    manualTurret = true; manualPower = -0.35;
+                }
+                turretController.update(manualTurret, manualPower);
+
+                // ── Manual intake ──
+                if (!gateController.isBusy()) {
+                    if (gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1) {
+                        intakeMotor.setPower(-1.0);
+                    } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
+                        intakeMotor.setPower(1.0);
+                    } else {
+                        intakeMotor.setPower(0.0);
+                    }
+                }
+
+                // ── Claw (X) ──
+                boolean xNow = gamepad1.x || gamepad2.x;
+                if (xNow && !xPressedLast) clawController.trigger(nowMs);
+                xPressedLast = xNow;
+                clawController.update(nowMs);
+
+                // ── Hood nudge ──
+                if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
+                if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
+
+                // ── Telemetry ──
+                telemetry.addData("🔴 Flywheel",
+                        "Cur: %.0f | Tgt: %.0f | Dist: %.1f",
+                        flywheel.getCurrentRPM(), targetRpm,
+                        flywheelVersatile.getLastDistance());
+                telemetry.addData("Base RPM",   "%.0f", flywheelVersatile.getLastBaseRpm());
+                telemetry.addData("Trim RPM",   "%.0f", flywheelVersatile.getTrimRpm());
+                telemetry.addData("Pose", "%s %s",
+                        followerPoseValid ? "✅" : "⏳",
+                        currentPose != null
+                                ? String.format("(%.1f, %.1f, %.1f°)",
+                                currentPose.getX(), currentPose.getY(),
+                                Math.toDegrees(currentPose.getHeading()))
+                                : "N/A");
+                telemetry.update();
             }
 
-            // ── Claw (X) ──
-            boolean xNow = gamepad1.x || gamepad2.x;
-            if (xNow && !xPressedLast) clawController.trigger(nowMs);
-            xPressedLast = xNow;
-            clawController.update(nowMs);
+            turretController.disable();
 
-            // ── Hood nudge ──
-            if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
-            if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
-
-            // ── Telemetry ──
-            telemetry.addData("🔴 Flywheel",
-                    "Cur: %.0f | Tgt: %.0f | Dist: %.1f",
-                    flywheel.getCurrentRPM(), targetRpm,
-                    flywheelVersatile.getLastDistance());
-            telemetry.addData("Base RPM",   "%.0f", flywheelVersatile.getLastBaseRpm());
-            telemetry.addData("Trim RPM",   "%.0f", flywheelVersatile.getTrimRpm());
-            // FIX: Show pose validity status
-            telemetry.addData("Pose", "%s %s",
-                    followerPoseValid ? "✅" : "⏳",
-                    currentPose != null
-                            ? String.format("(%.1f, %.1f, %.1f°)",
-                            currentPose.getX(), currentPose.getY(),
-                            Math.toDegrees(currentPose.getHeading()))
-                            : "N/A");
-            telemetry.update();
+        } finally {
+            // FIX: Always restore blue-side defaults so the next OpMode
+            //      (Blue or Red) starts from clean canonical values.
+            restoreBlueDefaults();
         }
-
-        turretController.disable();
     }
 
     // ═════════════════════════════════════════════════════════

@@ -96,10 +96,20 @@ public class AdaptiveHORSBlue extends LinearOpMode {
     private GoBildaPinpointDriver pinpoint;
     private Follower follower;
 
-    // FIX: Start pose constant — used for both follower init and pose fallback
+    // ── Blue-side default calibration values (canonical source of truth) ──
+    private static final double DEFAULT_GOAL_X = 15.0;
+    private static final double DEFAULT_GOAL_Y = 135.0;
+    private static final double DEFAULT_CAL1_X = 48.0;  private static final double DEFAULT_CAL1_Y = 96.0;
+    private static final double DEFAULT_CAL2_X = 60.0;  private static final double DEFAULT_CAL2_Y = 125.0;
+    private static final double DEFAULT_CAL3_X = 60.0;  private static final double DEFAULT_CAL3_Y = 82.0;
+    private static final double DEFAULT_CAL4_X = 72.0;  private static final double DEFAULT_CAL4_Y = 72.0;
+    private static final double DEFAULT_CAL5_X = 72.0;  private static final double DEFAULT_CAL5_Y = 120.0;
+    private static final double DEFAULT_CAL6_X = 95.0;  private static final double DEFAULT_CAL6_Y = 120.0;
+    private static final double DEFAULT_CAL7_X = 52.0;  private static final double DEFAULT_CAL7_Y = 14.0;
+
     private static final Pose START_POSE = new Pose(20, 122, Math.toRadians(135));
 
-    // FIX: Initialize to START_POSE so first-frame RPM calc uses real position, not (0,0,0)
+    // FIX: Initialize to START_POSE so first-frame RPM calc uses real position
     private Pose currentPose = START_POSE;
 
     // Blue goal target pose (only x, y matter for distance)
@@ -113,7 +123,7 @@ public class AdaptiveHORSBlue extends LinearOpMode {
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // ════════════ Hardware map ════════════
+        // ════════════ Hardware map ��═══════════
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive   = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
@@ -175,6 +185,18 @@ public class AdaptiveHORSBlue extends LinearOpMode {
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
+        // FIX: Restore blue-side calibration statics in case Red ran previously
+        //      and mutated the shared static fields.
+        ShooterCalibration.GOAL_X = DEFAULT_GOAL_X;
+        ShooterCalibration.GOAL_Y = DEFAULT_GOAL_Y;
+        ShooterCalibration.CAL1_X = DEFAULT_CAL1_X;  ShooterCalibration.CAL1_Y = DEFAULT_CAL1_Y;
+        ShooterCalibration.CAL2_X = DEFAULT_CAL2_X;  ShooterCalibration.CAL2_Y = DEFAULT_CAL2_Y;
+        ShooterCalibration.CAL3_X = DEFAULT_CAL3_X;  ShooterCalibration.CAL3_Y = DEFAULT_CAL3_Y;
+        ShooterCalibration.CAL4_X = DEFAULT_CAL4_X;  ShooterCalibration.CAL4_Y = DEFAULT_CAL4_Y;
+        ShooterCalibration.CAL5_X = DEFAULT_CAL5_X;  ShooterCalibration.CAL5_Y = DEFAULT_CAL5_Y;
+        ShooterCalibration.CAL6_X = DEFAULT_CAL6_X;  ShooterCalibration.CAL6_Y = DEFAULT_CAL6_Y;
+        ShooterCalibration.CAL7_X = DEFAULT_CAL7_X;  ShooterCalibration.CAL7_Y = DEFAULT_CAL7_Y;
+
         ShooterCalibration calibration = new ShooterCalibration();
         calibration.computeRegression();
 
@@ -214,9 +236,10 @@ public class AdaptiveHORSBlue extends LinearOpMode {
         // ════════════ Initial state ════════════
         gateController.setGateClosed(true);
 
-        // FIX: Show regression debug info at init
-        double startDist = Math.hypot(START_POSE.getX() - BLUE_GOAL.getX(),
-                START_POSE.getY() - BLUE_GOAL.getY());
+        // FIX: Use calibration's distanceToGoal so distance is computed
+        //      against the same goal used by the regression.
+        double startDist = ShooterCalibration.distanceToGoal(
+                START_POSE.getX(), START_POSE.getY());
         telemetry.addData("Status", "Initialized — Adaptive RPM (shooter OFF)");
         telemetry.addData("Start→Goal dist", "%.1f in", startDist);
         telemetry.addData("Regression", "slope=%.2f, intercept=%.1f",
@@ -248,7 +271,6 @@ public class AdaptiveHORSBlue extends LinearOpMode {
                 Pose rawPose = follower.getPose();
                 if (rawPose != null) {
                     if (!followerPoseValid) {
-                        // Check if the localizer is returning real data (not stuck at origin)
                         double distFromOrigin = Math.hypot(rawPose.getX(), rawPose.getY());
                         if (distFromOrigin > 5.0) {
                             followerPoseValid = true;
@@ -390,7 +412,6 @@ public class AdaptiveHORSBlue extends LinearOpMode {
                     flywheelVersatile.getLastDistance());
             telemetry.addData("Base RPM",   "%.0f", flywheelVersatile.getLastBaseRpm());
             telemetry.addData("Trim RPM",   "%.0f", flywheelVersatile.getTrimRpm());
-            // FIX: Show pose validity status
             telemetry.addData("Pose", "%s %s",
                     followerPoseValid ? "✅" : "⏳",
                     currentPose != null
