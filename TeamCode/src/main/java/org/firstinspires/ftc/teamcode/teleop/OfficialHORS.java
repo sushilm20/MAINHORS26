@@ -16,7 +16,6 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 
-import org.firstinspires.ftc.teamcode.extras.TelemetryData;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
@@ -46,7 +45,6 @@ public class OfficialHORS extends LinearOpMode {
 
     // Telemetry
     private TelemetryManager panelsTelemetry;
-    private TelemetryData telemetryData;
 
     // Toggles / state
     private boolean dpadDownLast = false;
@@ -171,8 +169,6 @@ public class OfficialHORS extends LinearOpMode {
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
 
-        telemetryData = new TelemetryData(telemetry, flywheel);
-
         gateController = new GateController(
                 gateServo, intakeMotor,
                 led1Red, led1Green, led2Red, led2Green,
@@ -213,12 +209,23 @@ public class OfficialHORS extends LinearOpMode {
         reZeroHeadingAndTurret();
         flywheel.setShooterOn(true);
 
+        // ── Loop time tracking ──
+        long lastLoopTimeMs = System.currentTimeMillis();
+        double loopTimeMs = 0.0;
+        double avgLoopTimeMs = 0.0;
+        long loopCount = 0;
+
         while (opModeIsActive()) {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
 
-            // ── Update loop time (tracked in TelemetryData) ──
-            telemetryData.updateLoopTime();
+            // ── Compute loop time ──
+            loopTimeMs = nowMs - lastLoopTimeMs;
+            lastLoopTimeMs = nowMs;
+            loopCount++;
+            if (loopCount > 1) {
+                avgLoopTimeMs += (loopTimeMs - avgLoopTimeMs) / (loopCount - 1);
+            }
 
             // Refresh pinpoint
             try { pinpoint.update(); } catch (Exception ignored) {}
@@ -353,9 +360,22 @@ public class OfficialHORS extends LinearOpMode {
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // Telemetry (centralized in TelemetryData)
-            telemetryData.setPose(currentPose);
-            telemetryData.update();
+            // Telemetry
+            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
+                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
+
+            telemetry.addData("Pose", currentPose != null
+                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
+                    : "N/A");
+
+            // ── Loop time telemetry ──
+            telemetry.addData("Loop", "%.0f ms (%.0f Hz) | avg %.1f ms (%.0f Hz)",
+                    loopTimeMs,
+                    loopTimeMs > 0 ? 1000.0 / loopTimeMs : 0,
+                    avgLoopTimeMs,
+                    avgLoopTimeMs > 0 ? 1000.0 / avgLoopTimeMs : 0);
+
+            telemetry.update();
         }
 
         turretController.disable();
