@@ -199,9 +199,24 @@ public class OfficialHORS extends LinearOpMode {
         reZeroHeadingAndTurret();
         flywheel.setShooterOn(true);
 
+        // ── Loop time tracking ──
+        long lastLoopTimeMs = System.currentTimeMillis();
+        double loopTimeMs = 0.0;
+        double avgLoopTimeMs = 0.0;
+        long loopCount = 0;
+
         while (opModeIsActive()) {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
+
+            // ── Compute loop time ──
+            loopTimeMs = nowMs - lastLoopTimeMs;
+            lastLoopTimeMs = nowMs;
+            loopCount++;
+            // Running average (skip first frame where delta is from waitForStart)
+            if (loopCount > 1) {
+                avgLoopTimeMs += (loopTimeMs - avgLoopTimeMs) / (loopCount - 1);
+            }
 
             // Refresh pinpoint
             try { pinpoint.update(); } catch (Exception ignored) {}
@@ -343,6 +358,14 @@ public class OfficialHORS extends LinearOpMode {
             telemetry.addData("Pose", currentPose != null
                     ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
                     : "N/A");
+
+            // ── Loop time telemetry ──
+            telemetry.addData("Loop", "%.0f ms (%.0f Hz) | avg %.1f ms (%.0f Hz)",
+                    loopTimeMs,
+                    loopTimeMs > 0 ? 1000.0 / loopTimeMs : 0,
+                    avgLoopTimeMs,
+                    avgLoopTimeMs > 0 ? 1000.0 / avgLoopTimeMs : 0);
+
             telemetry.update();
         }
 
