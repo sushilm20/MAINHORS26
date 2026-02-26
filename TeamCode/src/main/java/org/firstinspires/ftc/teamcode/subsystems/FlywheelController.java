@@ -1,12 +1,12 @@
-package org.firstinspires.ftc.teamcode. subsystems;
+package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.bylazar.configurables.annotations.Configurable;
-import com.bylazar.configurables.annotations. Sorter;
+import com.bylazar.configurables.annotations.Sorter;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com. qualcomm.robotcore.hardware.VoltageSensor;
-import com.qualcomm. robotcore.util.ElapsedTime;
-import org.firstinspires.ftc.robotcore.external. Telemetry;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 
 @Configurable
@@ -100,19 +100,19 @@ public class FlywheelController {
         this.voltageSensor = voltageSensor;
 
         try {
-            this.shooter.setMode(DcMotor.RunMode. STOP_AND_RESET_ENCODER);
-            this.shooter. setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-            this.shooter. setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+            this.shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            this.shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            this.shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         } catch (Exception e) {
-            if (telemetry != null) telemetry.addData("Flywheel. init", "primary cfg failed:  " + e.getMessage());
+            if (telemetry != null) telemetry.addData("Flywheel.init", "primary cfg failed: " + e.getMessage());
         }
 
         if (this.shooter2 != null) {
             try {
-                this. shooter2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior. FLOAT);
+                this.shooter2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
                 this.shooter2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER); // mirror mode (no encoder)
             } catch (Exception e) {
-                if (telemetry != null) telemetry.addData("Flywheel.init", "secondary cfg failed:  " + e.getMessage());
+                if (telemetry != null) telemetry.addData("Flywheel.init", "secondary cfg failed: " + e.getMessage());
             }
         }
 
@@ -162,7 +162,7 @@ public class FlywheelController {
 
     // --- Active coefficient getters (switch based on target RPM) ---
     private double getActiveKp() {
-        return shouldUseFarCoefficients() ? FAR_kP :  CLOSE_kP;
+        return shouldUseFarCoefficients() ? FAR_kP : CLOSE_kP;
     }
 
     private double getActiveKi() {
@@ -170,7 +170,7 @@ public class FlywheelController {
     }
 
     private double getActiveKd() {
-        return shouldUseFarCoefficients() ? FAR_kD :  CLOSE_kD;
+        return shouldUseFarCoefficients() ? FAR_kD : CLOSE_kD;
     }
 
     private double getActiveKf() {
@@ -182,11 +182,11 @@ public class FlywheelController {
     }
 
     private double getActiveDerivativeAlpha() {
-        return shouldUseFarCoefficients() ? FAR_derivativeAlpha :  CLOSE_derivativeAlpha;
+        return shouldUseFarCoefficients() ? FAR_derivativeAlpha : CLOSE_derivativeAlpha;
     }
 
     private double getActiveRpmFilterAlpha() {
-        return shouldUseFarCoefficients() ? FAR_rpmFilterAlpha :  CLOSE_rpmFilterAlpha;
+        return shouldUseFarCoefficients() ? FAR_rpmFilterAlpha : CLOSE_rpmFilterAlpha;
     }
 
     private double getActivePowerSmoothingAlpha() {
@@ -202,7 +202,7 @@ public class FlywheelController {
     }
 
     private double getActiveRpmTolerance() {
-        return shouldUseFarCoefficients() ? FAR_rpmTolerance :  CLOSE_rpmTolerance;
+        return shouldUseFarCoefficients() ? FAR_rpmTolerance : CLOSE_rpmTolerance;
     }
 
     public void update() {
@@ -261,14 +261,14 @@ public class FlywheelController {
         // Clamp to [-1, 1]
         out = Math.max(-1.0, Math.min(1.0, out));
 
-        if (! shooterOn) out = 0.0;
+        if (!shooterOn) out = 0.0;
 
         // Optional power smoothing (alpha=1 => no smoothing)
         double smoothedOut = activePowerSmoothingAlpha * out + (1.0 - activePowerSmoothingAlpha) * lastAppliedPower;
 
         // Apply to motors (shooter2 uses motor direction for opposite spin)
         try {
-            shooter. setPower(smoothedOut);
+            shooter.setPower(smoothedOut);
         } catch (Exception e) {
             if (telemetry != null) telemetry.addData("Flywheel.power", "primary setPower failed: " + e.getMessage());
         }
@@ -292,7 +292,7 @@ public class FlywheelController {
         }
         lastAtTarget = atTargetNow;
 
-        // --- Telemetry:  show which coefficient set is active ---
+        // --- Telemetry: show which coefficient set is active ---
         if (telemetry != null) {
             telemetry.addData("PIDF Mode", usingFarCoefficients ? "FAR" : "CLOSE");
         }
@@ -324,7 +324,7 @@ public class FlywheelController {
         return (ticksPerSecond * 60.0) / TICKS_PER_REV;
     }
 
-    // Convenience:  set close/far modes
+    // Convenience: set close/far modes
     public void setCloseMode() { setTargetRpm(closeRPM); }
     public void setFarMode()   { setTargetRpm(farRPM); }
 
@@ -362,6 +362,11 @@ public class FlywheelController {
      * Preserve the left-trigger behavior from the prior controller:
      * - on press:  save previous target and set low intake target
      * - on release: restore previous target and shooter state
+     *
+     * FIX: Actually restore savedTargetBeforeTrigger on release.
+     * Previously the saved RPM was never applied back, so the
+     * flywheel stayed at whatever RPM was set during the trigger
+     * press.
      */
     public void handleLeftTrigger(boolean leftTriggerNow) {
         if (leftTriggerNow && !leftTriggerLast) {
@@ -369,7 +374,9 @@ public class FlywheelController {
             savedShooterOnBeforeTrigger = shooterOn;
             shooterOn = true;
         } else if (!leftTriggerNow && leftTriggerLast) {
+            // FIX: restore the saved RPM target
             if (savedTargetBeforeTrigger >= 0.0) {
+                setTargetRpm(savedTargetBeforeTrigger);
                 savedTargetBeforeTrigger = -1.0;
             }
             shooterOn = savedShooterOnBeforeTrigger;
