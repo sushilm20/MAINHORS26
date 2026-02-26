@@ -20,6 +20,14 @@ import java.util.List;
  *
  * All pose / RPM fields are {@code @Configurable} so they can be tuned
  * live in the Panels dashboard without redeploying.
+ *
+ * <p><b>FIX:</b> {@link #rpmForDistance(double)} no longer clamps.
+ * Clamping is the sole responsibility of {@link FlywheelVersatile},
+ * which is the single authority on RPM bounds.  The old double-clamp
+ * (here at [2500,3000] then again in FlywheelVersatile at [2300,4000])
+ * silently crushed calibration points above 3000 RPM (e.g. point 7
+ * at 3750 RPM was clamped to 3000), making the regression output
+ * diverge from the model.</p>
  */
 @Configurable
 public class ShooterCalibration {
@@ -31,7 +39,9 @@ public class ShooterCalibration {
     @Sorter(sort = 1)  public static double GOAL_Y = 135.0;
 
     // ──────────────────────────────────────────────────────────
-    //  RPM clamp bounds
+    //  RPM clamp bounds — KEPT for Panels visibility but NO
+    //  LONGER used inside this class.  FlywheelVersatile owns
+    //  the single clamp.
     // ──────────────────────────────────────────────────────────
     @Sorter(sort = 2)  public static double MIN_RPM = 2500;
     @Sorter(sort = 3)  public static double MAX_RPM = 3000;
@@ -152,12 +162,15 @@ public class ShooterCalibration {
     }
 
     /**
-     * Returns the RPM the flywheel should target for the given distance,
-     * clamped to [{@link #MIN_RPM}, {@link #MAX_RPM}].
+     * Returns the raw regression RPM for the given distance.
+     *
+     * <p><b>FIX:</b> No clamping here.  {@link FlywheelVersatile#getFinalTargetRPM}
+     * is the single authority on RPM bounds.  The previous version clamped to
+     * [{@link #MIN_RPM}, {@link #MAX_RPM}] which silently crushed any regression
+     * output above 3000 RPM, even though calibration points went up to 3750.</p>
      */
     public double rpmForDistance(double distance) {
-        double rpm = slope * distance + intercept;
-        return Math.max(MIN_RPM, Math.min(MAX_RPM, rpm));
+        return slope * distance + intercept;
     }
 
     /** Euclidean distance from an arbitrary field point to the goal. */
