@@ -27,13 +27,20 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
  *
  * This class does NOT own the PIDF loop — it only computes the target RPM.
  * The existing {@link FlywheelController} handles all motor control.
+ *
+ * <p><b>FIX:</b> Distance is now computed using
+ * {@link ShooterCalibration#distanceToGoal} so that the same goal
+ * coordinates used during regression are used at run-time.  Previously
+ * this class computed distance against its own {@code goalPose} field,
+ * which could differ from the calibration's GOAL_X / GOAL_Y (especially
+ * after the Red OpMode mutated the statics).  This is the single-clamp
+ * authority — {@link ShooterCalibration#rpmForDistance} no longer clamps.</p>
  */
 @Configurable
 public class FlywheelVersatile {
 
     // ── References ────────────────────────────────────────────
     private final FlywheelController flywheel;
-    private final Pose goalPose;
     private final ShooterCalibration calibration;
 
     // ── Clamp bounds ──────────────────────────────────────────
@@ -55,7 +62,10 @@ public class FlywheelVersatile {
      * Primary constructor.
      *
      * @param flywheel    the underlying FlywheelController (motor control)
-     * @param goalPose    field-coordinate Pose of the target (only x, y used)
+     * @param goalPose    field-coordinate Pose of the target — <b>IGNORED</b>,
+     *                    kept for API compat. Distance is computed via
+     *                    {@link ShooterCalibration#distanceToGoal} so
+     *                    the regression and run-time use the same goal.
      * @param calibration ShooterCalibration that holds the points + regression
      * @param minRpm      hard-floor RPM clamp
      * @param maxRpm      hard-ceiling RPM clamp
@@ -66,7 +76,6 @@ public class FlywheelVersatile {
                              double minRpm,
                              double maxRpm) {
         this.flywheel    = flywheel;
-        this.goalPose    = goalPose;
         this.calibration = calibration;
         FlywheelVersatile.minRpm = minRpm;
         FlywheelVersatile.maxRpm = maxRpm;
@@ -77,7 +86,6 @@ public class FlywheelVersatile {
                              Pose goalPose,
                              ShooterCalibration calibration) {
         this.flywheel    = flywheel;
-        this.goalPose    = goalPose;
         this.calibration = calibration;
     }
 
@@ -89,17 +97,22 @@ public class FlywheelVersatile {
      * Returns the target RPM for the current robot pose, including trim.
      * Clamped to [{@link #minRpm}, {@link #maxRpm}].
      *
+     * <p><b>FIX:</b> Distance is now computed via
+     * {@link ShooterCalibration#distanceToGoal} so that the same
+     * GOAL_X / GOAL_Y used during regression are used here.</p>
+     *
      * @param robotPose the robot's current field pose (from Pedro follower)
      * @return the RPM the flywheel should spin at
      */
     public double getFinalTargetRPM(Pose robotPose) {
         if (robotPose == null) {
-            return lastBaseRpm + trimRpm;  // fallback: last known
+            return Math.max(minRpm, Math.min(maxRpm, lastBaseRpm + trimRpm));
         }
 
-        double dx = robotPose.getX() - goalPose.getX();
-        double dy = robotPose.getY() - goalPose.getY();
-        double distance = Math.hypot(dx, dy);
+        // FIX: use calibration's distanceToGoal so regression & runtime
+        //      always reference the same goal coordinates.
+        double distance = ShooterCalibration.distanceToGoal(
+                robotPose.getX(), robotPose.getY());
 
         lastDistance = distance;
         lastBaseRpm = calibration.rpmForDistance(distance);
