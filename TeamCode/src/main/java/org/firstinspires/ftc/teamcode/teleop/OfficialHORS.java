@@ -353,7 +353,7 @@ public class OfficialHORS extends LinearOpMode {
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // Telemetry (centralised in TelemetryData)
+            // Telemetry (centralized in TelemetryData)
             telemetryData.setPose(currentPose);
             telemetryData.update();
         }
