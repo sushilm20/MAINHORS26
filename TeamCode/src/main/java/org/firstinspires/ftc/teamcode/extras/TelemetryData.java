@@ -5,7 +5,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 /**
- * Centralised telemetry helper that can be shared across different TeleOps
+ * Centralized telemetry helper that can be shared across different TeleOps
  * (e.g. OfficialHORS, AdaptiveHORS, DynamicTrackingTurret).
  *
  * Instead of each TeleOp pulling data from controllers and formatting it
