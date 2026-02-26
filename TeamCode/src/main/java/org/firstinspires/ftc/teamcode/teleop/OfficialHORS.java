@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -21,6 +22,8 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
+
+import java.util.List;
 
 @TeleOp(name="A HORS OFFICIAL ⭐", group="Linear OpMode")
 public class OfficialHORS extends LinearOpMode {
@@ -87,6 +90,12 @@ public class OfficialHORS extends LinearOpMode {
     public void runOpMode() {
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
+
+        // ════════════ BULK READ — must be first! ════════════
+        List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : allHubs) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        }
 
         // Hardware map
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
@@ -181,6 +190,7 @@ public class OfficialHORS extends LinearOpMode {
         gateController.setGateClosed(true);
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
+        telemetry.addData("Bulk Read", "AUTO");
         telemetry.addData("\nTurret IMU", "pinpoint");
         telemetry.update();
 
@@ -213,7 +223,6 @@ public class OfficialHORS extends LinearOpMode {
             loopTimeMs = nowMs - lastLoopTimeMs;
             lastLoopTimeMs = nowMs;
             loopCount++;
-            // Running average (skip first frame where delta is from waitForStart)
             if (loopCount > 1) {
                 avgLoopTimeMs += (loopTimeMs - avgLoopTimeMs) / (loopCount - 1);
             }
@@ -382,20 +391,12 @@ public class OfficialHORS extends LinearOpMode {
         catch (Exception ignored) { return null; }
     }
 
-    /**
-     * Capture current heading and turret position as the new reference.
-     * Uses pinpoint IMU only.
-     */
     private void reZeroHeadingAndTurret() {
         try { pinpoint.update(); } catch (Exception ignored) {}
         turretController.captureReferences();
         turretController.resetPidState();
     }
 
-    /**
-     * Reset turret encoder and capture references.
-     * Clears any homing/freeze state so tracking resumes immediately.
-     */
     private void resetTurretEncoderAndReferences() {
         try { pinpoint.update(); } catch (Exception ignored) {}
         turretController.recenterAndResume(true);
