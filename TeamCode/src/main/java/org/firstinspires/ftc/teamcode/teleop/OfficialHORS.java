@@ -361,7 +361,7 @@ public class OfficialHORS extends LinearOpMode {
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
             // Telemetry
-            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
+            telemetry.addData("Flywheel", "Current: %.0f  | Target: %.0f ",
                     flywheel.getCurrentRPM(), flywheel.getTargetRPM());
 
             telemetry.addData("Pose", currentPose != null
