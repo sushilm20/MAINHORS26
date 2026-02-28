@@ -436,7 +436,7 @@ public class AdaptiveHORSBlue extends LinearOpMode {
 
     private LED getLedSafe(String name) {
         try { return hardwareMap.get(LED.class, name); }
-        catch (Exception ignored) { return null; }
+        catch (Exception ignored) { return null; }//trt
     }
 
     private void reZeroHeadingAndTurret() {
