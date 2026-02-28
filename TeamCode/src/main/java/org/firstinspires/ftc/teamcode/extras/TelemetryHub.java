@@ -30,18 +30,4 @@ public class TelemetryHub {
         this.loopMs = loopMs;
     }
 
-    public void push() {
-        tele.addData("Fly RPM", String.format("%.1f", flyCurrent));
-        tele.addData("Fly Target", String.format("%.1f", flyTarget));
-
-
-        tele.addData("Loop ms", String.format("%.2f", loopMs));
-        tele.update();
-
-        // Optional Panels telemetry
-        // if (panels != null) {
-        //     panels.debug("loop.ms", String.valueOf(loopMs));
-        //     panels.update(tele);
-        // }
-    }
 }
