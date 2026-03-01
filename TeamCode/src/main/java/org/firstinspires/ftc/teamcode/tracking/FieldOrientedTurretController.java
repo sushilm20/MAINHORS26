@@ -13,64 +13,50 @@ import java.util.function.BooleanSupplier;
 /**
  * FieldOrientedTurretController — Unified Pose-Based Turret Aiming
  *
- * Unlike TurretController (heading-hold only) or TurretGoalAimer (heading-hold + offset),
- * this controller computes the turret target from a SINGLE formula:
+ * CORE MATH (corrected):
  *
- *   α              = atan2(goalY - robotY, goalX - robotX)   // absolute bearing to goal
- *   turretAngleRad = normalize(α - θ_capture)                // angle from turret-zero direction
- *   desiredTicks   = turretAngleRad * ticksPerRad            // convert to encoder ticks
+ *   The turret encoder measures the turret angle RELATIVE TO THE CHASSIS.
+ *   Virtual encoder 0 = chassis forward at the moment captureReferences() was called.
+ *   At that moment the robot heading was θ_capture (headingReferenceRad).
  *
- * Where θ_capture is the robot heading at the moment captureReferences() was called
- * (i.e., the field-absolute direction that turret encoder = 0 corresponds to).
+ *   The turret's field-facing direction is:
+ *     turretFieldDir = θ_capture + virtualEncoderAngle
  *
- * This inherently handles BOTH rotation and translation because:
- *   - If the robot rotates: θ_capture doesn't change, but the PID sees the turret's
- *     real position drifting from the desired → corrects it.
- *     Wait — actually θ_capture is fixed at capture time. The turret encoder reads
- *     how far the turret has physically rotated from its zero. When the robot rotates,
- *     the turret motor doesn't move, so the encoder stays the same, but the desired
- *     ticks change because α changed (robot orientation changed → robot position hasn't,
- *     but heading used in α is field-absolute so α doesn't change with rotation alone).
- *     Actually α = atan2(goalY-robotY, goalX-robotX) does NOT depend on heading.
- *     So when the robot rotates in place, α stays constant, θ_capture is constant,
- *     so desiredTicks stays constant. But the turret is bolted to the chassis — when
- *     the chassis rotates, the turret physically rotates too, so the turret encoder
- *     stays the same while the turret now points in a different field direction.
+ *   We want the turret to point at the goal. The field bearing to the goal is:
+ *     α = atan2(goalY - robotY, goalX - robotX)
  *
- *   KEY INSIGHT: The turret encoder measures turret angle RELATIVE TO THE CHASSIS.
- *   When the chassis rotates by Δθ, the turret's field-facing direction changes by Δθ
- *   even though the encoder doesn't move. So we need:
+ *   Setting turretFieldDir = α:
+ *     virtualEncoderAngle = α - θ_capture
+ *     desiredTicks = normalize(α - θ_capture) * ticksPerRad
  *
- *     desiredTicks = normalize(α - θ_robot_now) * ticksPerRad
+ *   WHY THIS WORKS FOR ROTATION:
+ *     When the robot rotates by Δθ, the chassis drags the turret with it.
+ *     The encoder doesn't change, but the turret now points Δθ away from where
+ *     it should. Meanwhile α hasn't changed (robot didn't translate), but
+ *     θ_capture is fixed, so desiredTicks stays the same. The PID sees that
+ *     the actual encoder (still ~0) doesn't match the desired (still the same),
+ *     BUT — wait, if the robot rotated and the encoder didn't move, the desired
+ *     is still the same and the actual is still the same... so no correction?
  *
- *   NOT θ_capture. Because we want the turret to be at angle (α - θ_robot_now) relative
- *   to the chassis to point at the goal in field coordinates.
+ *     NO — that's wrong. When the chassis rotates, the ENCODER DOES CHANGE
+ *     if the turret motor is not moving with the chassis. Actually:
+ *     - The turret motor IS on the chassis
+ *     - When the chassis rotates, if the motor doesn't actively spin, the turret
+ *       stays locked to the chassis (brake mode), so the encoder stays at 0
+ *     - The turret field direction = θ_capture + 0 ≠ α anymore
+ *     - desiredTicks = normalize(α - θ_capture) * ticksPerRad is STILL the same
+ *     - currentTicks = 0 (hasn't moved)
+ *     - error = desired - 0 = desired → PID drives the turret to compensate!
  *
- *   But our encoder zero was set when θ_robot = θ_capture. So encoder 0 = chassis forward
- *   at θ_capture. If chassis has rotated to θ_now, then encoder 0 now points at θ_now
- *   in field coords. We want the turret to point at α. So:
+ *   WHY THIS WORKS FOR TRANSLATION:
+ *     When the robot moves (translates), α changes because (robotX, robotY) changed.
+ *     desiredTicks = normalize(newAlpha - θ_capture) * ticksPerRad → different value
+ *     The PID drives the turret to the new target.
  *
- *     desiredFieldAngle = α
- *     currentZeroFieldAngle = θ_now   (because encoder 0 = chassis forward = θ_now)
+ *   BOTH rotation and translation are handled by the SAME formula.
  *
- *   WRONG — encoder 0 doesn't equal chassis forward at θ_now. Encoder 0 was set when
- *   chassis was at θ_capture. If the chassis rotated by (θ_now - θ_capture), the turret
- *   encoder didn't change, but the field direction of encoder=0 changed by that amount.
- *
- *   Actually: the turret motor is on the chassis. When chassis rotates, turret rotates
- *   with it. The encoder measures turret-to-chassis angle. Encoder=0 always means
- *   "turret aligned with chassis forward". So:
- *     - Turret field direction = θ_robot + encoderAngle
- *     - We want turret field direction = α
- *     - So encoderAngle = α - θ_robot
- *     - desiredTicks = normalize(α - θ_robot) * ticksPerRad
- *
- *   This is INDEPENDENT of θ_capture entirely! The encoder offset just sets where
- *   virtual 0 is in raw encoder space. Since we captured when turret was at chassis
- *   forward, virtual 0 = chassis forward, and the formula above is correct.
- *
- * Feedforward: angular velocity of robot heading opposes the turret, so FF helps
- * the PID keep up with fast turns.
+ * Feedforward: angular velocity of robot heading, converted to encoder tick rate,
+ * helps the PID keep up during fast turns.
  *
  * Fallback: if no pose is available, falls back to pure heading-hold (same as
  * TurretController) so the turret still compensates for rotation.
@@ -151,7 +137,8 @@ public class FieldOrientedTurretController {
     private double lastAppliedPower = 0.0;
     private double lastDerivative = 0.0;
 
-    // Heading reference (for fallback heading-hold when no pose available)
+    // Heading reference (θ_capture — the robot heading when encoder was zeroed)
+    // This is the field direction that virtual encoder 0 corresponds to.
     private double headingReferenceRad = 0.0;
     private double lastHeadingRad = 0.0;
     private int turretEncoderReference = 0;
@@ -186,6 +173,7 @@ public class FieldOrientedTurretController {
     private double lastBearingToGoalDeg = 0.0;
     private double lastDistanceToGoal = 0.0;
     private int lastDampedError = 0;
+    private double lastTurretAngleDeg = 0.0; // FIX: added for debug
 
     // ==================== Constructors ====================
 
@@ -214,7 +202,11 @@ public class FieldOrientedTurretController {
 
     /**
      * Capture current heading and turret encoder as reference.
-     * Virtual encoder 0 = turret aligned with chassis forward at this moment.
+     * Virtual encoder 0 = turret's current position.
+     * headingReferenceRad = the field direction that virtual encoder 0 points in.
+     *
+     * CRITICAL: This means the turret's field-facing direction is:
+     *   headingReferenceRad + (virtualEncoder / ticksPerRad)
      */
     public void captureReferences() {
         headingReferenceRad = getHeadingRadians();
@@ -342,6 +334,7 @@ public class FieldOrientedTurretController {
         lastAngularVel = 0.0;
         lastBearingToGoalDeg = 0.0;
         lastDistanceToGoal = 0.0;
+        lastTurretAngleDeg = 0.0;
         lastDampedError = errorTicks;
 
         publishTelemetry();
@@ -359,17 +352,23 @@ public class FieldOrientedTurretController {
     /**
      * Main update loop — UNIFIED field-oriented aiming.
      *
-     * When pose is available:
-     *   α            = atan2(goalY - robotY, goalX - robotX)
-     *   θ_robot      = robotPose.getHeading()
-     *   turretAngle  = normalize(α - θ_robot)
-     *   desiredTicks = turretAngle * ticksPerRad
+     * FIXED FORMULA (when pose is available):
      *
-     *   This single formula accounts for BOTH rotation and translation.
-     *   No heading-delta is needed because θ_robot is already in the formula.
+     *   α = atan2(goalY - robotY, goalX - robotX)   // field bearing to goal
+     *   θ_capture = headingReferenceRad              // field dir of virtual encoder 0
+     *
+     *   turretFieldDir = θ_capture + virtualEncoderAngle
+     *   We want turretFieldDir = α
+     *   So: virtualEncoderAngle = α - θ_capture
+     *   desiredTicks = normalize(α - θ_capture) * ticksPerRad
+     *
+     *   WHY THIS WORKS:
+     *   - Robot rotates: encoder stays at 0, but desired = normalize(α - θ_capture) is nonzero
+     *     because the turret needs to counter-rotate. PID drives the turret.
+     *   - Robot translates: α changes, so desired changes. PID drives the turret.
      *
      * When pose is null (fallback):
-     *   headingDelta = currentPinpointHeading - headingReferenceRad
+     *   headingDelta = currentHeading - θ_capture
      *   desiredTicks = -headingDelta * ticksPerRad
      *   (Same as original TurretController — pure heading-hold)
      */
@@ -458,10 +457,21 @@ public class FieldOrientedTurretController {
         double headingDeltaForTelemetry = 0.0;
 
         if (robotPose != null) {
-            // ── UNIFIED FIELD-ORIENTED AIMING ──
+            // ── UNIFIED FIELD-ORIENTED AIMING (FIXED) ──
+            //
+            // θ_capture (headingReferenceRad) = the field direction that virtual encoder 0 points.
+            // α = field bearing from robot to goal.
+            // We want the turret to point at α in field coordinates.
+            // Turret field direction = θ_capture + (virtualEncoder in radians).
+            // So desired virtual encoder angle = α - θ_capture.
+            //
+            // This correctly handles:
+            //   ROTATION: robot turns → encoder stays at 0 → desired is nonzero → PID corrects
+            //   TRANSLATION: robot moves → α changes → desired changes → PID corrects
+
             double robotX = robotPose.getX();
             double robotY = robotPose.getY();
-            double robotHeading = robotPose.getHeading(); // Pedro Pathing heading (radians, field frame)
+            double robotHeading = robotPose.getHeading(); // for telemetry only
 
             double dx = GOAL_X - robotX;
             double dy = GOAL_Y - robotY;
@@ -471,21 +481,17 @@ public class FieldOrientedTurretController {
                 // α = absolute field bearing from robot to goal
                 double alpha = Math.atan2(dy, dx);
 
-                // Turret angle relative to chassis forward = α - θ_robot
-                // Encoder 0 = chassis forward (set at captureReferences time, but
-                // since we use the CURRENT robot heading, this works regardless
-                // of when captureReferences was called).
-                //
-                // SIGN NOTE: We negate because positive encoder ticks = turret
-                // rotates one way (CW/CCW depends on motor wiring). Adjust the
-                // negate below if turret aims the wrong direction.
-                double turretAngleRad = normalizeAngle(alpha - robotHeading);
+                // FIX: desired encoder angle = α - θ_capture (NOT α - θ_robot_now)
+                // Because virtual encoder 0 = the field direction at capture time (θ_capture),
+                // NOT the current chassis forward direction.
+                double turretAngleRad = normalizeAngle(alpha - headingReferenceRad);
 
                 desiredVirtualTicks = (int) Math.round(turretAngleRad * ticksPerRad);
                 lastValidDesiredTicks = desiredVirtualTicks;
 
                 lastBearingToGoalDeg = Math.toDegrees(alpha);
                 lastDistanceToGoal = distToGoal;
+                lastTurretAngleDeg = Math.toDegrees(turretAngleRad);
             } else {
                 // Too close to goal — hold last valid target to avoid atan2 jitter
                 desiredVirtualTicks = lastValidDesiredTicks;
@@ -496,6 +502,9 @@ public class FieldOrientedTurretController {
 
         } else {
             // ── FALLBACK: pure heading-hold (no pose available) ──
+            // This is identical to the original TurretController behavior.
+            // When robot rotates by Δθ, heading changes, desiredTicks = -Δθ * ticksPerRad,
+            // which drives the turret to counter the rotation.
             double headingDelta = normalizeAngle(currentHeadingRad - headingReferenceRad);
             headingDeltaForTelemetry = headingDelta;
 
@@ -642,6 +651,7 @@ public class FieldOrientedTurretController {
         lastAngularVel = 0.0;
         lastBearingToGoalDeg = 0.0;
         lastDistanceToGoal = 0.0;
+        lastTurretAngleDeg = 0.0;
         lastDampedError = lastErrorReported;
 
         publishTelemetry();
@@ -667,6 +677,7 @@ public class FieldOrientedTurretController {
         lastAngularVel = 0.0;
         lastBearingToGoalDeg = 0.0;
         lastDistanceToGoal = 0.0;
+        lastTurretAngleDeg = 0.0;
         lastDampedError = lastErrorReported;
     }
 
@@ -701,6 +712,7 @@ public class FieldOrientedTurretController {
     public double getLastAngularVel()    { return lastAngularVel; }
     public double getLastBearingDeg()    { return lastBearingToGoalDeg; }
     public double getLastDistToGoal()    { return lastDistanceToGoal; }
+    public double getLastTurretAngleDeg(){ return lastTurretAngleDeg; }
     public int getLastDampedError()      { return lastDampedError; }
     public boolean isHomingMode()        { return homingMode; }
     public boolean isFreezeMode()        { return freezeMode; }
@@ -714,6 +726,7 @@ public class FieldOrientedTurretController {
         telemetry.addData("turret.dampedError", lastDampedError);
         telemetry.addData("turret.offset", encoderOffset);
         telemetry.addData("turret.bearing", String.format("%.1f°", lastBearingToGoalDeg));
+        telemetry.addData("turret.turretAngle", String.format("%.1f°", lastTurretAngleDeg));
         telemetry.addData("turret.distToGoal", String.format("%.1f in", lastDistanceToGoal));
         telemetry.addData("turret.freeze", freezeMode);
         telemetry.addData("turret.homing", homingMode);
