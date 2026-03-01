@@ -26,13 +26,11 @@ import java.util.List;
 @TeleOp(name = "V3 Pinpoint Aim 🎯📍", group = "Linear OpMode")
 public class PinpointAimTeleOp extends LinearOpMode {
 
-    // Drive
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
     private DcMotor shooter, shooter2, turret, intakeMotor;
     private Servo clawServo, leftHoodServo, rightHoodServo, gateServo;
     private DigitalChannel turretLimitSwitch;
 
-    // Controllers
     private PinpointTurretAimer turretAimer;
     private DriveController driveController;
     private FlywheelController flywheel;
@@ -40,7 +38,6 @@ public class PinpointAimTeleOp extends LinearOpMode {
     private ClawController clawController;
     private HoodController hoodController;
 
-    // Telemetry
     private TelemetryManager panelsTelemetry;
     private TelemetryData telemetryData;
 
@@ -52,7 +49,6 @@ public class PinpointAimTeleOp extends LinearOpMode {
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
 
-    // Constants
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.26;
     private static final double GATE_OPEN = 0.67;
@@ -70,16 +66,14 @@ public class PinpointAimTeleOp extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // ── Bulk read ──
-        List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
-        for (LynxModule hub : allHubs) {
+        // Bulk read
+        for (LynxModule hub : hardwareMap.getAll(LynxModule.class)) {
             hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
         }
 
-        // ── Hardware ──
+        // Hardware
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "frontLeft");
         backLeftDrive   = hardwareMap.get(DcMotor.class, "backLeft");
         frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
@@ -108,7 +102,7 @@ public class PinpointAimTeleOp extends LinearOpMode {
         try { batterySensor = hardwareMap.voltageSensor.iterator().next(); }
         catch (Exception ignored) {}
 
-        // ── Directions ──
+        // Directions
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
         frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -120,26 +114,29 @@ public class PinpointAimTeleOp extends LinearOpMode {
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        // ── CRITICAL: Zero the turret encoder while it's physically straight forward ──
+        // ════════════════════════════════════════════════
+        // TURRET: zero encoder while physically straight forward
+        // This is the ONLY setup step needed.
+        // ════════════════════════════════════════════════
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // ── Pinpoint: the ONLY sensor we use for position + heading ──
+        // Pinpoint: single source of truth for position + heading
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.resetPosAndIMU();
 
-        // ── Turret aimer (pinpoint only — no Pedro Pathing heading) ──
+        // Turret aimer — pinpoint only, no Pedro, no old TurretController
         turretAimer = new PinpointTurretAimer(turret, pinpoint, telemetry);
         if (turretLimitSwitch != null) {
             turretAimer.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
 
-        // ── Other subsystems ──
-        driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
+        // Subsystems
+        driveController = new DriveController(
+                frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
-
         telemetryData = new TelemetryData(telemetry, flywheel);
 
         gateController = new GateController(
@@ -147,32 +144,31 @@ public class PinpointAimTeleOp extends LinearOpMode {
                 led1Red, led1Green, led2Red, led2Green,
                 GATE_OPEN, GATE_CLOSED,
                 INTAKE_DURATION_MS, CLAW_TRIGGER_BEFORE_END_MS,
-                INTAKE_SEQ_POWER
-        );
+                INTAKE_SEQ_POWER);
 
-        clawController = new ClawController(clawServo, ClawController.CLAW_OPEN, ClawController.CLAW_CLOSED, ClawController.CLAW_CLOSE_MS);
+        clawController = new ClawController(
+                clawServo, ClawController.CLAW_OPEN,
+                ClawController.CLAW_CLOSED, ClawController.CLAW_CLOSE_MS);
+
         hoodController = new HoodController(
                 leftHoodServo, rightHoodServo,
                 HOOD_MIN, RIGHT_HOOD_CLOSE,
                 HOOD_MIN, HOOD_MAX,
                 HOOD_LEFT_STEP, HOOD_RIGHT_STEP,
-                HOOD_DEBOUNCE_MS
-        );
+                HOOD_DEBOUNCE_MS);
 
         gateController.setGateClosed(true);
 
         telemetry.addData("Status", "V3 Pinpoint Aim — ready");
-        telemetry.addData("Goal", "(%.0f, %.0f)", PinpointTurretAimer.GOAL_X, PinpointTurretAimer.GOAL_Y);
-        telemetry.addData("NOTE", "Turret must be straight forward at init!");
+        telemetry.addData("Goal", "(%.0f, %.0f)",
+                PinpointTurretAimer.GOAL_X, PinpointTurretAimer.GOAL_Y);
+        telemetry.addData("⚠️ IMPORTANT", "Turret must be straight forward at init!");
         telemetry.update();
 
         waitForStart();
-
         if (isStopRequested()) { turretAimer.disable(); return; }
 
-        // Pinpoint is already zeroed from resetPosAndIMU().
-        // Turret encoder is already zeroed from STOP_AND_RESET_ENCODER.
-        // No "capture references" needed!
+        // No "capture references" — pinpoint is zeroed, encoder is zeroed. Done.
         flywheel.setShooterOn(true);
 
         while (opModeIsActive()) {
@@ -180,12 +176,10 @@ public class PinpointAimTeleOp extends LinearOpMode {
             long nowMs = System.currentTimeMillis();
             telemetryData.updateLoopTime();
 
-            // ── Update pinpoint (MUST be called every loop) ──
+            // Update pinpoint every loop
             try { pinpoint.update(); } catch (Exception ignored) {}
 
-            // ════════════ RESETS ════════════
-
-            // A button: zero turret encoder (must be straight forward!)
+            // ── Resets ──
             boolean aNow = gamepad1.a;
             if (aNow && !aLast) {
                 turretAimer.fullReset();
@@ -193,7 +187,6 @@ public class PinpointAimTeleOp extends LinearOpMode {
             }
             aLast = aNow;
 
-            // Gamepad2 touchpad: same reset
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gp2TouchpadLast) {
                 turretAimer.fullReset();
@@ -210,10 +203,12 @@ public class PinpointAimTeleOp extends LinearOpMode {
             }
             touchpadLast = touchpadNow;
 
-            // ════════════ DRIVE ════════════
-            driveController.setDrive(-gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x, 1.0);
+            // ── Drive ──
+            driveController.setDrive(
+                    -gamepad1.left_stick_y, gamepad1.left_stick_x,
+                    gamepad1.right_stick_x, 1.0);
 
-            // ════════════ FLYWHEEL ════════════
+            // ── Flywheel ──
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
             dpadDownLast = dpadDownNow;
@@ -226,25 +221,28 @@ public class PinpointAimTeleOp extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // ════════════ GATE ════════════
+            // ── Gate ──
             boolean bNow = gamepad1.b || gamepad2.b;
             if (bNow && !bLast && !gateController.isBusy()) gateController.toggleGate();
             bLast = bNow;
 
             boolean yNow = gamepad1.y || gamepad2.y;
-            if (yNow && !yLast && !gateController.isBusy()) gateController.startIntakeSequence(nowMs);
+            if (yNow && !yLast && !gateController.isBusy())
+                gateController.startIntakeSequence(nowMs);
             yLast = yNow;
 
             boolean shouldTriggerClaw = gateController.update(nowMs);
             if (shouldTriggerClaw) clawController.trigger(nowMs);
 
             boolean calibPressed = gamepad1.back || gamepad2.back;
-            flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
+            flywheel.handleLeftTrigger(
+                    gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
             boolean currentPidfMode = flywheel.isUsingFarCoefficients();
             if (currentPidfMode != lastPidfMode) {
-                hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
+                hoodController.setRightPosition(
+                        currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
                 lastPidfMode = currentPidfMode;
             }
 
@@ -253,8 +251,9 @@ public class PinpointAimTeleOp extends LinearOpMode {
                 try { gamepad2.rumble(200); } catch (Throwable ignored) {}
             }
 
-            // ════════════ TURRET (pinpoint aim) ════════════
-            turretAimer.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
+            // ── Turret aiming ──
+            turretAimer.commandHomingSweep(
+                    gamepad1.dpad_up || gamepad2.left_bumper);
 
             boolean manualNow = false;
             double manualPower = 0.0;
@@ -266,7 +265,7 @@ public class PinpointAimTeleOp extends LinearOpMode {
 
             turretAimer.update(manualNow, manualPower);
 
-            // ════════════ INTAKE ════════════
+            // ── Intake ──
             if (!gateController.isBusy()) {
                 if (gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1) {
                     intakeMotor.setPower(-1.0);
@@ -277,21 +276,22 @@ public class PinpointAimTeleOp extends LinearOpMode {
                 }
             }
 
-            // ════════════ CLAW ════════════
+            // ── Claw ──
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xLast) clawController.trigger(nowMs);
             xLast = xNow;
             clawController.update(nowMs);
 
-            // ════════════ HOOD (gamepad2 only) ════════════
+            // ── Hood ──
             if (gamepad2.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad2.b) hoodController.nudgeLeftDown(nowMs);
 
-            // ════════════ TELEMETRY ════════════
+            // ── Telemetry ──
             telemetry.addData("Aim.Error", "%.1f°", turretAimer.getErrorDeg());
             telemetry.addData("Aim.Dist", "%.1f in", turretAimer.getDistToGoal());
-            telemetry.addData("Aim.Mode", turretAimer.isFreezeMode() ? "FREEZE 🔒" :
-                    (turretAimer.isHomingMode() ? "HOMING 🔄" : "AIM 🎯"));
+            telemetry.addData("Aim.Mode",
+                    turretAimer.isFreezeMode() ? "FREEZE 🔒" :
+                            (turretAimer.isHomingMode() ? "HOMING 🔄" : "AIM 🎯"));
             telemetryData.update();
         }
 
