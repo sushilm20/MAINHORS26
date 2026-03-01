@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -16,16 +16,18 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 
+import org.firstinspires.ftc.teamcode.extras.TelemetryData;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
-import org.firstinspires.ftc.teamcode.tracking.TurretGoalAimer; // CHANGED: TurretController → TurretGoalAimer
+import org.firstinspires.ftc.teamcode.tracking.FieldOrientedTurretController;
 
-@Disabled
-@TeleOp(name="V2 Dynamic Tracking Turret 🎯", group="Linear OpMode") // CHANGED: new name
-public class DynamicTrackingTurret extends LinearOpMode {
+import java.util.List;
+
+@TeleOp(name = "V2 Dynamic Turret Tracking 🎯🗺️", group = "Linear OpMode")
+public class DynamicTrackingV2 extends LinearOpMode {
 
     // Drive + subsystems
     private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
@@ -35,7 +37,8 @@ public class DynamicTrackingTurret extends LinearOpMode {
     private Servo gateServo;
     private DigitalChannel turretLimitSwitch;
 
-    private TurretGoalAimer turretAimer; // CHANGED: TurretController → TurretGoalAimer
+    // NEW: FieldOrientedTurretController instead of TurretController
+    private FieldOrientedTurretController fieldTurret;
     private DriveController driveController;
     private FlywheelController flywheel;
     private GateController gateController;
@@ -44,6 +47,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
 
     // Telemetry
     private TelemetryManager panelsTelemetry;
+    private TelemetryData telemetryData;
 
     // Toggles / state
     private boolean dpadDownLast = false;
@@ -62,7 +66,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
 
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;
-    private static final double RIGHT_HOOD_FAR = 0.24;
+    private static final double RIGHT_HOOD_FAR = 0.26;
 
     // Gate/Intake constants
     private static final double GATE_OPEN = 0.67;
@@ -81,14 +85,25 @@ public class DynamicTrackingTurret extends LinearOpMode {
     // Pinpoint IMU only
     private GoBildaPinpointDriver pinpoint;
 
-    // Pose tracking
+    // Pose tracking via Pedro Pathing
     private Follower follower;
     private Pose currentPose = new Pose();
+
+    // Starting pose (robot starts here with turret encoder at 0)
+    private static final double START_X = 22.0;
+    private static final double START_Y = 122.0;
+    private static final double START_HEADING_DEG = 135.0;
 
     @Override
     public void runOpMode() {
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
+
+        // ════════════ BULK READ — must be first! ════════════
+        List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : allHubs) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        }
 
         // Hardware map
         frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
@@ -106,7 +121,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
-        // Optional: turret limit switch (active-low example)
+        // Optional: turret limit switch (active-low)
         try {
             turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
             turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
@@ -145,25 +160,28 @@ public class DynamicTrackingTurret extends LinearOpMode {
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.resetPosAndIMU();
 
-        try { // Follower
+        // Pedro Pathing follower for pose tracking
+        try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
+            follower.setStartingPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
         } catch (Exception e) {
             telemetry.addData("Error", "Follower initialization failed!");
             follower = null;
         }
 
-        // CHANGED: Create TurretGoalAimer instead of TurretController
-        turretAimer = new TurretGoalAimer(turret, null, pinpoint, telemetry);
+        // ════════════ NEW: FieldOrientedTurretController ════════════
+        fieldTurret = new FieldOrientedTurretController(turret, pinpoint, telemetry);
         if (turretLimitSwitch != null) {
-            turretAimer.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
+            fieldTurret.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
-        // CHANGED: Set the goal target point (default is (14, 134) — adjust to your basket/goal)
-        // turretAimer.setTargetPose(new Pose(14, 134, 0));
+        // Goal defaults to (14, 134) — change via dashboard or here:
+        // fieldTurret.setGoal(14.0, 134.0);
 
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
+
+        telemetryData = new TelemetryData(telemetry, flywheel);
 
         gateController = new GateController(
                 gateServo, intakeMotor,
@@ -186,22 +204,23 @@ public class DynamicTrackingTurret extends LinearOpMode {
         gateController.setGateClosed(true);
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
-        telemetry.addData("\nTurret IMU", "pinpoint");
-        telemetry.addData("Turret Mode", "GoalAimer (heading-hold + position offset)"); // CHANGED: info
+        telemetry.addData("Bulk Read", "AUTO");
+        telemetry.addData("Turret Mode", "FIELD-ORIENTED (pose + heading unified)");
+        telemetry.addData("Goal", "(%.0f, %.0f)", FieldOrientedTurretController.GOAL_X, FieldOrientedTurretController.GOAL_Y);
         telemetry.update();
 
         // Prepare subsystems
-        turretAimer.captureReferences(); // CHANGED: turretController → turretAimer
-        turretAimer.resetPidState();
+        fieldTurret.captureReferences();
+        fieldTurret.resetPidState();
 
         waitForStart();
 
         if (isStopRequested()) {
-            turretAimer.disable(); // CHANGED
+            fieldTurret.disable();
             return;
         }
 
-        // After start: re-zero with initial pose
+        // After start: re-zero turret and heading
         reZeroHeadingAndTurret();
         flywheel.setShooterOn(true);
 
@@ -209,14 +228,19 @@ public class DynamicTrackingTurret extends LinearOpMode {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
 
+            // ── Update loop time ──
+            telemetryData.updateLoopTime();
+
             // Refresh pinpoint
             try { pinpoint.update(); } catch (Exception ignored) {}
 
-            // CHANGED: Update follower and get pose (critical for GoalAimer)
+            // Update follower and get pose — critical for field-oriented aiming
             if (follower != null) {
                 follower.update();
                 currentPose = follower.getPose();
             }
+
+            // ════════════ RESET BUTTONS ════════════
 
             // Touchpad reset (gamepad2)
             boolean gp2Touch = getTouchpad(gamepad2);
@@ -228,7 +252,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1)
+            // A button reset (gamepad1) — resets turret encoder to 0 and recaptures
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
                 resetTurretEncoderAndReferences();
@@ -247,13 +271,13 @@ public class DynamicTrackingTurret extends LinearOpMode {
             }
             touchpadPressedLast = touchpadNow;
 
-            // Drive
+            // ════════════ DRIVE ════════════
             double axial = -gamepad1.left_stick_y;
             double lateral = gamepad1.left_stick_x;
             double yaw = gamepad1.right_stick_x;
             driveController.setDrive(axial, lateral, yaw, 1.0);
 
-            // Flywheel toggles (DPAD)
+            // ════════════ FLYWHEEL ════════════
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
             dpadDownLast = dpadDownNow;
@@ -266,7 +290,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // Gate manual toggle (B)
+            // ════════════ GATE ════════════
             boolean bNow = gamepad1.b || gamepad2.b;
             if (bNow && !bPressedLast && !gateController.isBusy()) {
                 gateController.toggleGate();
@@ -305,8 +329,8 @@ public class DynamicTrackingTurret extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // Turret control
-            turretAimer.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper); // CHANGED
+            // ════════════ TURRET (FIELD-ORIENTED) ════════════
+            fieldTurret.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             boolean manualNow = false;
             double manualPower = 0.0;
@@ -317,12 +341,11 @@ public class DynamicTrackingTurret extends LinearOpMode {
                 manualNow = true; manualPower = -0.35;
             }
 
-            // CHANGED: Pass currentPose to update() — this is the key difference!
-            // When pose is available: heading-hold + position offset → tracks the goal
-            // When pose is null (follower failed): pure heading-hold → same as TurretController
-            turretAimer.update(manualNow, manualPower, currentPose);
+            // Pass currentPose — when available, turret aims at goal using field math
+            // When null (follower failed), falls back to heading-hold
+            fieldTurret.update(manualNow, manualPower, currentPose);
 
-            // Intake manual (only if gate not busy)
+            // ════════════ INTAKE MANUAL ════════════
             if (!gateController.isBusy()) {
                 boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
                 if (leftTriggerNow) {
@@ -334,7 +357,7 @@ public class DynamicTrackingTurret extends LinearOpMode {
                 }
             }
 
-            // Claw manual (X)
+            // ════════════ CLAW (X) ════════════
             boolean xNow = gamepad1.x || gamepad2.x;
             if (xNow && !xPressedLast) {
                 clawController.trigger(nowMs);
@@ -342,29 +365,25 @@ public class DynamicTrackingTurret extends LinearOpMode {
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Hood adjustments
+            // ════════════ HOOD ════════════
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // Telemetry
-            telemetry.addData("Flywheel", "Current: %.0f rpm | Target: %.0f rpm",
-                    flywheel.getCurrentRPM(), flywheel.getTargetRPM());
+            // ════════════ TELEMETRY ════════════
+            telemetryData.setPose(currentPose);
 
-            telemetry.addData("Pose", currentPose != null
-                    ? String.format("(%.1f, %.1f, %.1f°)", currentPose.getX(), currentPose.getY(), Math.toDegrees(currentPose.getHeading()))
-                    : "N/A");
+            telemetry.addData("Turret.Bearing", "%.1f°", fieldTurret.getLastBearingDeg());
+            telemetry.addData("Turret.Dist", "%.1f in", fieldTurret.getLastDistToGoal());
+            telemetry.addData("Turret.Mode", fieldTurret.isFreezeMode() ? "FREEZE 🔒" :
+                    (fieldTurret.isHomingMode() ? "HOMING 🔄" : "FIELD AIM 🎯"));
 
-            // CHANGED: Added goal-aimer specific telemetry
-            telemetry.addData("Turret.PosOffset", String.format("%.2f°", turretAimer.getLastPositionOffsetDeg()));
-            telemetry.addData("Turret.HeadingΔ", String.format("%.2f°", Math.toDegrees(turretAimer.getLastHeadingDelta())));
-            telemetry.addData("Turret.Mode", turretAimer.isFreezeMode() ? "FREEZE 🔒" :
-                    (turretAimer.isHomingMode() ? "HOMING 🔄" : "TRACKING 🎯"));
-
-            telemetry.update();
+            telemetryData.update();
         }
 
-        turretAimer.disable(); // CHANGED
+        fieldTurret.disable();
     }
+
+    // ════════════ HELPERS ════════════
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {
         try { return gp.touchpad; }
@@ -376,24 +395,18 @@ public class DynamicTrackingTurret extends LinearOpMode {
         catch (Exception ignored) { return null; }
     }
 
-    /**
-     * Capture current heading, turret position, AND robot pose as the new reference.
-     * The GoalAimer needs the pose to compute the reference bearing to the goal.
-     */
     private void reZeroHeadingAndTurret() {
         try { pinpoint.update(); } catch (Exception ignored) {}
-        // CHANGED: Pass currentPose so the reference bearing to goal is captured
-        turretAimer.captureReferences(currentPose);
-        turretAimer.resetPidState();
+        fieldTurret.captureReferences();
+        fieldTurret.resetPidState();
     }
 
     /**
-     * Reset turret encoder and capture references with current pose.
-     * Clears any homing/freeze state so tracking resumes immediately.
+     * Reset turret encoder to 0, recapture heading reference, clear PID.
+     * Triggered by gamepad1 A or gamepad2 touchpad.
      */
     private void resetTurretEncoderAndReferences() {
         try { pinpoint.update(); } catch (Exception ignored) {}
-        // CHANGED: Pass currentPose so reference bearing is captured on reset
-        turretAimer.recenterAndResume(true, currentPose);
+        fieldTurret.recenterAndResume(true);
     }
 }

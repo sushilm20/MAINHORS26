@@ -11,6 +11,7 @@ import com.pedropathing.geometry.Pose;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Configurable
+@Disabled
 @TeleOp(name="Virtual Slime Out 🎮📷", group="Linear OpMode")
 public class FunCameraTeleop extends LinearOpMode {
 
