@@ -28,7 +28,7 @@ import org.firstinspires.ftc.teamcode.subsystems.DriveController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.subsystems.GateController;
 import org.firstinspires.ftc.teamcode.subsystems.HoodController;
-import org.firstinspires.ftc.teamcode.tracking.CameraTurretController;
+import org.firstinspires.ftc.teamcode.extras.CameraTurretController;
 import org.firstinspires.ftc.teamcode.tracking.CameraStreamManager;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 import org.firstinspires.ftc.vision.VisionPortal;
