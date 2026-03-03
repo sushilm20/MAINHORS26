@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Far 9?? 🔴 (Mirrored)", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
+@Autonomous(name = "Far 9? 🔴", group = "Autonomous", preselectTeleOp = "HORS OFFICIAL ⭐")
 @Configurable
 public class FarRed6 extends OpMode {
 
@@ -58,8 +58,7 @@ public class FarRed6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    // Turret is POSITIVE for Red side (mirrored from -105 on Blue)
-    private static final int TURRET_START_POS = 105;
+    private static final int TURRET_START_POS = -105;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -74,7 +73,7 @@ public class FarRed6 extends OpMode {
     // Timing
     // ============================
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
-    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.1;
+    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 4;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
@@ -101,7 +100,7 @@ public class FarRed6 extends OpMode {
     @Sorter(sort = 30) public static double START_POSE_TOLERANCE_IN = 6.0;
 
     // ============================
-    // Path poses (Blue-side base values — mirrored at runtime)
+    // Blue-side raw coordinates (kept for reference / mirror input)
     // ============================
     @Sorter(sort = 100) public static double START_X = 63.0;
     @Sorter(sort = 101) public static double START_Y = 8.0;
@@ -116,55 +115,60 @@ public class FarRed6 extends OpMode {
     @Sorter(sort = 121) public static double COLLECT_CTRL_Y = 18.0;
     @Sorter(sort = 122) public static double COLLECT_END_X = 16.0;
     @Sorter(sort = 123) public static double COLLECT_END_Y = 14.0;
-    @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195.0;
+    @Sorter(sort = 124) public static double COLLECT_HEADING_DEG = 195;
 
     @Sorter(sort = 130) public static double EXTEND_END_Y = 12;
 
     @Sorter(sort = 140) public static double BACK_COLLECT_X = 16.0;
     @Sorter(sort = 141) public static double BACK_COLLECT_Y = 14.0;
 
-    // ===== Mirrored (Red) poses/headings computed from base =====
-    private Pose START_POSE_R;
-    private Pose SHOOT_POSE_R;
-
-    private double START_HEADING_R;
-    private double SHOOT_HEADING_R;
-    private double SHOOT_RETURN_HEADING_R;
-    private double COLLECT_HEADING_R;
+    // ============================
+    // Mirror constant (field width reference line)
+    // ============================
+    private static final double MIRROR_Y = 146;
 
     public FarRed6() {}
 
+    // ============================
+    // Mirror helpers
+    // ============================
 
+    /** Mirror a position-only Pose across the field centre line (Y = MIRROR_Y). */
     private static Pose mirrorPose(double x, double y) {
-        return new Pose(x, y).mirror(146);
+        return new Pose(x, y).mirror(MIRROR_Y);
     }
 
+    /** Mirror a full Pose (position + heading) across the field centre line. */
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(146);
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(MIRROR_Y);
     }
 
+    /** Return the mirrored heading in **radians**. */
     private static double mirrorHeading(double headingDeg) {
-        // Return heading (radians) after mirroring
         return new Pose(0.0, 0.0, Math.toRadians(headingDeg)).mirror().getHeading();
     }
+
+    // ============================
+    // Cached mirrored shoot pose for distance checks
+    // ============================
+    private double mirroredShootX;
+    private double mirroredShootY;
 
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // Compute mirrored poses/headings from base (Blue) values
-        START_POSE_R = mirrorPose(START_X, START_Y, START_HEADING_DEG);
-        SHOOT_POSE_R = mirrorPose(SHOOT_X, SHOOT_Y, SHOOT_HEADING_DEG);
-
-        START_HEADING_R        = START_POSE_R.getHeading();
-        SHOOT_HEADING_R        = SHOOT_POSE_R.getHeading();
-        SHOOT_RETURN_HEADING_R = mirrorHeading(SHOOT_RETURN_HEADING_DEG);
-        COLLECT_HEADING_R      = mirrorHeading(COLLECT_HEADING_DEG);
+        // Pre-compute the mirrored shoot position for use in distanceToShootPose()
+        Pose mShoot = mirrorPose(SHOOT_X, SHOOT_Y);
+        mirroredShootX = mShoot.getX();
+        mirroredShootY = mShoot.getY();
 
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
-        follower.setStartingPose(new Pose(START_POSE_R.getX(), START_POSE_R.getY(), START_HEADING_R));
+        // Set the mirrored starting pose
+        Pose startPose = mirrorPose(START_X, START_Y, START_HEADING_DEG);
+        follower.setStartingPose(startPose);
 
         intakeTimer = new Timer();
         preActionTimer = new Timer();
@@ -262,7 +266,7 @@ public class FarRed6 extends OpMode {
             panelsTelemetry.debug("Init", "Gate servo map failed: " + e.getMessage());
         }
 
-        panelsTelemetry.debug("Status", "Initialized");
+        panelsTelemetry.debug("Status", "Initialized (RED mirrored)");
         panelsTelemetry.update(telemetry);
     }
 
@@ -291,7 +295,7 @@ public class FarRed6 extends OpMode {
         follower.update();
         long nowMs = System.currentTimeMillis();
 
-        // Turret pre-position then capture reference heading (POSITIVE for Red)
+        // Turret pre-position then capture reference heading
         if (turretController != null && !turretRefCaptured) {
             boolean done = turretController.driveToPosition(TURRET_START_POS, 10, 0.35);
             if (done) {
@@ -366,7 +370,7 @@ public class FarRed6 extends OpMode {
                         preActionTimerStarted = false;
                         preActionEntered = false;
                         poseWaitTimer.resetTimer();
-                        rpmStableTimer.resetTimer(); // One clean reset per volley
+                        rpmStableTimer.resetTimer();
                         if (flywheel != null) flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
                         state = AutoState.PRE_ACTION;
                     } else if (next <= 6) {
@@ -379,14 +383,12 @@ public class FarRed6 extends OpMode {
             }
 
             case PRE_ACTION: {
-                // Enter once per volley
                 if (!preActionEntered) {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
                 }
 
-                // Start the short settle timer once close enough OR after max wait
                 if (!preActionTimerStarted) {
                     double dist = distanceToShootPose();
                     if (dist <= START_POSE_TOLERANCE_IN || poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
@@ -394,7 +396,6 @@ public class FarRed6 extends OpMode {
                         preActionTimerStarted = true;
                     }
                 } else {
-                    // Watchdog: never hang here
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                         intakeTimer.resetTimer();
                         state = AutoState.INTAKE_RUN;
@@ -404,9 +405,7 @@ public class FarRed6 extends OpMode {
             }
 
             case INTAKE_RUN: {
-                // Watchdog: proceed after timer
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
-                    // Keep flywheel at full target RPM so it stays stable for the next gate open
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
@@ -488,8 +487,8 @@ public class FarRed6 extends OpMode {
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
-            double dx = p.getX() - SHOOT_POSE_R.getX();
-            double dy = p.getY() - SHOOT_POSE_R.getY();
+            double dx = p.getX() - mirroredShootX;
+            double dy = p.getY() - mirroredShootY;
             return Math.hypot(dx, dy);
         } catch (Exception e) {
             return Double.POSITIVE_INFINITY;
@@ -501,23 +500,16 @@ public class FarRed6 extends OpMode {
         try {
             double dist = distanceToShootPose();
 
-            // Only attempt to open the gate during shoot phases
             boolean inShootPhase = (state == AutoState.PRE_ACTION
                     || state == AutoState.INTAKE_RUN
                     || state == AutoState.CLAW_ACTION);
 
-            // Track RPM stability — but DON'T reset the timer when we're
-            // already in a shoot phase. This prevents momentary RPM flickers
-            // from blocking the gate indefinitely.
             boolean rpmCloseEnough = false;
             if (flywheel != null && flywheel.isShooterOn()) {
                 double err = Math.abs(flywheel.getCurrentRPM() - flywheel.getTargetRPM());
                 if (err <= GATE_RPM_TOLERANCE) {
                     rpmCloseEnough = true;
-                    // Timer keeps accumulating — don't reset here
                 } else if (!inShootPhase) {
-                    // Only reset while NOT in a shoot phase, so the timer
-                    // isn't constantly zeroed during approach oscillations
                     rpmStableTimer.resetTimer();
                 }
             } else {
@@ -527,7 +519,6 @@ public class FarRed6 extends OpMode {
             boolean rpmStable = rpmCloseEnough
                     && rpmStableTimer.getElapsedTimeSeconds() >= GATE_RPM_STABLE_SECONDS;
 
-            // Determine if the gate should be open or closed
             boolean shouldBeOpen = inShootPhase
                     && dist <= GATE_OPEN_TOLERANCE_IN
                     && rpmStable;
@@ -546,7 +537,6 @@ public class FarRed6 extends OpMode {
                 panelsTelemetry.debug("Gate", "Closed (dist=" + String.format("%.2f", dist) + ")");
             }
 
-            // Debug telemetry — see exactly why the gate isn't opening on the field
             panelsTelemetry.debug("Gate_dist", String.format("%.2f", dist));
             panelsTelemetry.debug("Gate_rpmErr", flywheel != null
                     ? String.format("%.1f", Math.abs(flywheel.getCurrentRPM() - flywheel.getTargetRPM()))
@@ -560,8 +550,8 @@ public class FarRed6 extends OpMode {
         }
     }
 
-    // ---------- Paths (all mirrored from Blue) ----------
-    public class Paths {
+    // ---------- Paths (ALL mirrored from Blue) ----------
+    public static class Paths {
         public PathChain StartTOShoot3;
         public PathChain Collect3;
         public PathChain ExtendCollect3;
@@ -570,59 +560,55 @@ public class FarRed6 extends OpMode {
         public PathChain BackTOShootFinal;
 
         public Paths(Follower follower) {
+
+            // Mirrored poses
+            Pose mStart       = mirrorPose(START_X, START_Y);
+            Pose mShoot       = mirrorPose(SHOOT_X, SHOOT_Y);
+            Pose mCollectCtrl = mirrorPose(COLLECT_CTRL_X, COLLECT_CTRL_Y);
+            Pose mCollectEnd  = mirrorPose(COLLECT_END_X, COLLECT_END_Y);
+            Pose mExtendEnd   = mirrorPose(COLLECT_END_X, EXTEND_END_Y);
+            Pose mBackCollect = mirrorPose(BACK_COLLECT_X, BACK_COLLECT_Y);
+
+            // Mirrored headings (radians)
+            double mStartHdg        = mirrorHeading(START_HEADING_DEG);
+            double mShootHdg        = mirrorHeading(SHOOT_HEADING_DEG);
+            double mShootReturnHdg  = mirrorHeading(SHOOT_RETURN_HEADING_DEG);
+            double mCollectHdg      = mirrorHeading(COLLECT_HEADING_DEG);
+
+            // Path 1 — Start → Shoot
             StartTOShoot3 = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            mirrorPose(START_X, START_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(START_HEADING_DEG),
-                            mirrorHeading(SHOOT_HEADING_DEG))
+                    .addPath(new BezierLine(mStart, mShoot))
+                    .setLinearHeadingInterpolation(mStartHdg, mShootHdg)
                     .build();
 
+            // Path 2 — Shoot → Collect (curve via control point)
             Collect3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            mirrorPose(SHOOT_X, SHOOT_Y),
-                            mirrorPose(COLLECT_CTRL_X, COLLECT_CTRL_Y),
-                            mirrorPose(COLLECT_END_X, COLLECT_END_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(SHOOT_HEADING_DEG),
-                            mirrorHeading(COLLECT_HEADING_DEG))
+                    .addPath(new BezierCurve(mShoot, mCollectCtrl, mCollectEnd))
+                    .setLinearHeadingInterpolation(mShootHdg, mCollectHdg)
                     .build();
 
+            // Path 3 — Collect → ExtendCollect (short push forward)
             ExtendCollect3 = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            mirrorPose(COLLECT_END_X, COLLECT_END_Y),
-                            mirrorPose(COLLECT_END_X, EXTEND_END_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(COLLECT_HEADING_DEG),
-                            mirrorHeading(COLLECT_HEADING_DEG))
+                    .addPath(new BezierLine(mCollectEnd, mExtendEnd))
+                    .setLinearHeadingInterpolation(mCollectHdg, mCollectHdg)
                     .build();
 
+            // Path 4 — ExtendCollect → Shoot
             BackTOShoot = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            mirrorPose(COLLECT_END_X, EXTEND_END_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(COLLECT_HEADING_DEG),
-                            mirrorHeading(SHOOT_RETURN_HEADING_DEG))
+                    .addPath(new BezierLine(mExtendEnd, mShoot))
+                    .setLinearHeadingInterpolation(mCollectHdg, mShootReturnHdg)
                     .build();
 
+            // Path 5 — Shoot → BackCollect
             BackTOCollect = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            mirrorPose(SHOOT_X, SHOOT_Y),
-                            mirrorPose(BACK_COLLECT_X, BACK_COLLECT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(SHOOT_RETURN_HEADING_DEG),
-                            mirrorHeading(COLLECT_HEADING_DEG))
+                    .addPath(new BezierLine(mShoot, mBackCollect))
+                    .setLinearHeadingInterpolation(mShootReturnHdg, mCollectHdg)
                     .build();
 
+            // Path 6 — BackCollect → Shoot (final)
             BackTOShootFinal = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            mirrorPose(BACK_COLLECT_X, BACK_COLLECT_Y),
-                            mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(COLLECT_HEADING_DEG),
-                            mirrorHeading(SHOOT_RETURN_HEADING_DEG))
+                    .addPath(new BezierLine(mBackCollect, mShoot))
+                    .setLinearHeadingInterpolation(mCollectHdg, mShootReturnHdg)
                     .build();
         }
     }
