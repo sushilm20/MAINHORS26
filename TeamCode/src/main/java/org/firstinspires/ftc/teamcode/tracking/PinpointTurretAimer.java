@@ -441,10 +441,9 @@ public class PinpointTurretAimer {
         telemetry.addData("aim.turretField", "%.1f°", tTurretFieldDeg);
         telemetry.addData("aim.desired", "%.1f°", tDesiredFieldDeg);
         telemetry.addData("aim.error", "%.1f°", tErrorDeg);
-        telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
+
         telemetry.addData("aim.encoder", tEncoderTicks);
         telemetry.addData("aim.power", "%.3f", tAppliedPower);
-        telemetry.addData("aim.mode",
-                freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "AIM"));
+
     }
 }
