@@ -134,7 +134,7 @@ public class FarRed6 extends OpMode {
 
     public FarRed6() {}
 
-    /* Helpers to mirror poses/headings using the Pose.mirror() helper already available on Pose. */
+
     private static Pose mirrorPose(double x, double y) {
         return new Pose(x, y).mirror(146);
     }
