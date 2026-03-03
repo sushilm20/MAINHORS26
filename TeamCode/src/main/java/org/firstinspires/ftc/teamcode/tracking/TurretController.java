@@ -147,6 +147,7 @@ public class TurretController {
      * Rising edge starts the sweep; if already frozen, rising edge unfreezes and resumes tracking.
      */
     public void commandHomingSweep(boolean homingButtonPressed) {
+        //also to do if it was true to do during init.
         if (homingButtonPressed && !homingCommandPrev) {
             if (freezeMode) {
                 // Unfreeze: re-capture references and resume tracking
