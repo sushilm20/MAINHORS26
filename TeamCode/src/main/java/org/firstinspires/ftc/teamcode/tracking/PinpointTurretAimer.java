@@ -424,15 +424,15 @@ public class PinpointTurretAimer {
     //  Telemetry
     // ══════════════════════════════════════════════════
 
-    public double getErrorDeg()        { return tErrorDeg; }
-    public double getDistToGoal()      { return tDistToGoal; }
-    public double getTurretFieldDeg()  { return tTurretFieldDeg; }
-    public double getDesiredFieldDeg() { return tDesiredFieldDeg; }
-    public double getRobotHeading()    { return tRobotHeadDeg; }
-    public int    getEncoderTicks()    { return tEncoderTicks; }
-    public double getAppliedPower()    { return tAppliedPower; }
-    public boolean isHomingMode()      { return homingMode; }
-    public boolean isFreezeMode()      { return freezeMode; }
+    public double getErrorDeg()        { return tErrorDeg;}
+    public double getDistToGoal()      { return tDistToGoal;}
+    public double getTurretFieldDeg()  { return tTurretFieldDeg;}
+    public double getDesiredFieldDeg() { return tDesiredFieldDeg;}
+    public double getRobotHeading()    { return tRobotHeadDeg;}
+    public int    getEncoderTicks()    { return tEncoderTicks;}
+    public double getAppliedPower()    { return tAppliedPower;}
+    public boolean isHomingMode()      { return homingMode;}
+    public boolean isFreezeMode()      { return freezeMode;}
 
     private void publishTelemetry() {
         if (telemetry == null) return;
