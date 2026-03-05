@@ -58,7 +58,7 @@ public class FarBlue6 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = -105;
+    private static final int TURRET_START_POS = -100;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -73,7 +73,7 @@ public class FarBlue6 extends OpMode {
     // Timing
     // ============================
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
-    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 4;
+    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
