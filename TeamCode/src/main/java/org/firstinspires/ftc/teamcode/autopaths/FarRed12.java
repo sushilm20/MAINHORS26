@@ -124,7 +124,7 @@ public class FarRed12 extends OpMode {
     // ============================
     // Mirror constant (field width reference line)
     // ============================
-    private static final double MIRROR_Y = 146;
+    private static final double MIRROR_Y = 142;
 
     public FarRed12() {}
 

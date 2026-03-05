@@ -275,7 +275,7 @@ public class RedMirrorAuto extends OpMode {
     }
 
     private static Pose mirrorPose(double x, double y, double headingDeg) {
-        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(142);
+        return new Pose(x, y, Math.toRadians(headingDeg)).mirror(144);
     }
 
     private static double mirrorHeading(double headingDeg) {
