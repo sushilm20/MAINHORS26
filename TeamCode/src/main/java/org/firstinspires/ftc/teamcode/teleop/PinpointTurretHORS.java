@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
 import java.util.List;
 
-@TeleOp(name="Dynamic Tracking 🔫", group="Linear OpMode")
+@TeleOp(name="A HORS TURRET", group="Linear OpMode")
 public class PinpointTurretHORS extends LinearOpMode {
 
     // Drive + subsystems
@@ -71,6 +71,11 @@ public class PinpointTurretHORS extends LinearOpMode {
     private static final double HOOD_LEFT_STEP = 0.025;
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
+
+    // Starting pose constants
+    private static final double START_X = 20;
+    private static final double START_Y = 122;
+    private static final double START_HEADING_DEG = 135;
 
     // Pose tracking
     private Follower follower;
@@ -143,7 +148,7 @@ public class PinpointTurretHORS extends LinearOpMode {
         // Follower init (Pedro Pathing — sole source of pose + heading)
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
+            follower.setStartingPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
         } catch (Exception e) {
             telemetry.addData("Error", "Follower initialization failed!");
             follower = null;
@@ -191,6 +196,8 @@ public class PinpointTurretHORS extends LinearOpMode {
         }
 
         // After start: zero turret encoder and start flywheel
+        // Do NOT move the turret — the first-pose guard in BearingTurretController
+        // will hold position until the localizer has settled.
         bearingTurret.zeroEncoder();
         flywheel.setShooterOn(true);
         lastLoopMs = System.currentTimeMillis();
@@ -209,7 +216,7 @@ public class PinpointTurretHORS extends LinearOpMode {
                 currentPose = follower.getPose();
             }
 
-            // ── Touchpad reset (gamepad2): zero turret encoder ──
+            // ── Touchpad reset (gamepad2): zero turret encoder + clear offset ──
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
                 bearingTurret.zeroEncoder();
@@ -218,12 +225,27 @@ public class PinpointTurretHORS extends LinearOpMode {
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // ── A button reset (gamepad1): zero turret + clear offset ──
+            // ══════��═══════════════════════════════════════════
+            //  A BUTTON — Two-press toggle:
+            //    1st press: home turret encoder + freeze in place
+            //    2nd press: reset pose to start + unfreeze + resume tracking
+            // ══════════════════════════════════════════════════
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                bearingTurret.zeroEncoder();
-                bearingTurret.clearManualOffset();
-                driveController.stop();
+                if (!bearingTurret.isFreezeMode()) {
+                    // First press: zero encoder, clear offset, freeze turret
+                    bearingTurret.zeroEncoder();
+                    bearingTurret.clearManualOffset();
+                    bearingTurret.freeze();
+                    driveController.stop();
+                } else {
+                    // Second press: reset follower pose to start, unfreeze, resume tracking
+                    if (follower != null) {
+                        follower.setPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
+                    }
+                    bearingTurret.clearManualOffset();
+                    bearingTurret.unfreeze();
+                }
             }
             aPressedLast = aNow;
 
@@ -294,7 +316,7 @@ public class PinpointTurretHORS extends LinearOpMode {
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
             }
 
-            // ── Turret: homing sweep ──
+            // ── Turret: homing sweep (dpad_up / gp2 left bumper) ──
             bearingTurret.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             // ── Turret: manual override (bumpers / gp2 right stick) ──
@@ -349,8 +371,10 @@ public class PinpointTurretHORS extends LinearOpMode {
                     flywheel.getTargetRPM(),
                     flywheel.isAtTarget() ? "✓" : "");
 
-            // Turret (BearingTurretController publishes its own via publishTelemetry())
+            // Turret offset + mode
             telemetry.addData("Turret Offset", "%.1f°", bearingTurret.getManualOffsetDeg());
+            telemetry.addData("Turret Mode", bearingTurret.isFreezeMode() ? "FROZEN (press A to reset)" :
+                    bearingTurret.isHomingMode() ? "HOMING" : "TRACKING");
 
             // Loop
             telemetry.addData("Loop", "%.0f ms (%.0f Hz)",

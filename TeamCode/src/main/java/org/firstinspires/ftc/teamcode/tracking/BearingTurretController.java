@@ -30,7 +30,7 @@ import java.util.function.BooleanSupplier;
  *      (0 ticks = turret aligned with chassis forward direction)
  *   2. Set the goal position (field coordinates, inches).
  *   3. Provide the Follower reference (call setFollower or pass to constructor).
- *   4. Call update() each loop.
+ *   4. Call update() each loop AFTER follower.update().
  *
  * MANUAL OFFSET:
  *   When the driver uses manual control (bumpers/stick), the controller tracks how
@@ -67,7 +67,8 @@ public class BearingTurretController {
     // Total encoder ticks for one full 360° turret rotation
     @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 2000.0;
     // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
-    @Sorter(sort = 3) public static double ENCODER_SIGN = -1.0;
+    // If turret overturns on rotation, flip this sign.
+    @Sorter(sort = 3) public static double ENCODER_SIGN = 1.0;
 
     // Encoder hard limits (raw ticks)
     @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -1000;
@@ -132,6 +133,11 @@ public class BearingTurretController {
     private boolean freezeMode = false;
     private int freezeTargetTicks = 0;
 
+    // Tracks whether the controller has received at least one valid pose.
+    // Prevents the turret from lurching on the very first loop cycle
+    // before the Follower localizer has settled.
+    private boolean hasFirstPose = false;
+
     // Telemetry readouts
     private double tBearingDeg, tTurretDesiredDeg, tErrorDeg;
     private double tRobotX, tRobotY, tRobotHeadingDeg;
@@ -191,11 +197,12 @@ public class BearingTurretController {
         clearPid();
     }
 
-    /** Full reset: exit homing/freeze and zero the encoder. */
+    /** Full reset: exit homing/freeze, zero encoder, clear manual offset. */
     public void fullReset() {
         homingMode = false;
         freezeMode = false;
         manualOffsetRad = 0.0;
+        hasFirstPose = false;
         zeroEncoder();
     }
 
@@ -221,7 +228,7 @@ public class BearingTurretController {
 
     /**
      * Reset the manual offset back to zero (turret aims purely at the goal).
-     * Call this on a button press (e.g., gamepad1.a) to "re-center" the aim.
+     * Call this on a button press to "re-center" the aim.
      */
     public void clearManualOffset() {
         manualOffsetRad = 0.0;
@@ -230,6 +237,33 @@ public class BearingTurretController {
     /** Get the current manual offset in degrees (useful for telemetry). */
     public double getManualOffsetDeg() {
         return Math.toDegrees(manualOffsetRad);
+    }
+
+    /** Whether the controller is currently in freeze/hold mode. */
+    public boolean isFreezeMode() {
+        return freezeMode;
+    }
+
+    /** Whether the controller is currently running a homing sweep. */
+    public boolean isHomingMode() {
+        return homingMode;
+    }
+
+    /**
+     * Enter freeze mode: hold current encoder position, stop tracking.
+     */
+    public void freeze() {
+        freezeMode = true;
+        freezeTargetTicks = turretMotor.getCurrentPosition();
+        clearPid();
+    }
+
+    /**
+     * Exit freeze mode and resume tracking.
+     */
+    public void unfreeze() {
+        freezeMode = false;
+        clearPid();
     }
 
     // ══════════════════════════════════════════════════
@@ -258,8 +292,7 @@ public class BearingTurretController {
      * Convert a turret-relative angle (radians) to encoder ticks.
      *
      * turretAngleRad = 0 means turret points forward.
-     * Positive turretAngleRad = CCW (left) in standard math convention.
-     * ENCODER_SIGN maps this to the motor's tick direction.
+     * ENCODER_SIGN maps the math-convention angle to the motor's tick direction.
      */
     private double radiansToTicks(double turretAngleRad) {
         double ticksPerRad = TICKS_PER_FULL_ROTATION / (2.0 * Math.PI);
@@ -370,8 +403,8 @@ public class BearingTurretController {
     }
 
     // ══════════════════════════════════════════════════
-    //  MAIN UPDATE — Call this every loop
-    // ══════════════════════════════════════════════���═══
+    //  MAIN UPDATE — Call this every loop AFTER follower.update()
+    // ══════════════════════════════════════════════════
 
     /**
      * Main update. Call from your OpMode loop().
@@ -434,7 +467,7 @@ public class BearingTurretController {
         }
         manualWasActive = false;
 
-        // ── Freeze hold (after homing) ──
+        // ── Freeze hold (after homing or explicit freeze) ──
         if (freezeMode) {
             holdRawTicks(freezeTargetTicks);
             publishTelemetry();
@@ -455,6 +488,18 @@ public class BearingTurretController {
 
         Pose robotPose = follower.getPose();
         if (robotPose == null) {
+            turretMotor.setPower(0.0);
+            lastAppliedPower = 0.0;
+            publishTelemetry();
+            return;
+        }
+
+        // ── First-pose guard: skip the very first cycle to let the localizer settle.
+        //    This prevents the turret from lurching to a stale/default heading on startup.
+        if (!hasFirstPose) {
+            hasFirstPose = true;
+            lastTimeMs = nowMs;
+            // Don't move the turret this cycle — just record that we have a pose now
             turretMotor.setPower(0.0);
             lastAppliedPower = 0.0;
             publishTelemetry();
@@ -567,8 +612,6 @@ public class BearingTurretController {
     public int    getEncoderTicks()      { return tEncoderTicks; }
     public int    getDesiredTicks()      { return tDesiredTicks; }
     public double getAppliedPower()      { return tAppliedPower; }
-    public boolean isHomingMode()        { return homingMode; }
-    public boolean isFreezeMode()        { return freezeMode; }
 
     private void publishTelemetry() {
         if (telemetry == null) return;
