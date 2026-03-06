@@ -32,6 +32,12 @@ import java.util.function.BooleanSupplier;
  *   3. Provide the Follower reference (call setFollower or pass to constructor).
  *   4. Call update() each loop.
  *
+ * MANUAL OFFSET:
+ *   When the driver uses manual control (bumpers/stick), the controller tracks how
+ *   far they moved the turret. On release, that movement is stored as an angular
+ *   offset (manualOffsetRad) that persists on top of the bearing calculation.
+ *   Call clearManualOffset() to snap back to pure goal tracking.
+ *
  * BEARING MATH (from StackExchange):
  *   Standard atan2 bearing:  θ = atan2(Δy, Δx)
  *   This matches Pedro Pathing's heading convention (0 = +X east, CCW positive).
@@ -110,6 +116,11 @@ public class BearingTurretController {
     // Last valid aim direction (used when too close to goal)
     private double lastValidDesiredRad = 0.0;
 
+    // Manual aim offset: when the driver nudges the turret and releases,
+    // the angular displacement is stored here and added to the bearing calc.
+    private double manualOffsetRad = 0.0;
+    private int manualStartTicks = 0;
+
     // Homing state
     private boolean homingMode = false;
     private boolean homingBtnPrev = false;
@@ -184,6 +195,7 @@ public class BearingTurretController {
     public void fullReset() {
         homingMode = false;
         freezeMode = false;
+        manualOffsetRad = 0.0;
         zeroEncoder();
     }
 
@@ -205,6 +217,19 @@ public class BearingTurretController {
         lastAppliedPower = 0.0;
         lastTimeMs = -1L;
         turretMotor.setPower(0.0);
+    }
+
+    /**
+     * Reset the manual offset back to zero (turret aims purely at the goal).
+     * Call this on a button press (e.g., gamepad1.a) to "re-center" the aim.
+     */
+    public void clearManualOffset() {
+        manualOffsetRad = 0.0;
+    }
+
+    /** Get the current manual offset in degrees (useful for telemetry). */
+    public double getManualOffsetDeg() {
+        return Math.toDegrees(manualOffsetRad);
     }
 
     // ══════════════════════════════════════════════════
@@ -346,7 +371,7 @@ public class BearingTurretController {
 
     // ══════════════════════════════════════════════════
     //  MAIN UPDATE — Call this every loop
-    // ══════════════════════════════════════════════════
+    // ══════════════════════════════════════════════���═══
 
     /**
      * Main update. Call from your OpMode loop().
@@ -372,6 +397,11 @@ public class BearingTurretController {
 
         // ── Manual override (always allowed, even when frozen) ──
         if (manualNow) {
+            // Snapshot ticks when manual STARTS (rising edge)
+            if (!manualWasActive) {
+                manualStartTicks = rawTicks;
+            }
+
             double req = manualPower;
             if ((rawTicks >= TURRET_MAX_TICKS && req > 0) ||
                     (rawTicks <= TURRET_MIN_TICKS && req < 0)) {
@@ -392,8 +422,11 @@ public class BearingTurretController {
             return;
         }
 
-        // Clear PID when coming back from manual
+        // ── When releasing manual: capture the angular offset ──
         if (manualWasActive) {
+            int ticksMoved = turretMotor.getCurrentPosition() - manualStartTicks;
+            manualOffsetRad += ticksToRadians(ticksMoved);
+
             integral = 0.0;
             lastErrorDeg = 0.0;
             lastTimeMs = nowMs;
@@ -430,7 +463,7 @@ public class BearingTurretController {
 
         double robotX = robotPose.getX();
         double robotY = robotPose.getY();
-        double robotHeadingRad = robotPose.getHeading(); // Pedro convention: 0 = +X, CCW positive
+        double robotHeadingRad = robotPose.getHeading(); // Pedro: 0 = +X, CCW positive
 
         // 2. Compute field-frame bearing from robot → goal
         double dx = GOAL_X - robotX;
@@ -446,10 +479,10 @@ public class BearingTurretController {
             fieldBearingRad = lastValidDesiredRad;
         }
 
-        // 3. Convert field bearing to turret-relative angle
-        //    turretDesiredRad = 0 means "point forward along chassis"
-        //    Positive = CCW from chassis forward
-        double turretDesiredRad = normalizeAngle(fieldBearingRad - robotHeadingRad + TURRET_FORWARD_OFFSET_RAD);
+        // 3. Convert to turret-relative angle (+ manual offset from driver nudge)
+        double turretDesiredRad = normalizeAngle(
+                fieldBearingRad - robotHeadingRad + TURRET_FORWARD_OFFSET_RAD + manualOffsetRad
+        );
 
         // 4. Convert to desired encoder ticks
         double desiredTicksDouble = radiansToTicks(turretDesiredRad);
@@ -547,6 +580,7 @@ public class BearingTurretController {
         telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
         telemetry.addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
         telemetry.addData("aim.power", "%.3f", tAppliedPower);
+        telemetry.addData("aim.manualOffset", "%.1f°", Math.toDegrees(manualOffsetRad));
         telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
     }
 }
