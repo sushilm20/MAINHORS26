@@ -618,12 +618,11 @@ public class BearingTurretController {
         telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
         telemetry.addData("aim.robotHead", "%.1f°", tRobotHeadingDeg);
         telemetry.addData("aim.bearing", "%.1f°", tBearingDeg);
-        telemetry.addData("aim.turretDesired", "%.1f°", tTurretDesiredDeg);
-        telemetry.addData("aim.error", "%.1f°", tErrorDeg);
+
         telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
         telemetry.addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
         telemetry.addData("aim.power", "%.3f", tAppliedPower);
-        telemetry.addData("aim.manualOffset", "%.1f°", Math.toDegrees(manualOffsetRad));
+
         telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
     }
 }
