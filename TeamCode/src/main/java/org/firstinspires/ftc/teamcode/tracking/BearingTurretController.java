@@ -65,14 +65,14 @@ public class BearingTurretController {
 
     // Encoder geometry
     // Total encoder ticks for one full 360° turret rotation
-    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 2000.0;
+    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 1700;
     // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
     // If turret overturns on rotation, flip this sign.
-    @Sorter(sort = 3) public static double ENCODER_SIGN = 1.0;
+    @Sorter(sort = 3) public static double ENCODER_SIGN = - 1.0; //keep liek this to have correct adjustment direction
 
     // Encoder hard limits (raw ticks)
-    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -1000;
-    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 1000;
+    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -850;
+    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 850;
 
     // PID gains (error is in degrees)
     @Sorter(sort = 6)  public static double KP = 0.015;
@@ -87,7 +87,7 @@ public class BearingTurretController {
     @Sorter(sort = 11) public static double INTEGRAL_CLAMP_DEG = 100.0;
 
     // Power smoothing (EMA alpha: 0 = no smoothing, 1 = never changes)
-    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.8;
+    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.75;
 
     // Minimum distance to goal (inches). If closer than this, hold last known aim.
     // Prevents wild oscillation when robot is nearly on top of the goal.
@@ -276,7 +276,7 @@ public class BearingTurretController {
      * This matches Pedro Pathing's heading convention.
      */
     private static double bearingRad(double ax, double ay, double bx, double by) {
-        return Math.atan2(by - ay, bx - ax);
+        return Math.atan2(by - ay, bx - ax); //w arc tan
     }
 
     /**
