@@ -1,0 +1,552 @@
+package org.firstinspires.ftc.teamcode.tracking;
+
+import com.bylazar.configurables.annotations.Configurable;
+import com.bylazar.configurables.annotations.Sorter;
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+
+import java.util.function.BooleanSupplier;
+
+/**
+ * BearingTurretController — Pure Pose-Based Turret Aiming
+ *
+ * Uses the Pedro Pathing Follower pose as the SOLE source of truth.
+ * No IMU, no heading-hold layer, no reference-delta system.
+ *
+ * EVERY LOOP:
+ *   1. Get robot pose from Follower: (x, y, heading)
+ *   2. Compute field bearing from robot → goal:
+ *        bearingRad = atan2(goalY - robotY, goalX - robotX)
+ *   3. Compute turret-relative angle:
+ *        turretAngleRad = normalize(bearingRad - robotHeading)
+ *   4. Convert to encoder ticks:
+ *        desiredTicks = turretAngleRad × (TICKS_PER_FULL_ROTATION / 2π) × ENCODER_SIGN
+ *   5. PID on the error (desired - current), enforce encoder limits, apply power.
+ *
+ * SETUP:
+ *   1. Zero the turret encoder when the turret is pointing straight forward on the robot.
+ *      (0 ticks = turret aligned with chassis forward direction)
+ *   2. Set the goal position (field coordinates, inches).
+ *   3. Provide the Follower reference (call setFollower or pass to constructor).
+ *   4. Call update() each loop.
+ *
+ * BEARING MATH (from StackExchange):
+ *   Standard atan2 bearing:  θ = atan2(Δy, Δx)
+ *   This matches Pedro Pathing's heading convention (0 = +X east, CCW positive).
+ */
+@Configurable
+public class BearingTurretController {
+
+    // ── Hardware ──
+    private final DcMotor turretMotor;
+    private final Telemetry telemetry;  // may be null
+
+    // ── Pose source ──
+    private Follower follower;
+
+    // ── Encoder reset trigger (e.g., magnetic limit switch) ──
+    private BooleanSupplier encoderResetTrigger = null;
+
+    // ══════════════════════════════════════════════════
+    //  CONFIGURABLE CONSTANTS
+    // ══════════════════════════════════════════════════
+
+    // Goal position on the field (inches, Pedro Pathing coordinates)
+    @Sorter(sort = 0) public static double GOAL_X = 13.0;
+    @Sorter(sort = 1) public static double GOAL_Y = 135.0;
+
+    // Encoder geometry
+    // Total encoder ticks for one full 360° turret rotation
+    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 2000.0;
+    // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
+    @Sorter(sort = 3) public static double ENCODER_SIGN = -1.0;
+
+    // Encoder hard limits (raw ticks)
+    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -1000;
+    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 1000;
+
+    // PID gains (error is in degrees)
+    @Sorter(sort = 6)  public static double KP = 0.015;
+    @Sorter(sort = 7)  public static double KI = 0.0;
+    @Sorter(sort = 8)  public static double KD = 0.003;
+    @Sorter(sort = 9)  public static double MAX_POWER = 1.0;
+
+    // Deadband: if error < this many degrees, output 0 (prevents jitter)
+    @Sorter(sort = 10) public static double DEADBAND_DEG = 1.5;
+
+    // Integral anti-windup clamp (in degree·seconds)
+    @Sorter(sort = 11) public static double INTEGRAL_CLAMP_DEG = 100.0;
+
+    // Power smoothing (EMA alpha: 0 = no smoothing, 1 = never changes)
+    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.8;
+
+    // Minimum distance to goal (inches). If closer than this, hold last known aim.
+    // Prevents wild oscillation when robot is nearly on top of the goal.
+    @Sorter(sort = 13) public static double MIN_GOAL_DIST = 3.0;
+
+    // Turret forward offset in radians: if the turret's "zero" doesn't point
+    // exactly along the robot's +X axis, add an offset here.
+    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = 0.0;
+
+    // Homing sweep configuration
+    @Sorter(sort = 15) public static int HOMING_AMP_TICKS = 300;
+    @Sorter(sort = 16) public static double HOMING_POWER = 0.5;
+    @Sorter(sort = 17) public static int HOMING_DEADBAND = 12;
+    @Sorter(sort = 18) public static long HOMING_TIMEOUT_MS = 3000;
+
+    // ══════════════════════════════════════════════════
+    //  INTERNAL STATE
+    // ══════════════════════════════════════════════════
+
+    // PID state
+    private double integral = 0.0;
+    private double lastErrorDeg = 0.0;
+    private long lastTimeMs = -1L;
+    private double lastAppliedPower = 0.0;
+    private boolean manualWasActive = false;
+
+    // Last valid aim direction (used when too close to goal)
+    private double lastValidDesiredRad = 0.0;
+
+    // Homing state
+    private boolean homingMode = false;
+    private boolean homingBtnPrev = false;
+    private boolean homingDirPos = true;
+    private int homingTarget = HOMING_AMP_TICKS;
+    private long homingStartMs = 0L;
+
+    // Freeze/hold state (after homing finds the limit switch)
+    private boolean freezeMode = false;
+    private int freezeTargetTicks = 0;
+
+    // Telemetry readouts
+    private double tBearingDeg, tTurretDesiredDeg, tErrorDeg;
+    private double tRobotX, tRobotY, tRobotHeadingDeg;
+    private double tDistToGoal, tAppliedPower;
+    private int tEncoderTicks, tDesiredTicks;
+
+    // ══════════════════════════════════════════════════
+    //  CONSTRUCTORS
+    // ══════════════════════════════════════════════════
+
+    /**
+     * Full constructor.
+     *
+     * @param turretMotor the turret DcMotor (must already be configured: direction, mode)
+     * @param follower    Pedro Pathing Follower (provides robot pose)
+     * @param telemetry   optional FTC Telemetry for debugging (may be null)
+     */
+    public BearingTurretController(DcMotor turretMotor, Follower follower, Telemetry telemetry) {
+        this.turretMotor = turretMotor;
+        this.follower = follower;
+        this.telemetry = telemetry;
+    }
+
+    /**
+     * Constructor without telemetry.
+     */
+    public BearingTurretController(DcMotor turretMotor, Follower follower) {
+        this(turretMotor, follower, null);
+    }
+
+    // ══════════════════════════════════════════════════
+    //  SETUP METHODS
+    // ══════════════════════════════════════════════════
+
+    /** Set/change the Follower reference (e.g., if created after this controller). */
+    public void setFollower(Follower follower) {
+        this.follower = follower;
+    }
+
+    /** Set the goal the turret should aim at (field inches). */
+    public void setGoal(double x, double y) {
+        GOAL_X = x;
+        GOAL_Y = y;
+    }
+
+    /** Provide a limit-switch trigger for homing. */
+    public void setEncoderResetTrigger(BooleanSupplier trigger) {
+        this.encoderResetTrigger = trigger;
+    }
+
+    /** Zero the turret encoder. Call this when turret is physically pointing forward. */
+    public void zeroEncoder() {
+        try {
+            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        } catch (Exception ignored) {}
+        clearPid();
+    }
+
+    /** Full reset: exit homing/freeze and zero the encoder. */
+    public void fullReset() {
+        homingMode = false;
+        freezeMode = false;
+        zeroEncoder();
+    }
+
+    /** Clear PID state (useful on mode transitions). */
+    public void clearPid() {
+        integral = 0.0;
+        lastErrorDeg = 0.0;
+        lastTimeMs = System.currentTimeMillis();
+        lastAppliedPower = 0.0;
+        manualWasActive = false;
+    }
+
+    /** Stop the turret motor and reset all state. */
+    public void disable() {
+        homingMode = false;
+        freezeMode = false;
+        integral = 0.0;
+        lastErrorDeg = 0.0;
+        lastAppliedPower = 0.0;
+        lastTimeMs = -1L;
+        turretMotor.setPower(0.0);
+    }
+
+    // ══════════════════════════════════════════════════
+    //  CORE MATH
+    // ══════════════════════════════════════════════════
+
+    /**
+     * Bearing from point A to point B in radians.
+     * Uses standard atan2 convention: 0 = +X (east), CCW positive.
+     * This matches Pedro Pathing's heading convention.
+     */
+    private static double bearingRad(double ax, double ay, double bx, double by) {
+        return Math.atan2(by - ay, bx - ax);
+    }
+
+    /**
+     * Normalize an angle to [-π, +π].
+     */
+    private static double normalizeAngle(double rad) {
+        while (rad > Math.PI) rad -= 2.0 * Math.PI;
+        while (rad <= -Math.PI) rad += 2.0 * Math.PI;
+        return rad;
+    }
+
+    /**
+     * Convert a turret-relative angle (radians) to encoder ticks.
+     *
+     * turretAngleRad = 0 means turret points forward.
+     * Positive turretAngleRad = CCW (left) in standard math convention.
+     * ENCODER_SIGN maps this to the motor's tick direction.
+     */
+    private double radiansToTicks(double turretAngleRad) {
+        double ticksPerRad = TICKS_PER_FULL_ROTATION / (2.0 * Math.PI);
+        return turretAngleRad * ticksPerRad * ENCODER_SIGN;
+    }
+
+    /**
+     * Convert encoder ticks to turret angle in radians.
+     */
+    private double ticksToRadians(int ticks) {
+        double ticksPerRad = TICKS_PER_FULL_ROTATION / (2.0 * Math.PI);
+        return ticks / (ticksPerRad * ENCODER_SIGN);
+    }
+
+    // ══════════════════════════════════════════════════
+    //  HOMING SWEEP
+    // ══════════════════════════════════════════════════
+
+    /**
+     * Command a homing sweep via button. Rising edge starts sweep;
+     * if frozen, rising edge unfreezes and resumes tracking.
+     */
+    public void commandHomingSweep(boolean buttonPressed) {
+        if (buttonPressed && !homingBtnPrev) {
+            if (freezeMode) {
+                freezeMode = false;
+                clearPid();
+            } else {
+                homingMode = true;
+                homingDirPos = true;
+                homingTarget = HOMING_AMP_TICKS;
+                homingStartMs = System.currentTimeMillis();
+                freezeMode = false;
+                lastAppliedPower = 0.0;
+            }
+        }
+        homingBtnPrev = buttonPressed;
+    }
+
+    /**
+     * Run the homing sweep state machine.
+     * Returns true if homing finished this cycle.
+     */
+    private boolean runHomingSweep() {
+        // Immediate stop if limit switch trips
+        if (encoderResetTrigger != null && encoderResetTrigger.getAsBoolean()) {
+            turretMotor.setPower(0.0);
+            zeroEncoder();
+            freezeMode = true;
+            freezeTargetTicks = 0;
+            homingMode = false;
+            return true;
+        }
+
+        // Safety timeout
+        if (System.currentTimeMillis() - homingStartMs > HOMING_TIMEOUT_MS) {
+            turretMotor.setPower(0.0);
+            homingMode = false;
+            return true;
+        }
+
+        int current = turretMotor.getCurrentPosition();
+
+        // Oscillate between -amp and +amp
+        if (homingDirPos && current >= homingTarget - HOMING_DEADBAND) {
+            homingDirPos = false;
+            homingTarget = -HOMING_AMP_TICKS;
+        } else if (!homingDirPos && current <= homingTarget + HOMING_DEADBAND) {
+            homingDirPos = true;
+            homingTarget = HOMING_AMP_TICKS;
+        }
+
+        double power = homingDirPos ? HOMING_POWER : -HOMING_POWER;
+
+        // Respect encoder hard limits
+        if ((current >= TURRET_MAX_TICKS && power > 0) ||
+                (current <= TURRET_MIN_TICKS && power < 0)) {
+            power = 0.0;
+        }
+
+        turretMotor.setPower(power);
+        return false;
+    }
+
+    // ══════════════════════════════════════════════════
+    //  FREEZE HOLD (simple P on raw ticks)
+    // ══════════════════════════════════════════════════
+
+    private void holdRawTicks(int targetTicks) {
+        int current = turretMotor.getCurrentPosition();
+        int err = targetTicks - current;
+
+        double power = 0.0;
+        if (Math.abs(err) > 3) {
+            double ticksPerDeg = TICKS_PER_FULL_ROTATION / 360.0;
+            double errDeg = err / ticksPerDeg;
+            power = KP * errDeg;
+            if (power > MAX_POWER) power = MAX_POWER;
+            if (power < -MAX_POWER) power = -MAX_POWER;
+        }
+
+        if ((current >= TURRET_MAX_TICKS && power > 0) ||
+                (current <= TURRET_MIN_TICKS && power < 0)) {
+            power = 0.0;
+        }
+
+        turretMotor.setPower(power);
+    }
+
+    // ══════════════════════════════════════════════════
+    //  MAIN UPDATE — Call this every loop
+    // ══════════════════════════════════════════════════
+
+    /**
+     * Main update. Call from your OpMode loop().
+     *
+     * @param manualNow   true if the driver is manually controlling the turret this cycle
+     * @param manualPower the manual power (-1 to +1) from the joystick
+     */
+    public void update(boolean manualNow, double manualPower) {
+        long nowMs = System.currentTimeMillis();
+
+        // ── Homing overrides everything ──
+        if (homingMode) {
+            if (runHomingSweep()) {
+                nowMs = System.currentTimeMillis();
+                // homing finished, fall through
+            } else {
+                publishTelemetry();
+                return; // still homing
+            }
+        }
+
+        int rawTicks = turretMotor.getCurrentPosition();
+
+        // ── Manual override (always allowed, even when frozen) ──
+        if (manualNow) {
+            double req = manualPower;
+            if ((rawTicks >= TURRET_MAX_TICKS && req > 0) ||
+                    (rawTicks <= TURRET_MIN_TICKS && req < 0)) {
+                req = 0.0;
+            }
+            if (req > 1.0) req = 1.0;
+            if (req < -1.0) req = -1.0;
+
+            turretMotor.setPower(req);
+            integral = 0.0;
+            lastErrorDeg = 0.0;
+            lastTimeMs = nowMs;
+            lastAppliedPower = 0.0;
+            manualWasActive = true;
+
+            if (freezeMode) freezeTargetTicks = turretMotor.getCurrentPosition();
+            publishTelemetry();
+            return;
+        }
+
+        // Clear PID when coming back from manual
+        if (manualWasActive) {
+            integral = 0.0;
+            lastErrorDeg = 0.0;
+            lastTimeMs = nowMs;
+            lastAppliedPower = 0.0;
+        }
+        manualWasActive = false;
+
+        // ── Freeze hold (after homing) ──
+        if (freezeMode) {
+            holdRawTicks(freezeTargetTicks);
+            publishTelemetry();
+            return;
+        }
+
+        // ══════════════════════════════════════
+        //  AUTO AIMING — THE CORE LOGIC
+        // ══════════════════════════════════════
+
+        // 1. Get robot pose from Follower
+        if (follower == null) {
+            turretMotor.setPower(0.0);
+            lastAppliedPower = 0.0;
+            publishTelemetry();
+            return;
+        }
+
+        Pose robotPose = follower.getPose();
+        if (robotPose == null) {
+            turretMotor.setPower(0.0);
+            lastAppliedPower = 0.0;
+            publishTelemetry();
+            return;
+        }
+
+        double robotX = robotPose.getX();
+        double robotY = robotPose.getY();
+        double robotHeadingRad = robotPose.getHeading(); // Pedro convention: 0 = +X, CCW positive
+
+        // 2. Compute field-frame bearing from robot → goal
+        double dx = GOAL_X - robotX;
+        double dy = GOAL_Y - robotY;
+        double distToGoal = Math.sqrt(dx * dx + dy * dy);
+
+        double fieldBearingRad;
+        if (distToGoal >= MIN_GOAL_DIST) {
+            fieldBearingRad = bearingRad(robotX, robotY, GOAL_X, GOAL_Y);
+            lastValidDesiredRad = fieldBearingRad;
+        } else {
+            // Too close — hold last known aim direction to avoid wild spinning
+            fieldBearingRad = lastValidDesiredRad;
+        }
+
+        // 3. Convert field bearing to turret-relative angle
+        //    turretDesiredRad = 0 means "point forward along chassis"
+        //    Positive = CCW from chassis forward
+        double turretDesiredRad = normalizeAngle(fieldBearingRad - robotHeadingRad + TURRET_FORWARD_OFFSET_RAD);
+
+        // 4. Convert to desired encoder ticks
+        double desiredTicksDouble = radiansToTicks(turretDesiredRad);
+        int desiredTicks = (int) Math.round(desiredTicksDouble);
+
+        // Clamp to encoder limits
+        if (desiredTicks > TURRET_MAX_TICKS) desiredTicks = TURRET_MAX_TICKS;
+        if (desiredTicks < TURRET_MIN_TICKS) desiredTicks = TURRET_MIN_TICKS;
+
+        // 5. Compute error in DEGREES (for PID)
+        rawTicks = turretMotor.getCurrentPosition();
+        int errorTicks = desiredTicks - rawTicks;
+        double ticksPerDeg = TICKS_PER_FULL_ROTATION / 360.0;
+        double errorDeg = errorTicks / ticksPerDeg;
+
+        // 6. PID
+        long dtMs = (lastTimeMs < 0) ? 20 : Math.max(1, nowMs - lastTimeMs);
+        double dt = dtMs / 1000.0;
+        lastTimeMs = nowMs;
+
+        // Integral with deadband gating
+        if (Math.abs(errorDeg) > DEADBAND_DEG) {
+            integral += errorDeg * dt;
+        } else {
+            integral *= 0.9; // slowly decay when on-target
+        }
+        // Anti-windup clamp
+        if (integral > INTEGRAL_CLAMP_DEG) integral = INTEGRAL_CLAMP_DEG;
+        if (integral < -INTEGRAL_CLAMP_DEG) integral = -INTEGRAL_CLAMP_DEG;
+
+        // Derivative
+        double derivative = (errorDeg - lastErrorDeg) / Math.max(1e-4, dt);
+        lastErrorDeg = errorDeg;
+
+        // PID output
+        double pidOut = KP * errorDeg + KI * integral + KD * derivative;
+
+        // Zero output in deadband
+        if (Math.abs(errorDeg) <= DEADBAND_DEG) pidOut = 0.0;
+
+        // Clamp to max power
+        if (pidOut > MAX_POWER) pidOut = MAX_POWER;
+        if (pidOut < -MAX_POWER) pidOut = -MAX_POWER;
+
+        // Power smoothing (EMA)
+        double applied = POWER_SMOOTH * lastAppliedPower + (1.0 - POWER_SMOOTH) * pidOut;
+
+        // 7. Enforce encoder hard limits
+        if ((rawTicks >= TURRET_MAX_TICKS && applied > 0) ||
+                (rawTicks <= TURRET_MIN_TICKS && applied < 0)) {
+            applied = 0.0;
+        }
+
+        // 8. Apply!
+        turretMotor.setPower(applied);
+        lastAppliedPower = applied;
+
+        // ── Store telemetry values ──
+        tRobotX = robotX;
+        tRobotY = robotY;
+        tRobotHeadingDeg = Math.toDegrees(robotHeadingRad);
+        tBearingDeg = Math.toDegrees(fieldBearingRad);
+        tTurretDesiredDeg = Math.toDegrees(turretDesiredRad);
+        tErrorDeg = errorDeg;
+        tDistToGoal = distToGoal;
+        tAppliedPower = applied;
+        tEncoderTicks = rawTicks;
+        tDesiredTicks = desiredTicks;
+
+        publishTelemetry();
+    }
+
+    // ══════════════════════════════════════════════════
+    //  TELEMETRY
+    // ══════════════════════════════════════════════════
+
+    public double getErrorDeg()          { return tErrorDeg; }
+    public double getDistToGoal()        { return tDistToGoal; }
+    public double getBearingDeg()        { return tBearingDeg; }
+    public double getTurretDesiredDeg()  { return tTurretDesiredDeg; }
+    public double getRobotHeadingDeg()   { return tRobotHeadingDeg; }
+    public int    getEncoderTicks()      { return tEncoderTicks; }
+    public int    getDesiredTicks()      { return tDesiredTicks; }
+    public double getAppliedPower()      { return tAppliedPower; }
+    public boolean isHomingMode()        { return homingMode; }
+    public boolean isFreezeMode()        { return freezeMode; }
+
+    private void publishTelemetry() {
+        if (telemetry == null) return;
+        telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
+        telemetry.addData("aim.robotHead", "%.1f°", tRobotHeadingDeg);
+        telemetry.addData("aim.bearing", "%.1f°", tBearingDeg);
+        telemetry.addData("aim.turretDesired", "%.1f°", tTurretDesiredDeg);
+        telemetry.addData("aim.error", "%.1f°", tErrorDeg);
+        telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
+        telemetry.addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
+        telemetry.addData("aim.power", "%.3f", tAppliedPower);
+        telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
+    }
+}
