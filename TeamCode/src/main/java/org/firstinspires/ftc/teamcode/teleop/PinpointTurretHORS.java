@@ -70,7 +70,7 @@ public class PinpointTurretHORS extends LinearOpMode {
 
     // Hood constants
     private static final double HOOD_MIN = 0.12;
-    private static final double HOOD_MAX = 0.45;
+    private static final double HOOD_MAX = 0.5;
     private static final double HOOD_LEFT_STEP = 0.025;
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
@@ -354,11 +354,22 @@ public class PinpointTurretHORS extends LinearOpMode {
 
             // ── Intake manual (only if gate not busy) ──
             if (!gateController.isBusy()) {
-                boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
-                if (leftTriggerNow) {
+                boolean gp1LeftTrigger = gamepad1.left_trigger > 0.1;
+                boolean gp2LeftTrigger = gamepad2.left_trigger > 0.1;
+                boolean gp1RightTrigger = gamepad1.right_trigger > 0.1;
+                boolean gp2RightTrigger = gamepad2.right_trigger > 0.1;
+
+                if (gp1LeftTrigger || gp2LeftTrigger) {
                     intakeMotor.setPower(-1.0);
-                } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
-                    intakeMotor.setPower(1.0);
+                } else if (gp1RightTrigger || gp2RightTrigger) {
+                    // In far mode, gamepad1 intake runs at half power;
+                    // gamepad2 always runs at full power.
+                    if (isFarMode && gp1RightTrigger && !gp2RightTrigger) {
+                        intakeMotor.setPower(0.5);
+                    } else {
+                        // gp2 is pressing (full power always), or close/default mode (full power)
+                        intakeMotor.setPower(1.0);
+                    }
                 } else {
                     intakeMotor.setPower(0.0);
                 }
