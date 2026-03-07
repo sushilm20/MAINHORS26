@@ -37,8 +37,9 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  *   <li><b>dpad down</b> — toggle shooter on/off</li>
  * </ul>
  */
-@Configurable
 @Disabled
+@Configurable
+
 @TeleOp(name = "ADAPTIVE HORS 🧨", group = "Linear OpMode")
 public class AdaptiveHORSBlue extends LinearOpMode {
 

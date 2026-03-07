@@ -39,8 +39,9 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  * and the original values are restored in a {@code finally} block when the
  * OpMode exits, so that a subsequent Blue run is not corrupted.</p>
  */
-@Configurable
 @Disabled
+@Configurable
+
 @TeleOp(name = "ADAPTIVE HORS RED 🔴⚡", group = "Linear OpMode")
 public class AdaptiveHORSRed extends LinearOpMode {
 
