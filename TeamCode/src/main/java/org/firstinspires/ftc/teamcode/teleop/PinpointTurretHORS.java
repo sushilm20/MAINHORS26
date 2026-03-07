@@ -54,6 +54,9 @@ public class PinpointTurretHORS extends LinearOpMode {
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
 
+    // ── NEW: turret starts locked (frozen) until first A press ──
+    private boolean turretUnlocked = false;
+
     // Hood presets
     private static final double RIGHT_HOOD_CLOSE = 0.16;
     private static final double RIGHT_HOOD_FAR = 0.26;
@@ -161,6 +164,9 @@ public class PinpointTurretHORS extends LinearOpMode {
             bearingTurret.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
 
+        // ── NEW: freeze turret immediately at init ──
+        bearingTurret.freeze();
+
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
@@ -184,8 +190,9 @@ public class PinpointTurretHORS extends LinearOpMode {
 
         // Initial positions
         gateController.setGateClosed(true);
-        telemetry.addData("Status", "Initialized (Bearing Turret)");
+        telemetry.addData("Status", "Initialized (Bearing Turret) — TURRET FROZEN");
         telemetry.addData("Goal", "(%.0f, %.0f)", BearingTurretController.GOAL_X, BearingTurretController.GOAL_Y);
+        telemetry.addData("Turret", "FROZEN — press A after start to unlock");
         telemetry.update();
 
         waitForStart();
@@ -196,9 +203,10 @@ public class PinpointTurretHORS extends LinearOpMode {
         }
 
         // After start: zero turret encoder and start flywheel
-        // Do NOT move the turret — the first-pose guard in BearingTurretController
-        // will hold position until the localizer has settled.
+        // Turret stays FROZEN — will not track until A is pressed
         bearingTurret.zeroEncoder();
+        bearingTurret.freeze();          // ── NEW: ensure still frozen after start ──
+        turretUnlocked = false;          // ── NEW: explicitly mark as locked ──
         flywheel.setShooterOn(true);
         lastLoopMs = System.currentTimeMillis();
 
@@ -225,21 +233,33 @@ public class PinpointTurretHORS extends LinearOpMode {
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // ══════��═══════════════════════════════════════════
-            //  A BUTTON — Two-press toggle:
-            //    1st press: home turret encoder + freeze in place
-            //    2nd press: reset pose to start + unfreeze + resume tracking
+            // ══════════════════════════════════════════════════
+            //  A BUTTON — Three-mode logic:
+            //    If turret has never been unlocked:
+            //      → zero encoder, clear offset, reset pose, unfreeze, unlock
+            //    Otherwise original two-press toggle:
+            //      1st press (tracking): home encoder + freeze
+            //      2nd press (frozen):   reset pose + unfreeze + resume tracking
             // ══════════════════════════════════════════════════
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
-                if (!bearingTurret.isFreezeMode()) {
-                    // First press: zero encoder, clear offset, freeze turret
+                if (!turretUnlocked) {
+                    // ── NEW: First-ever A press — unlock the turret ──
+                    bearingTurret.zeroEncoder();
+                    bearingTurret.clearManualOffset();
+                    if (follower != null) {
+                        follower.setPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
+                    }
+                    bearingTurret.unfreeze();
+                    turretUnlocked = true;
+                } else if (!bearingTurret.isFreezeMode()) {
+                    // Already unlocked, currently tracking → freeze
                     bearingTurret.zeroEncoder();
                     bearingTurret.clearManualOffset();
                     bearingTurret.freeze();
                     driveController.stop();
                 } else {
-                    // Second press: reset follower pose to start, unfreeze, resume tracking
+                    // Already unlocked, currently frozen → reset pose & unfreeze
                     if (follower != null) {
                         follower.setPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
                     }
@@ -371,10 +391,12 @@ public class PinpointTurretHORS extends LinearOpMode {
                     flywheel.getTargetRPM(),
                     flywheel.isAtTarget() ? "✓" : "");
 
-            // Turret offset + mode
+            // Turret offset + mode (updated to show LOCKED state)
             telemetry.addData("Turret Offset", "%.1f°", bearingTurret.getManualOffsetDeg());
-            telemetry.addData("Turret Mode", bearingTurret.isFreezeMode() ? "FROZEN (press A to reset)" :
-                    bearingTurret.isHomingMode() ? "HOMING" : "TRACKING");
+            telemetry.addData("Turret Mode",
+                    !turretUnlocked ? "LOCKED (press A to unlock)" :
+                            bearingTurret.isFreezeMode() ? "FROZEN (press A to reset)" :
+                                    bearingTurret.isHomingMode() ? "HOMING" : "TRACKING");
 
             // Loop
             telemetry.addData("Loop", "%.0f ms (%.0f Hz)",
