@@ -62,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2600;
+    private static final double AUTO_SHOOTER_RPM = 2620;
 
     private DcMotor intakeMotor;
 
@@ -89,11 +89,11 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 0.5;
     @Sorter(sort = 2)
-    public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.76;  // wait after startToShoot before any shoot actions
+    public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.8;  // wait after startToShoot before any shoot actions
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.65;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.85;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -101,7 +101,7 @@ public class BluePedroAuto extends OpMode {
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.75;
+    public static double INTAKE_ON_POWER = -0.7;
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
     @Sorter(sort = 12)
@@ -115,7 +115,7 @@ public class BluePedroAuto extends OpMode {
     // TOLERANCE SETTINGS
     // ========================================
     @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 5.0;
+    public static double START_POSE_TOLERANCE_IN = 4.0;
 
     // ========================================
     // GATE SETTINGS
@@ -123,15 +123,15 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.45;
+    public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 10.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 4.0;
     @Sorter(sort = 33)
-    public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
+    public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
 
     // ========================================
     // PATH POSES - START POSITION
@@ -163,7 +163,7 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - COLLECT FIRST 3 POSITION
     // ========================================
     @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 22.004;
+    public static double COLLECT_FIRST3_X = 20.0;
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 84.0;
     @Sorter(sort = 122)
@@ -183,11 +183,12 @@ public class BluePedroAuto extends OpMode {
     // PATH POSES - GATE CLEAR POSITION
     // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 18.0;
+    public static double GATE_CLEAR_X = 20.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 180.0;
+    public static double GATE_CLEAR_HEADING =
+            180.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION
@@ -195,7 +196,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 140)
     public static double ALIGN_SECOND3_X = 50.0;
     @Sorter(sort = 141)
-    public static double ALIGN_SECOND3_Y = 58.0;
+    public static double ALIGN_SECOND3_Y = 56.0;
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = -175.0;
 
@@ -205,7 +206,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 150)
     public static double COLLECT_SECOND3_X = 12.0;
     @Sorter(sort = 151)
-    public static double COLLECT_SECOND3_Y = 58.0;
+    public static double COLLECT_SECOND3_Y = 56.0;
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = -180.0;
 
