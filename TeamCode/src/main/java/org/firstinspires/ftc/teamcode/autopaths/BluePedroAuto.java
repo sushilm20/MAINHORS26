@@ -165,7 +165,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 180.0;
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 18.0;
+    public static double GATE_CLEAR_X = 22.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
