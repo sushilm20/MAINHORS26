@@ -613,6 +613,7 @@ public class BearingTurretController {
     public int    getDesiredTicks()      { return tDesiredTicks; }
     public double getAppliedPower()      { return tAppliedPower; }
 
+    
     private void publishTelemetry() {
         if (telemetry == null) return;
         telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
