@@ -73,114 +73,94 @@ public class BlueTurretAuto extends OpMode {
     @Sorter(sort = 0)
     public static double INTAKE_RUN_SECONDS = 0.7;
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.1;
+    public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.4;
+    public static double PRE_ACTION_WAIT_SECONDS = 0.5;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.9;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.8;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
-    @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.75;
-    @Sorter(sort = 11)
-    public static double SHOOT_POSE_INTAKE_POWER = -0.95;
-    @Sorter(sort = 12)
-    public static double CLOSED_INTAKE_POWER = -0.67;
-    @Sorter(sort = 13)
-    public static double CLOSED_INTAKE_TOLERANCE_IN = 9.0;
+    @Sorter(sort = 10) public static double INTAKE_ON_POWER = -0.75;
+    @Sorter(sort = 11) public static double SHOOT_POSE_INTAKE_POWER = -1.0;
+    @Sorter(sort = 12) public static double CLOSED_INTAKE_POWER = -0.67;
+    @Sorter(sort = 13) public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
+    @Sorter(sort = 20) public static double START_POSE_TOLERANCE_IN = 5.0;
 
-    @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 5.0;
+    // ========================================
+    // PATH POSES - GATE ALIGN POSITION
+    // ========================================
 
-    @Sorter(sort = 30)
-    public static double GATE_OPEN = 0.67;
-    @Sorter(sort = 31)
-    public static double GATE_CLOSED = 0.45;
-    @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 3.0;
-    @Sorter(sort = 33)
-    public static double GATE_CLOSE_TOLERANCE_IN = 7.0;
-    @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.5;
-    @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.0;
+    @Sorter(sort = 30) public static double GATE_OPEN = 0.67;
+    @Sorter(sort = 31) public static double GATE_CLOSED = 0.45;
+    @Sorter(sort = 32) public static double GATE_OPEN_TOLERANCE_IN = 10.0;
+    @Sorter(sort = 33) public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
+    @Sorter(sort = 34) public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
+    @Sorter(sort = 35) public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
 
-    @Sorter(sort = 100)
-    public static double START_X = 20.0;
-    @Sorter(sort = 101)
-    public static double START_Y = 122.0;
-    @Sorter(sort = 102)
-    public static double START_HEADING = 130.0;
+    @Sorter(sort = 100) public static double START_X = 20.0;
+    @Sorter(sort = 101) public static double START_Y = 122.0;
+    @Sorter(sort = 102) public static double START_HEADING = 130.0;
 
-    @Sorter(sort = 110)
-    public static double SHOOT_POSE_X = 60.0;
-    @Sorter(sort = 111)
-    public static double SHOOT_POSE_Y = 88.0;
-    @Sorter(sort = 112)
-    public static double SHOOT_HEADING_INITIAL = 180.0;
-    @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 180.0;
-    @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 180.0;
-    @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 180.0;
+    @Sorter(sort = 110) public static double SHOOT_POSE_X = 60.0;
+    @Sorter(sort = 111) public static double SHOOT_POSE_Y = 88.0;
+    @Sorter(sort = 112) public static double SHOOT_HEADING_INITIAL = 180.0;
+    @Sorter(sort = 113) public static double SHOOT_HEADING_FIRST3 = 180.0;
+    @Sorter(sort = 114) public static double SHOOT_SECOND3_HEADING = 180.0;
+    @Sorter(sort = 115) public static double SHOOT_FINAL_HEADING = 180.0;
 
-    @Sorter(sort = 120)
-    public static double COLLECT_FIRST3_X = 21.0;
-    @Sorter(sort = 121)
-    public static double COLLECT_FIRST3_Y = 80.0;
-    @Sorter(sort = 122)
-    public static double COLLECT_FIRST3_HEADING = 175.0;
+    // ========================================
+    // PATH POSES - COLLECT FIRST 3 POSITION
+    // ========================================
+    @Sorter(sort = 120) public static double COLLECT_FIRST3_X = 16.0;
+    @Sorter(sort = 121) public static double COLLECT_FIRST3_Y = 80.0;
+    @Sorter(sort = 122) public static double COLLECT_FIRST3_HEADING = 180.0;
 
-    @Sorter(sort = 125)
-    public static double GATE_ALIGN_X = 24.0;
-    @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 74.0;
-    @Sorter(sort = 127)
-    public static double GATE_ALIGN_HEADING = 179.0;
+    @Sorter(sort = 125) public static double GATE_ALIGN_X = 24.0;
+    @Sorter(sort = 126) public static double GATE_ALIGN_Y = 74.0;
+    @Sorter(sort = 127) public static double GATE_ALIGN_HEADING = 180.0;
 
-    @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 20.0;
-    @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 74.0;
-    @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING = 179.0;
+    @Sorter(sort = 130) public static double GATE_CLEAR_X = 15.0;
+    @Sorter(sort = 131) public static double GATE_CLEAR_Y = 74.0;
+    @Sorter(sort = 132) public static double GATE_CLEAR_HEADING = 179.0;
 
-    @Sorter(sort = 140)
-    public static double ALIGN_SECOND3_X = 50.0;
-    @Sorter(sort = 141)
-    public static double ALIGN_SECOND3_Y = 58.0;
-    @Sorter(sort = 142)
-    public static double ALIGN_SECOND3_HEADING = -175.0;
+    // ========================================
+    // PATH POSES - ALIGN SECOND 3 POSITION
+    // ========================================
 
-    @Sorter(sort = 150)
-    public static double COLLECT_SECOND3_X = 16.0;
-    @Sorter(sort = 151)
-    public static double COLLECT_SECOND3_Y = 58.0;
-    @Sorter(sort = 152)
-    public static double COLLECT_SECOND3_HEADING = -180.0;
+    @Sorter(sort = 140) public static double ALIGN_SECOND3_X = 50.0;
+    @Sorter(sort = 141) public static double ALIGN_SECOND3_Y = 56.0;
+    @Sorter(sort = 142) public static double ALIGN_SECOND3_HEADING = -180;
 
-    @Sorter(sort = 160)
-    public static double ALIGN_THIRD3_X = 50.0;
-    @Sorter(sort = 161)
-    public static double ALIGN_THIRD3_Y = 35.0;
-    @Sorter(sort = 162)
-    public static double ALIGN_THIRD3_HEADING = -180.0;
+    // ========================================
+    // PATH POSES - COLLECT SECOND 3 POSITION
+    // ========================================
 
-    @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 16.0;
-    @Sorter(sort = 171)
-    public static double COLLECT_THIRD3_Y = 35.0;
-    @Sorter(sort = 172)
-    public static double COLLECT_THIRD3_HEADING = 180.0;
+    @Sorter(sort = 150) public static double COLLECT_SECOND3_X = 19.0;
+    @Sorter(sort = 151) public static double COLLECT_SECOND3_Y = 56.0;
+    @Sorter(sort = 152) public static double COLLECT_SECOND3_HEADING = -180.0;
 
-    @Sorter(sort = 180)
-    public static double MOVE_RP_X = 36.0;
-    @Sorter(sort = 181)
-    public static double MOVE_RP_Y = 80.0;
-    @Sorter(sort = 182)
-    public static double MOVE_RP_HEADING = 135.0;
+    // ========================================
+    // PATH POSES - ALIGN THIRD 3 POSITION
+    // ========================================
+
+    @Sorter(sort = 160) public static double ALIGN_THIRD3_X = 50.0;
+    @Sorter(sort = 161) public static double ALIGN_THIRD3_Y = 35.0;
+    @Sorter(sort = 162) public static double ALIGN_THIRD3_HEADING = -180.0;
+
+    // ========================================
+    // PATH POSES - COLLECT THIRD 3 POSITION
+    // ========================================
+    @Sorter(sort = 170) public static double COLLECT_THIRD3_X = 19.0;
+    @Sorter(sort = 171) public static double COLLECT_THIRD3_Y = 35.0;
+    @Sorter(sort = 172) public static double COLLECT_THIRD3_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - MOVE FOR RP POSITION
+    // ========================================
+    @Sorter(sort = 180) public static double MOVE_RP_X = 36.0;
+    @Sorter(sort = 181) public static double MOVE_RP_Y = 80.0;
+    @Sorter(sort = 182) public static double MOVE_RP_HEADING = 135.0;
 
     public BlueTurretAuto() {}
 
