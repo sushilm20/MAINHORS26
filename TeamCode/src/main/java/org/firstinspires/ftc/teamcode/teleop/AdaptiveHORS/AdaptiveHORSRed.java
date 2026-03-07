@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.teleop.AdaptiveHORS;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -39,6 +40,7 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
  * OpMode exits, so that a subsequent Blue run is not corrupted.</p>
  */
 @Configurable
+@Disabled
 @TeleOp(name = "ADAPTIVE HORS RED 🔴⚡", group = "Linear OpMode")
 public class AdaptiveHORSRed extends LinearOpMode {
 

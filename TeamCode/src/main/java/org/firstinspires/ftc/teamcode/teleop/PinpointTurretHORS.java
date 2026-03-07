@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
 import java.util.List;
 
-@TeleOp(name="A HORS TURRET", group="Linear OpMode")
+@TeleOp(name="A HORS TURRET 🎯", group="Linear OpMode")
 public class PinpointTurretHORS extends LinearOpMode {
 
     // Drive + subsystems
