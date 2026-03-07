@@ -62,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2610;
+    private static final double AUTO_SHOOTER_RPM = 2600;
 
     private DcMotor intakeMotor;
 
@@ -108,6 +108,8 @@ public class BluePedroAuto extends OpMode {
     public static double CLOSED_INTAKE_POWER = -0.67;
     @Sorter(sort = 13)
     public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
+    @Sorter(sort = 14)
+    public static double INTAKE_HOLD_POWER = -0.5;  // always-on hold power to keep balls in
 
     // ========================================
     // TOLERANCE SETTINGS
@@ -140,6 +142,10 @@ public class BluePedroAuto extends OpMode {
     public static double START_Y = 122.0;
     @Sorter(sort = 102)
     public static double START_HEADING = 135.0;
+
+    // ========================================
+    // PATH POSES - SHOOT POSITION (Primary)
+    // ========================================
     @Sorter(sort = 110)
     public static double SHOOT_POSE_X = 54;
     @Sorter(sort = 111)
@@ -152,48 +158,80 @@ public class BluePedroAuto extends OpMode {
     public static double SHOOT_SECOND3_HEADING = 185;
     @Sorter(sort = 115)
     public static double SHOOT_FINAL_HEADING = 185;
+
+    // ========================================
+    // PATH POSES - COLLECT FIRST 3 POSITION
+    // ========================================
     @Sorter(sort = 120)
     public static double COLLECT_FIRST3_X = 22.004;
     @Sorter(sort = 121)
     public static double COLLECT_FIRST3_Y = 84.0;
     @Sorter(sort = 122)
     public static double COLLECT_FIRST3_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - GATE ALIGN POSITION
+    // ========================================
     @Sorter(sort = 125)
     public static double GATE_ALIGN_X = 24.0;
     @Sorter(sort = 126)
     public static double GATE_ALIGN_Y = 74.0;
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - GATE CLEAR POSITION
+    // ========================================
     @Sorter(sort = 130)
-    public static double GATE_CLEAR_X = 22.0;
+    public static double GATE_CLEAR_X = 18.0;
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - ALIGN SECOND 3 POSITION
+    // ========================================
     @Sorter(sort = 140)
     public static double ALIGN_SECOND3_X = 50.0;
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 58.0;
     @Sorter(sort = 142)
     public static double ALIGN_SECOND3_HEADING = -175.0;
+
+    // ========================================
+    // PATH POSES - COLLECT SECOND 3 POSITION
+    // ========================================
     @Sorter(sort = 150)
     public static double COLLECT_SECOND3_X = 12.0;
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 58.0;
     @Sorter(sort = 152)
     public static double COLLECT_SECOND3_HEADING = -180.0;
+
+    // ========================================
+    // PATH POSES - ALIGN THIRD 3 POSITION
+    // ========================================
     @Sorter(sort = 160)
     public static double ALIGN_THIRD3_X = 50.0;
     @Sorter(sort = 161)
     public static double ALIGN_THIRD3_Y = 35.0;
     @Sorter(sort = 162)
     public static double ALIGN_THIRD3_HEADING = -180.0;
+
+    // ========================================
+    // PATH POSES - COLLECT THIRD 3 POSITION
+    // ========================================
     @Sorter(sort = 170)
     public static double COLLECT_THIRD3_X = 12.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 35.0;
     @Sorter(sort = 172)
     public static double COLLECT_THIRD3_HEADING = 180.0;
+
+    // ========================================
+    // PATH POSES - MOVE FOR RP POSITION
+    // ========================================
     @Sorter(sort = 180)
     public static double MOVE_RP_X = 36.0;
     @Sorter(sort = 181)
@@ -375,6 +413,13 @@ public class BluePedroAuto extends OpMode {
             updateGate();
         }
 
+        // ── SAFETY NET: if the auto is running and the intake is at 0, force hold power ──
+        if (state != AutoState.IDLE && state != AutoState.FINISHED) {
+            if (intakeMotor != null && intakeMotor.getPower() == 0.0) {
+                intakeMotor.setPower(INTAKE_HOLD_POWER);
+            }
+        }
+
         double elapsedSec = (autoStartMs > 0) ? (nowMs - autoStartMs) / 1000.0 : 0.0;
         panelsTelemetry.debug("Elapsed(s)", String.format("%.2f", elapsedSec));
         panelsTelemetry.debug("State", state.name());
@@ -424,7 +469,7 @@ public class BluePedroAuto extends OpMode {
             flywheel.setTargetRPM(0.0);
             flywheel.update(System.currentTimeMillis(), false);
         }
-        stopIntake();
+        fullStopIntake();
         if (gateServo != null) {
             gateServo.setPosition(GATE_CLOSED);
             gateClosed = true;
@@ -462,11 +507,21 @@ public class BluePedroAuto extends OpMode {
         }
     }
 
+    // stopIntake now sets hold power instead of 0 — balls stay in
     private void stopIntake() {
+        try {
+            if (intakeMotor != null) intakeMotor.setPower(INTAKE_HOLD_POWER);
+        } catch (Exception e) {
+            panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
+        }
+    }
+
+    // true stop — only used during FINISHED/reset
+    private void fullStopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(0.0);
         } catch (Exception e) {
-            panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
+            panelsTelemetry.debug("Intake", "fullStopIntake error: " + e.getMessage());
         }
     }
 
@@ -525,9 +580,10 @@ public class BluePedroAuto extends OpMode {
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
+                // timed burst done — keep intake at full travel power for backToShoot paths
                 startIntake(INTAKE_ON_POWER);
                 timedIntakeActive = false;
-                panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at travel power");
+                panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at INTAKE_ON_POWER");
             } else {
                 panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
             }
@@ -567,7 +623,7 @@ public class BluePedroAuto extends OpMode {
 
                         // ── Only for startToShoot (path 1): stop everything and wait before shooting ──
                         if (finished == 1) {
-                            stopIntake();
+                            stopIntake();  // sets hold power, not 0
                             // Force gate closed during the wait
                             if (gateServo != null && !gateClosed) {
                                 gateServo.setPosition(GATE_CLOSED);
@@ -575,7 +631,7 @@ public class BluePedroAuto extends OpMode {
                             }
                             firstShootWaitTimer.resetTimer();
                             state = AutoState.WAIT_FIRST_SHOOT;
-                            panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Path 1 done, waiting " + PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS + "s (intake off, gate closed)");
+                            panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Path 1 done, waiting " + PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS + "s (intake hold, gate closed)");
                         } else {
                             state = AutoState.CLOSED_INTAKE_SEQUENCE;
                         }
@@ -590,7 +646,7 @@ public class BluePedroAuto extends OpMode {
                 }
                 break;
 
-            // ── WAIT_FIRST_SHOOT: pure wait — no intake, no gate — then hand off to normal shoot sequence ──
+            // ── WAIT_FIRST_SHOOT: pure wait — hold intake, no gate — then hand off to normal shoot sequence ──
             case WAIT_FIRST_SHOOT:
                 double waitElapsed = firstShootWaitTimer.getElapsedTimeSeconds();
                 panelsTelemetry.debug("WAIT_FIRST_SHOOT", String.format("remaining=%.2fs", PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS - waitElapsed));
@@ -730,6 +786,7 @@ public class BluePedroAuto extends OpMode {
         public PathChain moveForRP;
 
         public Paths(Follower follower) {
+            // Path 1: Start -> Primary shoot pose
             startToShoot = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(START_X, START_Y),
@@ -737,6 +794,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(START_HEADING), Math.toRadians(SHOOT_HEADING_INITIAL))
                     .build();
 
+            // Path 2: Shoot -> Collect first 3
             collectFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -744,6 +802,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_INITIAL), Math.toRadians(COLLECT_FIRST3_HEADING))
                     .build();
 
+            // Path 3: Collect first 3 -> Gate align
             gateAlign = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
@@ -751,6 +810,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_FIRST3_HEADING), Math.toRadians(GATE_ALIGN_HEADING))
                     .build();
 
+            // Path 4: Gate align -> Gate clear
             gateClear = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_ALIGN_X, GATE_ALIGN_Y),
@@ -758,6 +818,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_ALIGN_HEADING), Math.toRadians(GATE_CLEAR_HEADING))
                     .build();
 
+            // Path 5: Gate clear -> Shoot (angled for first 3)
             backToShootFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_CLEAR_X, GATE_CLEAR_Y),
@@ -765,6 +826,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_CLEAR_HEADING), Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
+            // Path 6: Shoot -> Align for second 3
             alignToCollectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -772,6 +834,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_FIRST3), Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 
+            // Path 7: Align -> Collect second 3
             collectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y),
@@ -779,6 +842,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_SECOND3_HEADING), Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
+            // Path 8: Collect second 3 -> Shoot (angled for second 3)
             backToShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
@@ -786,6 +850,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_SECOND3_HEADING), Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
+            // Path 9: Shoot -> Align for third 3
             alignToCollectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -793,6 +858,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_SECOND3_HEADING), Math.toRadians(ALIGN_THIRD3_HEADING))
                     .build();
 
+            // Path 10: Align -> Collect third 3
             collectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y),
@@ -800,6 +866,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_THIRD3_HEADING), Math.toRadians(COLLECT_THIRD3_HEADING))
                     .build();
 
+            // Path 11: Collect third 3 -> Shoot (final)
             backToShootThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
@@ -807,6 +874,7 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_THIRD3_HEADING), Math.toRadians(SHOOT_FINAL_HEADING))
                     .build();
 
+            // Path 12: Shoot -> Move for RP
             moveForRP = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),

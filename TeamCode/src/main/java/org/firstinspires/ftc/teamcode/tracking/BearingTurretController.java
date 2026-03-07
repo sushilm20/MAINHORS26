@@ -87,7 +87,7 @@ public class BearingTurretController {
     @Sorter(sort = 11) public static double INTEGRAL_CLAMP_DEG = 100.0;
 
     // Power smoothing (EMA alpha: 0 = no smoothing, 1 = never changes)
-    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.75;
+    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.7;
 
     // Minimum distance to goal (inches). If closer than this, hold last known aim.
     // Prevents wild oscillation when robot is nearly on top of the goal.
