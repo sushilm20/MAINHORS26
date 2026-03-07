@@ -84,13 +84,13 @@ public class RedPedroAuto extends OpMode {
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.7;
+    public static double INTAKE_RUN_SECONDS = 0.5;
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.5;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.8;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -110,7 +110,7 @@ public class RedPedroAuto extends OpMode {
     // TOLERANCE SETTINGS
     // ========================================
     @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 5.0;
+    public static double START_POSE_TOLERANCE_IN = 4.0;
 
     // ========================================
     // GATE SETTINGS
@@ -120,13 +120,13 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 31)
     public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 10.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 4.0;
     @Sorter(sort = 33)
-    public static double GATE_CLOSE_TOLERANCE_IN = 10.0;
+    public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
     @Sorter(sort = 34)
-    public static double GATE_ALIGN_WAIT_SECONDS = 0.25;
+    public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.7;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
 
     // ========================================
     // PATH POSES - START POSITION

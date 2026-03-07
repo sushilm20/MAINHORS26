@@ -85,9 +85,9 @@ public class BluePedroAuto extends OpMode {
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.4;
+    public static double INTAKE_RUN_SECONDS = 0.3;
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 0.5;
+    public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 2)
     public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.8;  // wait after startToShoot before any shoot actions
     @Sorter(sort = 3)
