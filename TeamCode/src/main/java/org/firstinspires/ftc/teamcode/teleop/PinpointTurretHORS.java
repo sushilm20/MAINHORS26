@@ -78,7 +78,7 @@ public class PinpointTurretHORS extends LinearOpMode {
     // Starting pose constants
     private static final double START_X = 20;
     private static final double START_Y = 122;
-    private static final double START_HEADING_DEG = 135;
+    private static final double START_HEADING_DEG = 142.5;
 
     // Pose tracking
     private Follower follower;
