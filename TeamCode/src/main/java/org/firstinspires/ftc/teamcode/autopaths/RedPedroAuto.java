@@ -120,7 +120,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 31)
     public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 4.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 3.0;
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
     @Sorter(sort = 34)
