@@ -365,7 +365,7 @@ public class PinpointTurretHORS extends LinearOpMode {
                     // In far mode, gamepad1 intake runs at half power;
                     // gamepad2 always runs at full power.
                     if (isFarMode && gp1RightTrigger && !gp2RightTrigger) {
-                        intakeMotor.setPower(0.5);
+                        intakeMotor.setPower(0.7);
                     } else {
                         // gp2 is pressing (full power always), or close/default mode (full power)
                         intakeMotor.setPower(1.0);

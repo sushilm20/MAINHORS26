@@ -59,7 +59,7 @@ public class FarBlue12 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = -100;
+    private static final int TURRET_START_POS = -107;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
