@@ -60,7 +60,7 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2620;
+    private static final double AUTO_SHOOTER_RPM = 2600;
 
     private DcMotor intakeMotor;
 
@@ -88,9 +88,9 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 1)
     public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 1.0;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.5;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 2.0;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -126,7 +126,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 34)
     public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.2;
 
     // ========================================
     // PATH POSES - START POSITION
@@ -168,7 +168,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 126) public static double GATE_ALIGN_Y = 78.0;
     @Sorter(sort = 127) public static double GATE_ALIGN_HEADING = 0.0;
 
-    @Sorter(sort = 130) public static double GATE_CLEAR_X = 133.0;
+    @Sorter(sort = 130) public static double GATE_CLEAR_X = 134.0;
     @Sorter(sort = 131) public static double GATE_CLEAR_Y = 78.0;
     @Sorter(sort = 132) public static double GATE_CLEAR_HEADING = 0.0;
 
@@ -340,8 +340,8 @@ public class RedPedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.16);
-                panelsTelemetry.debug("Init", "Right hood servo initialized to 0.16");
+                rightHoodServo.setPosition(0.22);
+                panelsTelemetry.debug("Init", "Right hood servo initialized to 0.19");
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Right hood servo mapping failed: " + e.getMessage());
@@ -470,6 +470,8 @@ public class RedPedroAuto extends OpMode {
         if (clawServo != null) {
             clawServo.setPosition(ClawController.CLAW_OPEN);
         }
+
+
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
         }
