@@ -126,7 +126,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 34)
     public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
-    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 1.2;
+    public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
 
     // ========================================
     // PATH POSES - START POSITION
