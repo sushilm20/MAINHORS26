@@ -80,6 +80,15 @@ public class PinpointTurretHORS extends LinearOpMode {
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
 
+    // ── Ball-detection & shoot-zone slowdown ──
+    private static final double INTAKE_VELO_BALL_THRESHOLD = 2100.0; // velocity ≤ this = 1+ balls
+    private static final double SHOOT_ZONE_RADIUS_IN       = 12.0;  // inches from shoot pose
+    private static final double SHOOT_ZONE_SPEED_SCALE     = 0.45;  // 45% speed when loaded in zone
+
+    // Shoot pose coordinates (Blue side close — matches auto)
+    private static final double SHOOT_POSE_X = 54.0;
+    private static final double SHOOT_POSE_Y = 84.0;
+
     // Starting pose constants
     private static final double START_X = 20;
     private static final double START_Y = 122;
@@ -287,7 +296,17 @@ public class PinpointTurretHORS extends LinearOpMode {
             double axial = -gamepad1.left_stick_y;
             double lateral = gamepad1.left_stick_x;
             double yaw = gamepad1.right_stick_x;
-            driveController.setDrive(axial, lateral, yaw, 1.0);
+
+            // Slow down when in shoot zone AND loaded with balls
+            double speedScale = 1.0;
+            boolean hasBalls = hasBalls();
+            boolean inShootZone = isInShootZone();
+            boolean inZoneWithBalls = inShootZone && hasBalls;
+            if (inZoneWithBalls) {
+                speedScale = SHOOT_ZONE_SPEED_SCALE;
+            }
+
+            driveController.setDrive(axial, lateral, yaw, speedScale);
 
             // ── Flywheel toggles (DPAD) ──
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
@@ -419,6 +438,12 @@ public class PinpointTurretHORS extends LinearOpMode {
                     loopTimeMs,
                     loopTimeMs > 0 ? 1000.0 / loopTimeMs : 0);
 
+            // Ball detection & zone info
+            telemetry.addData("Intake Velo", "%.0f", intakeMotor.getVelocity());
+            telemetry.addData("Has Balls?", hasBalls);
+            telemetry.addData("In Shoot Zone?", inShootZone);
+            telemetry.addData("Drive Scale", inZoneWithBalls ? "SLOW (0.45)" : "FULL");
+
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor AMPS", intakeMotor.getCurrent(CurrentUnit.AMPS));
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor VELO", intakeMotor.getVelocity());
             PanelsTelemetry.INSTANCE.getTelemetry().update();
@@ -427,6 +452,27 @@ public class PinpointTurretHORS extends LinearOpMode {
         }
 
         bearingTurret.disable();
+    }
+
+    /**
+     * Returns true if the robot is within SHOOT_ZONE_RADIUS_IN of the shoot pose.
+     */
+    private boolean isInShootZone() {
+        if (follower == null) return false;
+        Pose p = follower.getPose();
+        double dx = p.getX() - SHOOT_POSE_X;
+        double dy = p.getY() - SHOOT_POSE_Y;
+        return Math.hypot(dx, dy) <= SHOOT_ZONE_RADIUS_IN;
+    }
+
+    /**
+     * Returns true if the intake velocity suggests 1 or more balls are loaded.
+     * When the intake is running and loaded, velocity drops below the threshold.
+     */
+    private boolean hasBalls() {
+        double velo = intakeMotor.getVelocity();
+        // Only count as "has balls" if intake is actually spinning forward
+        return velo > 0 && velo <= INTAKE_VELO_BALL_THRESHOLD;
     }
 
     private boolean getTouchpad(com.qualcomm.robotcore.hardware.Gamepad gp) {
