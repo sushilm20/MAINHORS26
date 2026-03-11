@@ -16,8 +16,8 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 public class Constants {
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(12.1)
-//            .forwardZeroPowerAcceleration(-36.47575519127562)
-//            .lateralZeroPowerAcceleration(-55.47828826172785)
+            .forwardZeroPowerAcceleration(-34.301348613733026)
+            .lateralZeroPowerAcceleration(-55.70316252147476)
             .translationalPIDFCoefficients(new PIDFCoefficients(0.09,0,0.0067,0.03))
             .headingPIDFCoefficients(new PIDFCoefficients(0.8,0,0.03,0.028));//change today
 

@@ -62,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2600;
+    private static final double AUTO_SHOOTER_RPM = 2350;
 
     private DcMotor intakeMotor;
 
@@ -153,11 +153,11 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 180;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 185;
+    public static double SHOOT_HEADING_FIRST3 = 180;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 185;
+    public static double SHOOT_SECOND3_HEADING = 180;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 185;
+    public static double SHOOT_FINAL_HEADING = 180;
 
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
@@ -198,7 +198,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 56.0;
     @Sorter(sort = 142)
-    public static double ALIGN_SECOND3_HEADING = -175.0;
+    public static double ALIGN_SECOND3_HEADING = -180;
 
     // ========================================
     // PATH POSES - COLLECT SECOND 3 POSITION
