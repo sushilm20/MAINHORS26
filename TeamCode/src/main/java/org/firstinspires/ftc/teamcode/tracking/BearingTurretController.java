@@ -103,6 +103,14 @@ public class BearingTurretController {
     @Sorter(sort = 17) public static int HOMING_DEADBAND = 12;
     @Sorter(sort = 18) public static long HOMING_TIMEOUT_MS = 3000;
 
+    // ── Velocity compensation ──
+    // Feedforward gain: how many degrees of turret lead per degree/sec of bearing rate.
+    // Higher = more aggressive lead. Start at ~0.05, tune up.
+    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.05;
+
+    // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
+    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
+
     // ══════════════════════════════════════════════════
     //  INTERNAL STATE
     // ══════════════════════════════════════════════════
@@ -143,6 +151,13 @@ public class BearingTurretController {
     private double tRobotX, tRobotY, tRobotHeadingDeg;
     private double tDistToGoal, tAppliedPower;
     private int tEncoderTicks, tDesiredTicks;
+
+    // Velocity compensation state
+    private double lastBearingRad = Double.NaN;
+    private double filteredBearingRateDegPerSec = 0.0;
+
+    // Velocity compensation telemetry
+    private double tVelCompDeg;
 
     // ══════════════════════════════════════════════════
     //  CONSTRUCTORS
@@ -213,6 +228,8 @@ public class BearingTurretController {
         lastTimeMs = System.currentTimeMillis();
         lastAppliedPower = 0.0;
         manualWasActive = false;
+        lastBearingRad = Double.NaN;
+        filteredBearingRateDegPerSec = 0.0;
     }
 
     /** Stop the turret motor and reset all state. */
@@ -223,6 +240,8 @@ public class BearingTurretController {
         lastErrorDeg = 0.0;
         lastAppliedPower = 0.0;
         lastTimeMs = -1L;
+        lastBearingRad = Double.NaN;
+        filteredBearingRateDegPerSec = 0.0;
         turretMotor.setPower(0.0);
     }
 
@@ -529,6 +548,32 @@ public class BearingTurretController {
                 fieldBearingRad - robotHeadingRad + TURRET_FORWARD_OFFSET_RAD + manualOffsetRad
         );
 
+        // ── 3.5 VELOCITY COMPENSATION ──
+        // Compute bearing rate (how fast the angle to goal is changing)
+        // and add a feedforward lead so the turret anticipates motion.
+        double velCompDeg = 0.0;
+        if (!Double.isNaN(lastBearingRad) && lastTimeMs > 0) {
+            long dtMsVel = Math.max(1, nowMs - lastTimeMs);
+            double dtVel = dtMsVel / 1000.0;
+
+            // Rate of change of the field bearing (deg/sec)
+            double bearingDelta = normalizeAngle(fieldBearingRad - lastBearingRad);
+            double rawRateDegPerSec = Math.toDegrees(bearingDelta) / dtVel;
+
+            // Low-pass filter to reject noise
+            filteredBearingRateDegPerSec =
+                    BEARING_RATE_FILTER * filteredBearingRateDegPerSec
+                  + (1.0 - BEARING_RATE_FILTER) * rawRateDegPerSec;
+
+            // Lead = gain × rate
+            velCompDeg = VELOCITY_COMP_GAIN * filteredBearingRateDegPerSec;
+        }
+        lastBearingRad = fieldBearingRad;
+
+        // Apply velocity lead to desired turret angle
+        double velCompRad = Math.toRadians(velCompDeg);
+        turretDesiredRad = normalizeAngle(turretDesiredRad + velCompRad);
+
         // 4. Convert to desired encoder ticks
         double desiredTicksDouble = radiansToTicks(turretDesiredRad);
         int desiredTicks = (int) Math.round(desiredTicksDouble);
@@ -596,6 +641,7 @@ public class BearingTurretController {
         tAppliedPower = applied;
         tEncoderTicks = rawTicks;
         tDesiredTicks = desiredTicks;
+        tVelCompDeg = velCompDeg;
 
         publishTelemetry();
     }
@@ -612,6 +658,7 @@ public class BearingTurretController {
     public int    getEncoderTicks()      { return tEncoderTicks; }
     public int    getDesiredTicks()      { return tDesiredTicks; }
     public double getAppliedPower()      { return tAppliedPower; }
+    public double getVelCompDeg()        { return tVelCompDeg; }
 
     
     private void publishTelemetry() {
@@ -625,5 +672,8 @@ public class BearingTurretController {
         telemetry.addData("aim.power", "%.3f", tAppliedPower);
 
         telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
+        telemetry.addData("aim.velComp", "%.1f °/s → %.1f° lead",
+                filteredBearingRateDegPerSec,
+                tVelCompDeg);
     }
 }
