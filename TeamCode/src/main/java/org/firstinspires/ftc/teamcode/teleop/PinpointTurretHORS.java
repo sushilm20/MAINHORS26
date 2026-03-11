@@ -1,15 +1,20 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
+import com.bylazar.panels.Panels;
+import com.bylazar.telemetry.PanelsTelemetry;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.LED;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
+
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
@@ -25,8 +30,8 @@ import java.util.List;
 public class PinpointTurretHORS extends LinearOpMode {
 
     // Drive + subsystems
-    private DcMotor frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
-    private DcMotor shooter, shooter2, turret, intakeMotor;
+    private DcMotorEx frontLeftDrive, backLeftDrive, frontRightDrive, backRightDrive;
+    private DcMotorEx shooter, shooter2, turret, intakeMotor;
     private Servo clawServo;
     private Servo leftHoodServo, rightHoodServo;
     private Servo gateServo;
@@ -98,15 +103,15 @@ public class PinpointTurretHORS extends LinearOpMode {
         }
 
         // Hardware map
-        frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeft");
-        backLeftDrive = hardwareMap.get(DcMotor.class, "backLeft");
-        frontRightDrive = hardwareMap.get(DcMotor.class, "frontRight");
-        backRightDrive = hardwareMap.get(DcMotor.class, "backRight");
+        frontLeftDrive = hardwareMap.get(DcMotorEx.class, "frontLeft");
+        backLeftDrive = hardwareMap.get(DcMotorEx.class, "backLeft");
+        frontRightDrive = hardwareMap.get(DcMotorEx.class, "frontRight");
+        backRightDrive = hardwareMap.get(DcMotorEx.class, "backRight");
 
-        shooter = hardwareMap.get(DcMotor.class, "shooter");
-        shooter2 = hardwareMap.get(DcMotor.class, "shooter2");
-        turret = hardwareMap.get(DcMotor.class, "turret");
-        intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+        shooter = hardwareMap.get(DcMotorEx.class, "shooter");
+        shooter2 = hardwareMap.get(DcMotorEx.class, "shooter2");
+        turret = hardwareMap.get(DcMotorEx.class, "turret");
+        intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
 
         clawServo = hardwareMap.get(Servo.class, "clawServo");
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
@@ -413,6 +418,10 @@ public class PinpointTurretHORS extends LinearOpMode {
             telemetry.addData("Loop", "%.0f ms (%.0f Hz)",
                     loopTimeMs,
                     loopTimeMs > 0 ? 1000.0 / loopTimeMs : 0);
+
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor AMPS", intakeMotor.getCurrent(CurrentUnit.AMPS));
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor VELO", intakeMotor.getVelocity());
+            PanelsTelemetry.INSTANCE.getTelemetry().update();
 
             telemetry.update();
         }

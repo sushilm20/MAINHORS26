@@ -33,8 +33,8 @@ public class FlywheelController {
     @Sorter(sort = 8) public static double CLOSE_derivativeAlpha = 0.9;
     @Sorter(sort = 9) public static double CLOSE_rpmFilterAlpha = 0.72;
     @Sorter(sort = 10) public static double CLOSE_powerSmoothingAlpha = 0.5;
-    @Sorter(sort = 11) public static double CLOSE_ffReferenceVoltage = 13.0;
-    @Sorter(sort = 12) public static double CLOSE_ffReferenceMaxTicksPerSec = 4930;
+    @Sorter(sort = 11) public static double CLOSE_ffReferenceVoltage = 12.8;
+    @Sorter(sort = 12) public static double CLOSE_ffReferenceMaxTicksPerSec = 4600;
     @Sorter(sort = 13) public static double CLOSE_rpmTolerance = 50.0;
 
     // --- FAR PIDF coefficients (for target RPM at or above threshold) ---
