@@ -22,7 +22,7 @@ public class FlywheelController {
     @Sorter(sort = 1) public static double TICKS_PER_REV = 28.0;
 
     // --- RPM threshold for switching between CLOSE and FAR PIDF coefficients ---
-    @Sorter(sort = 2) public static double RPM_SWITCH_THRESHOLD = 3000.0;
+    @Sorter(sort = 2) public static double RPM_SWITCH_THRESHOLD = 2900;
 
     // --- CLOSE PIDF coefficients (for target RPM below threshold) ---
     @Sorter(sort = 3) public static double CLOSE_kP = 0.00165;

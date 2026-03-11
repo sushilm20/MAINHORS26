@@ -1,16 +1,6 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
-/*
-  DriveController.java
-  --------------------
-  Minimal wrapper that performs the exact same mecanum mixing and normalization
-  that was originally in secondexperimentalHORS. NO smoothing, NO changes to logic —
-  only an extraction to keep the OpMode uncluttered.
 
-  Usage:
-    DriveController drive = new DriveController(frontLeft, frontRight, backLeft, backRight);
-    drive.setDrive(axial, lateral, yaw, speedScale);
-*/
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 
