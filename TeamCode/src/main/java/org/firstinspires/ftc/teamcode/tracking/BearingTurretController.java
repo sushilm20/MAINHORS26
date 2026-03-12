@@ -106,7 +106,7 @@ public class BearingTurretController {
     // ── Velocity compensation ──
     // Feedforward gain: how many degrees of turret lead per degree/sec of bearing rate.
     // Higher = more aggressive lead. Start at ~0.05, tune up.
-    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.05;
+    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.25;
 
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
     @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
