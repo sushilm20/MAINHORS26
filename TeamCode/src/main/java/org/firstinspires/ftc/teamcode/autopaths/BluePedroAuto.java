@@ -62,7 +62,7 @@ public class BluePedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2350;
+    private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
 
@@ -91,9 +91,9 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 2)
     public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.8;  // wait after startToShoot before any shoot actions
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 1.5;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 2.0;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -101,7 +101,7 @@ public class BluePedroAuto extends OpMode {
     // INTAKE POWER SETTINGS
     // ========================================
     @Sorter(sort = 10)
-    public static double INTAKE_ON_POWER = -0.7;
+    public static double INTAKE_ON_POWER = -1.0;
     @Sorter(sort = 11)
     public static double SHOOT_POSE_INTAKE_POWER = -1.0;
     @Sorter(sort = 12)

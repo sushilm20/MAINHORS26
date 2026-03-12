@@ -82,9 +82,12 @@ public class PinpointTurretHORS extends LinearOpMode {
 
     // ── Ball-detection & shoot-zone slowdown ──
     private static final double INTAKE_VELO_BALL_THRESHOLD = 2100.0; // velocity ≤ this = 1+ balls
-    private static final double SHOOT_ZONE_RADIUS_IN       = 12.0;  // inches from shoot pose
-    private static final double SHOOT_ZONE_SPEED_SCALE     = 0.45;  // 45% speed when loaded in zone
+    private static final double SHOOT_ZONE_RADIUS_IN       = 50.0;  // inches from shoot pose
+    private static final double SHOOT_ZONE_SPEED_SCALE     = 0.8;  // 45% speed when loaded in zone
 
+    // Shoot pose coordinates
+    private static final double SHOOT_POSE_X2 = 70.0;
+    private static final double SHOOT_POSE_Y2 = 122.0;
     // Shoot pose coordinates (Blue side close — matches auto)
     private static final double SHOOT_POSE_X = 54.0;
     private static final double SHOOT_POSE_Y = 84.0;
@@ -126,6 +129,7 @@ public class PinpointTurretHORS extends LinearOpMode {
         leftHoodServo = hardwareMap.get(Servo.class, "leftHoodServo");
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
+        VoltageSensor voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         // Optional: turret limit switch (active-low)
         try {
@@ -446,22 +450,36 @@ public class PinpointTurretHORS extends LinearOpMode {
 
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor AMPS", intakeMotor.getCurrent(CurrentUnit.AMPS));
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor VELO", intakeMotor.getVelocity());
-            PanelsTelemetry.INSTANCE.getTelemetry().update();
+// Define expected ranges for each metric
+            double intakeVelo = intakeMotor.getVelocity();
+            double flywheelRPM = flywheel.getCurrentRPM();
+            double voltage = voltageSensor.getVoltage();
 
+// Min-max normalization to 0.0 - 1.0
+            double intakeNorm = normalize(intakeVelo, 0, 3000);      // adjust min/max to your observed range
+            double flywheelNorm = normalize(flywheelRPM, 2000, 2600);
+            double voltageNorm = normalize(voltage, 8, 15);
+
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor VELO (norm)", intakeNorm);
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Flywheel RPM (norm)", flywheelNorm);
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Voltage (norm)", voltageNorm);
+            PanelsTelemetry.INSTANCE.getTelemetry().update();
             telemetry.update();
         }
 
         bearingTurret.disable();
     }
-
+    private double normalize(double value, double min, double max) {
+        return Math.max(0.0, Math.min(1.0, (value - min) / (max - min)));
+    }
     /**
      * Returns true if the robot is within SHOOT_ZONE_RADIUS_IN of the shoot pose.
      */
     private boolean isInShootZone() {
         if (follower == null) return false;
         Pose p = follower.getPose();
-        double dx = p.getX() - SHOOT_POSE_X;
-        double dy = p.getY() - SHOOT_POSE_Y;
+        double dx = p.getX() - SHOOT_POSE_X2;
+        double dy = p.getY() - SHOOT_POSE_Y2;
         return Math.hypot(dx, dy) <= SHOOT_ZONE_RADIUS_IN;
     }
 
