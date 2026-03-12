@@ -19,7 +19,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
-import org.firstinspires.ftc.teamcode.tracking.TurretController;
+import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
 @Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
 @Configurable
@@ -61,7 +61,7 @@ public class BluePedroAuto extends OpMode {
     private BNO055IMU imu = null;
 
     private FlywheelController flywheel;
-    private TurretController turretController;
+    private BearingTurretController bearingTurretController;
     private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
@@ -72,8 +72,18 @@ public class BluePedroAuto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     private final boolean turretForceManualNoMove = false;
-    private boolean turretForceHold = true;
-    private int turretHoldTarget = 0;
+
+    // ── Velocity-based shoot gating ──
+    private double lastPoseX = Double.NaN;
+    private double lastPoseY = Double.NaN;
+    private double lastPoseHeadingRad = Double.NaN;
+    private long lastPoseTimeMs = -1L;
+
+    private double translationalSpeedInPerS = 0.0;
+    private double angularSpeedDegPerS = 0.0;
+
+    private Timer speedStableTimer;
+    private boolean speedStableTimerStarted = false;
 
     private Servo gateServo;
     private boolean gateClosed = false;
@@ -116,6 +126,14 @@ public class BluePedroAuto extends OpMode {
     // ========================================
     @Sorter(sort = 20)
     public static double START_POSE_TOLERANCE_IN = 4.0;
+
+    // ── Velocity-based shoot gating thresholds ──
+    @Sorter(sort = 21)
+    public static double SHOOT_MAX_TRANSLATIONAL_SPEED_IN_PER_S = 6.0;
+    @Sorter(sort = 22)
+    public static double SHOOT_MAX_ANGULAR_SPEED_DEG_PER_S = 20.0;
+    @Sorter(sort = 23)
+    public static double SPEED_STABLE_HOLD_SECONDS = 0.15;
 
     // ========================================
     // GATE SETTINGS
@@ -256,12 +274,17 @@ public class BluePedroAuto extends OpMode {
         gateAlignWaitTimer = new Timer();
         gateClearWaitTimer = new Timer();
         firstShootWaitTimer = new Timer();
+        speedStableTimer = new Timer();
         nextPathIndex = -1;
         intakeSegmentEnd = -1;
         preActionTimerStarted = false;
         preActionEntered = false;
         timedIntakeActive = false;
-        turretHoldTarget = 0;
+        speedStableTimerStarted = false;
+        lastPoseTimeMs = -1L;
+        lastPoseX = Double.NaN;
+        lastPoseY = Double.NaN;
+        lastPoseHeadingRad = Double.NaN;
 
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
@@ -315,17 +338,14 @@ public class BluePedroAuto extends OpMode {
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
             if (turretMotor != null) {
-                turretController = new TurretController(turretMotor, imu, telemetry);
-            }
-            if (turretController != null) {
-                turretController.captureReferences();
-                turretController.resetPidState();
+                bearingTurretController = new BearingTurretController(turretMotor, follower, telemetry);
+                bearingTurretController.clearPid();
             }
             if (flywheel != null) {
                 flywheel.setShooterOn(false);
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Flywheel/BearingTurretController creation error: " + e.getMessage());
         }
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
@@ -369,8 +389,8 @@ public class BluePedroAuto extends OpMode {
     public void init_loop() {
         if (flywheel != null) {
         }
-        if (turretController != null && turretForceHold) {
-            turretController.holdPositionTicks(turretHoldTarget);
+        if (bearingTurretController != null) {
+            bearingTurretController.update(false, 0.0);
         }
     }
 
@@ -382,13 +402,9 @@ public class BluePedroAuto extends OpMode {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
         }
-        if (turretController != null) {
-            turretController.captureReferences();
-            turretController.resetPidState();
+        if (bearingTurretController != null) {
+            bearingTurretController.clearPid();
         }
-
-        turretHoldTarget = 230;
-        turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;
@@ -398,13 +414,14 @@ public class BluePedroAuto extends OpMode {
     public void loop() {
         follower.update();
         long nowMs = System.currentTimeMillis();
+        updateChassisSpeeds(nowMs);
 
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
         }
-        if (turretController != null && turretForceHold) {
-            turretController.holdPositionTicks(turretHoldTarget);
+        if (bearingTurretController != null) {
+            bearingTurretController.update(false, 0.0);
         }
 
         runStateMachine(nowMs);
@@ -433,12 +450,14 @@ public class BluePedroAuto extends OpMode {
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
         }
-        if (turretMotor != null && turretController != null) {
+        if (turretMotor != null && bearingTurretController != null) {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
-            panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
+            panelsTelemetry.debug("Turret Power", bearingTurretController.getAppliedPower());
             panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
-            panelsTelemetry.debug("TurretHoldingEncoder", String.valueOf(turretForceHold));
         }
+        panelsTelemetry.debug("V_trans (in/s)", String.format("%.2f", translationalSpeedInPerS));
+        panelsTelemetry.debug("V_ang (deg/s)", String.format("%.2f", angularSpeedDegPerS));
+        panelsTelemetry.debug("ShootStable", String.valueOf(isShootMotionStable()));
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
         }
@@ -481,11 +500,9 @@ public class BluePedroAuto extends OpMode {
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
         }
-        if (turretController != null && turretForceHold) {
-            turretHoldTarget = 0;
-            turretController.holdPositionTicks(turretHoldTarget);
-        }
-        if (turretMotor != null) {
+        if (bearingTurretController != null) {
+            bearingTurretController.disable();
+        } else if (turretMotor != null) {
             try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
         }
     }
@@ -539,6 +556,43 @@ public class BluePedroAuto extends OpMode {
         } catch (Exception e) {
             return Double.POSITIVE_INFINITY;
         }
+    }
+
+    private static double normalizeAngleRad(double a) {
+        while (a > Math.PI) a -= 2.0 * Math.PI;
+        while (a <= -Math.PI) a += 2.0 * Math.PI;
+        return a;
+    }
+
+    private void updateChassisSpeeds(long nowMs) {
+        try {
+            Pose p = follower.getPose();
+            if (p == null) return;
+
+            double x = p.getX();
+            double y = p.getY();
+            double h = p.getHeading();
+
+            if (lastPoseTimeMs > 0 && !Double.isNaN(lastPoseX) && !Double.isNaN(lastPoseY) && !Double.isNaN(lastPoseHeadingRad)) {
+                double dt = Math.max(1, nowMs - lastPoseTimeMs) / 1000.0;
+                double dx = x - lastPoseX;
+                double dy = y - lastPoseY;
+                double dh = normalizeAngleRad(h - lastPoseHeadingRad);
+
+                translationalSpeedInPerS = Math.hypot(dx, dy) / dt;
+                angularSpeedDegPerS = Math.toDegrees(Math.abs(dh)) / dt;
+            }
+
+            lastPoseX = x;
+            lastPoseY = y;
+            lastPoseHeadingRad = h;
+            lastPoseTimeMs = nowMs;
+        } catch (Exception ignored) {}
+    }
+
+    private boolean isShootMotionStable() {
+        return translationalSpeedInPerS <= SHOOT_MAX_TRANSLATIONAL_SPEED_IN_PER_S
+                && angularSpeedDegPerS <= SHOOT_MAX_ANGULAR_SPEED_DEG_PER_S;
     }
 
     private Timer gateAlignWaitTimer;
@@ -681,37 +735,32 @@ public class BluePedroAuto extends OpMode {
                 break;
 
             case CLOSED_INTAKE_SEQUENCE:
-                double distPre = distanceToShootPose();
-                if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) {
+                if (isShootMotionStable()) {
                     startIntake(CLOSED_INTAKE_POWER);
-                }
-                if (distPre <= START_POSE_TOLERANCE_IN) {
-                    state = AutoState.PRE_ACTION;
+
+                    if (!speedStableTimerStarted) {
+                        speedStableTimer.resetTimer();
+                        speedStableTimerStarted = true;
+                    }
+
+                    if (speedStableTimer.getElapsedTimeSeconds() >= SPEED_STABLE_HOLD_SECONDS) {
+                        state = AutoState.PRE_ACTION;
+                        speedStableTimerStarted = false;
+                    }
+                } else {
+                    speedStableTimerStarted = false;
                 }
                 break;
 
             case PRE_ACTION:
                 if (!preActionEntered) {
-                    poseWaitTimer.resetTimer();
-                    preActionTimerStarted = false;
+                    preActionTimer.resetTimer();
+                    preActionTimerStarted = true;
                     preActionEntered = true;
-                    panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
+                    panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting timer");
                 }
 
-                if (!preActionTimerStarted) {
-                    double dist = distanceToShootPose();
-                    if (dist <= START_POSE_TOLERANCE_IN) {
-                        preActionTimer.resetTimer();
-                        preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
-                    } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
-                        preActionTimer.resetTimer();
-                        preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
-                    } else {
-                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
-                    }
-                } else {
+                if (preActionTimerStarted) {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                         startIntake(SHOOT_POSE_INTAKE_POWER);
                         intakeTimer.resetTimer();
@@ -743,9 +792,6 @@ public class BluePedroAuto extends OpMode {
                 break;
 
             case FINISHED:
-                if (turretForceHold) {
-                    turretHoldTarget = 0;
-                }
                 break;
 
             case IDLE:
