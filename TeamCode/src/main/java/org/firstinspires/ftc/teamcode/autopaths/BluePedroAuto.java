@@ -704,18 +704,8 @@ public class BluePedroAuto extends OpMode {
                         preActionTimerStarted = false;
                         preActionEntered = false;
 
-                        // ── If a backToShoot path (5/8/11) arrives with 0 balls, skip the entire shoot sequence ──
-                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
-                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
-                            if (nextPathIndex > 0 && nextPathIndex <= 12) {
-                                startPath(nextPathIndex);
-                                nextPathIndex = -1;
-                            } else {
-                                state = AutoState.FINISHED;
-                            }
-                        }
                         // ── Only for startToShoot (path 1): stop everything and wait before shooting ──
-                        else if (finished == 1) {
+                        if (finished == 1) {
                             stopIntake();  // sets hold power, not 0
                             // Force gate closed during the wait
                             if (gateServo != null && !gateClosed) {
@@ -782,8 +772,20 @@ public class BluePedroAuto extends OpMode {
                     }
 
                     if (speedStableTimer.getElapsedTimeSeconds() >= SPEED_STABLE_HOLD_SECONDS) {
-                        state = AutoState.PRE_ACTION;
                         speedStableTimerStarted = false;
+
+                        // ── Now that intake is slowed & stable, reliably check for balls ──
+                        if (currentPathIndex != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + currentPathIndex + " has 0 balls – skipping shoot");
+                            if (nextPathIndex > 0 && nextPathIndex <= 12) {
+                                startPath(nextPathIndex);
+                                nextPathIndex = -1;
+                            } else {
+                                state = AutoState.FINISHED;
+                            }
+                        } else {
+                            state = AutoState.PRE_ACTION;
+                        }
                     }
                 } else {
                     speedStableTimerStarted = false;

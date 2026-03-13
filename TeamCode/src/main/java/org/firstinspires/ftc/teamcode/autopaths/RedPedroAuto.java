@@ -607,19 +607,7 @@ public class RedPedroAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
-
-                        // ── If a backToShoot path (5/8/11) arrives with 0 balls, skip the entire shoot sequence ──
-                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
-                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
-                            if (nextPathIndex > 0 && nextPathIndex <= 12) {
-                                startPath(nextPathIndex);
-                                nextPathIndex = -1;
-                            } else {
-                                state = AutoState.FINISHED;
-                            }
-                        } else {
-                            state = AutoState.CLOSED_INTAKE_SEQUENCE;
-                        }
+                        state = AutoState.CLOSED_INTAKE_SEQUENCE;
                     } else {
                         int next = finished + 1;
                         if (next > 12) {
@@ -659,7 +647,18 @@ public class RedPedroAuto extends OpMode {
                     startIntake(CLOSED_INTAKE_POWER);
                 }
                 if (distPre <= START_POSE_TOLERANCE_IN) {
-                    state = AutoState.PRE_ACTION;
+                    // ── Intake is slowed & robot settled — reliably check for balls ──
+                    if (currentPathIndex != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                        panelsTelemetry.debug("SKIP_SHOOT", "Path " + currentPathIndex + " has 0 balls – skipping shoot");
+                        if (nextPathIndex > 0 && nextPathIndex <= 12) {
+                            startPath(nextPathIndex);
+                            nextPathIndex = -1;
+                        } else {
+                            state = AutoState.FINISHED;
+                        }
+                    } else {
+                        state = AutoState.PRE_ACTION;
+                    }
                 }
                 break;
 

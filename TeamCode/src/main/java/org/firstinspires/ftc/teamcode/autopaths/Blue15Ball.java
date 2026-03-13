@@ -310,16 +310,7 @@ public class Blue15Ball extends OpMode {
                         preActionEntered = false;
                         preActionTimerStarted = false;
 
-                        // ── If a backToShoot path (3/7/11/13) arrives with 0 balls, skip the entire shoot sequence ──
-                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
-                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
-                            if (nextPathIndex > 0 && nextPathIndex <= 14) {
-                                startPath(nextPathIndex);
-                                nextPathIndex = -1;
-                            } else {
-                                state = AutoState.FINISHED;
-                            }
-                        } else if (finished == 1) {
+                        if (finished == 1) {
                             stopIntake();
                             forceGateClosed();
                             firstShootWaitTimer.resetTimer();
@@ -352,8 +343,20 @@ public class Blue15Ball extends OpMode {
                     }
 
                     if (speedStableTimer.getElapsedTimeSeconds() >= SPEED_STABLE_HOLD_SECONDS) {
-                        state = AutoState.PRE_ACTION;
                         speedStableTimerStarted = false;
+
+                        // ── Now that intake is slowed & stable, reliably check for balls ──
+                        if (currentPathIndex != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + currentPathIndex + " has 0 balls – skipping shoot");
+                            if (nextPathIndex > 0 && nextPathIndex <= 14) {
+                                startPath(nextPathIndex);
+                                nextPathIndex = -1;
+                            } else {
+                                state = AutoState.FINISHED;
+                            }
+                        } else {
+                            state = AutoState.PRE_ACTION;
+                        }
                     }
                 } else {
                     speedStableTimerStarted = false;
