@@ -12,6 +12,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -63,7 +64,7 @@ public class RedPedroAuto extends OpMode {
     private TurretController turretController;
     private static final double AUTO_SHOOTER_RPM = 2300;
 
-    private DcMotor intakeMotor;
+    private DcMotorEx intakeMotor;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -322,7 +323,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         try {
-            intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {

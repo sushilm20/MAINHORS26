@@ -12,6 +12,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -65,7 +66,7 @@ public class BluePedroAuto extends OpMode {
     private BearingTurretController bearingTurretController; // unused for hold in this auto
     private static final double AUTO_SHOOTER_RPM = 2400;
 
-    private DcMotor intakeMotor;
+    private DcMotorEx intakeMotor;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -351,7 +352,7 @@ public class BluePedroAuto extends OpMode {
             panelsTelemetry.debug("Init", "Flywheel/BearingTurretController creation error: " + e.getMessage());
         }
         try {
-            intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {

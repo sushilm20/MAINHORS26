@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 
 /**
  * Shared utility for detecting whether the intake currently has 1 or more balls loaded.
@@ -25,7 +26,7 @@ public final class IntakeBallDetector {
      * @param threshold   velocity threshold; at or below this means loaded
      * @return true if loaded (or if motor is null — assume loaded to be safe)
      */
-    public static boolean hasBalls(DcMotor intakeMotor, double threshold) {
+    public static boolean hasBalls(DcMotorEx intakeMotor, double threshold) {
         if (intakeMotor == null) return true; // assume loaded if we can't check
         double velo = intakeMotor.getVelocity();
         // Only count as "has balls" if intake is actually spinning forward
@@ -35,7 +36,7 @@ public final class IntakeBallDetector {
     /**
      * Convenience overload using the default threshold.
      */
-    public static boolean hasBalls(DcMotor intakeMotor) {
+    public static boolean hasBalls(DcMotorEx intakeMotor) {
         return hasBalls(intakeMotor, DEFAULT_VELO_THRESHOLD);
     }
 }
