@@ -574,12 +574,12 @@ public class Blue15Ball extends OpMode {
                     .build();
 
             collectFirst3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(new Pose(54.000, 84.000), new Pose(68.000, 56.000), new Pose(12.000, 56.000)))
+                    .addPath(new BezierCurve(new Pose(54.000, 84.000), new Pose(68.000, 56.000), new Pose(13.000, 60.000)))
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .build();
 
             backToShootFirst3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(new Pose(12.000, 56.000), new Pose(43.000, 63.000), new Pose(54.000, 84.000)))
+                    .addPath(new BezierCurve(new Pose(13.000, 60.000), new Pose(43.000, 63.000), new Pose(54.000, 84.000)))
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                     .setConstraintsForLast(slow)
                     .setBrakingStrength(SLOW_BRAKING_STRENGTH)

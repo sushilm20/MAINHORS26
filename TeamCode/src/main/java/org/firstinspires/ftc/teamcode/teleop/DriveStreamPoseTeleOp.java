@@ -27,7 +27,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor.TagFamily;
 import java.util.List;
 import java.util.Locale;
 
-@Disabled
+
 @Configurable
 @TeleOp(name = "Z Drive and Stream it", group = "TeleOp")
 public class DriveStreamPoseTeleOp extends OpMode {
@@ -77,7 +77,7 @@ public class DriveStreamPoseTeleOp extends OpMode {
     private void initFollower() {
         try {
             follower = Constants.createFollower(hardwareMap);
-            follower.setStartingPose(new Pose(63, 8, Math.toRadians(135)));
+            follower.setStartingPose(new Pose(20, 122   , Math.toRadians(135)));
             panelsTelemetry.debug("FOLLOWER", "Follower init");
         } catch (Exception e) {
             panelsTelemetry.debug("FOLLOWER", "Follower initialization fail");
