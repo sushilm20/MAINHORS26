@@ -19,6 +19,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.IntakeBallDetector;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @Autonomous(name = "Red 12 Ball 🔴", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
@@ -605,7 +606,19 @@ public class RedPedroAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
-                        state = AutoState.CLOSED_INTAKE_SEQUENCE;
+
+                        // ── If a backToShoot path (5/8/11) arrives with 0 balls, skip the entire shoot sequence ──
+                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
+                            if (nextPathIndex > 0 && nextPathIndex <= 12) {
+                                startPath(nextPathIndex);
+                                nextPathIndex = -1;
+                            } else {
+                                state = AutoState.FINISHED;
+                            }
+                        } else {
+                            state = AutoState.CLOSED_INTAKE_SEQUENCE;
+                        }
                     } else {
                         int next = finished + 1;
                         if (next > 12) {

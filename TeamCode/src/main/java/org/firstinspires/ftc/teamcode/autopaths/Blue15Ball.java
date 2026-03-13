@@ -21,6 +21,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.IntakeBallDetector;
 import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
 @Autonomous(name = "Blue 15 Ball 🔷", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
@@ -308,7 +309,16 @@ public class Blue15Ball extends OpMode {
                         preActionEntered = false;
                         preActionTimerStarted = false;
 
-                        if (finished == 1) {
+                        // ── If a backToShoot path (3/7/11/13) arrives with 0 balls, skip the entire shoot sequence ──
+                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
+                            if (nextPathIndex > 0 && nextPathIndex <= 14) {
+                                startPath(nextPathIndex);
+                                nextPathIndex = -1;
+                            } else {
+                                state = AutoState.FINISHED;
+                            }
+                        } else if (finished == 1) {
                             stopIntake();
                             forceGateClosed();
                             firstShootWaitTimer.resetTimer();

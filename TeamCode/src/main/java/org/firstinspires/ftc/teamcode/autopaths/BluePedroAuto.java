@@ -19,6 +19,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
+import org.firstinspires.ftc.teamcode.subsystems.IntakeBallDetector;
 import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
 @Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
@@ -544,6 +545,8 @@ public class BluePedroAuto extends OpMode {
         return pathIndex == 1 || pathIndex == 5 || pathIndex == 8 || pathIndex == 11;
     }
 
+
+
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
@@ -700,8 +703,18 @@ public class BluePedroAuto extends OpMode {
                         preActionTimerStarted = false;
                         preActionEntered = false;
 
+                        // ── If a backToShoot path (5/8/11) arrives with 0 balls, skip the entire shoot sequence ──
+                        if (finished != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
+                            panelsTelemetry.debug("SKIP_SHOOT", "Path " + finished + " arrived with 0 balls – skipping shoot sequence");
+                            if (nextPathIndex > 0 && nextPathIndex <= 12) {
+                                startPath(nextPathIndex);
+                                nextPathIndex = -1;
+                            } else {
+                                state = AutoState.FINISHED;
+                            }
+                        }
                         // ── Only for startToShoot (path 1): stop everything and wait before shooting ──
-                        if (finished == 1) {
+                        else if (finished == 1) {
                             stopIntake();  // sets hold power, not 0
                             // Force gate closed during the wait
                             if (gateServo != null && !gateClosed) {
