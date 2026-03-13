@@ -16,6 +16,7 @@ import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
@@ -61,7 +62,7 @@ public class Blue15Ball extends OpMode {
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
     private DcMotor turretMotor;
-    private DcMotor intakeMotor;
+    private DcMotorEx intakeMotor;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -192,7 +193,7 @@ public class Blue15Ball extends OpMode {
         }
 
         try {
-            intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
