@@ -56,6 +56,14 @@ public class PinpointTurretHORS extends LinearOpMode {
     private boolean aPressedLast = false;
     private boolean dpadUpLast = false;
 
+    // ── B button double-click detection ──
+    private long lastBPressTimeMs = 0;
+    private static final long B_DOUBLE_CLICK_WINDOW_MS = 400; // max gap between clicks
+
+    // ── Post-homing offset state ──
+    private boolean pendingHomingOffset = false; // true while waiting for homing to finish
+    private static final int HOMING_OFFSET_TICKS = 90;
+
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
 
@@ -325,10 +333,23 @@ public class PinpointTurretHORS extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // ── Gate manual toggle (B) ──
+            // ── Gate toggle / double-click homing (B) ──
             boolean bNow = gamepad1.b || gamepad2.b;
-            if (bNow && !bPressedLast && !gateController.isBusy()) {
-                gateController.toggleGate();
+            if (bNow && !bPressedLast) {
+                long timeSinceLastB = nowMs - lastBPressTimeMs;
+                if (timeSinceLastB <= B_DOUBLE_CLICK_WINDOW_MS && timeSinceLastB > 0) {
+                    // ── Double-click detected: trigger homing + offset ──
+                    bearingTurret.commandHomingSweep(true);
+                    bearingTurret.commandHomingSweep(false); // release edge
+                    pendingHomingOffset = true;
+                    lastBPressTimeMs = 0; // reset so triple-click won't re-trigger
+                } else {
+                    // ── First click: toggle gate (if not busy) ──
+                    if (!gateController.isBusy()) {
+                        gateController.toggleGate();
+                    }
+                    lastBPressTimeMs = nowMs;
+                }
             }
             bPressedLast = bNow;
 
@@ -365,7 +386,15 @@ public class PinpointTurretHORS extends LinearOpMode {
             }
 
             // ── Turret: homing sweep (dpad_up / gp2 left bumper) ──
-            bearingTurret.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
+            boolean homingBtn = gamepad1.dpad_up || gamepad2.left_bumper;
+            if (homingBtn) pendingHomingOffset = false; // manual homing clears auto-offset
+            bearingTurret.commandHomingSweep(homingBtn);
+
+            // ── Post-homing offset: once homing finishes (enters freeze), drive to +90 ticks ──
+            if (pendingHomingOffset && !bearingTurret.isHomingMode() && bearingTurret.isFreezeMode()) {
+                bearingTurret.freezeTargetTicks = HOMING_OFFSET_TICKS;
+                pendingHomingOffset = false;
+            }
 
             // ── Turret: manual override (bumpers / gp2 right stick) ──
             boolean manualNow = false;
