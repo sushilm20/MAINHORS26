@@ -27,10 +27,11 @@ public final class IntakeBallDetector {
      * @return true if loaded (or if motor is null — assume loaded to be safe)
      */
     public static boolean hasBalls(DcMotorEx intakeMotor, double threshold) {
-        if (intakeMotor == null) return true; // assume loaded if we can't check
+        return true;
+        /*if (intakeMotor == null) return true; // assume loaded if we can't check
         double velo = intakeMotor.getVelocity();
         // Only count as "has balls" if intake is actually spinning forward
-        return velo > 0 && velo <= threshold;
+        return velo > 0 && velo <= threshold;*/
     }
 
     /**
