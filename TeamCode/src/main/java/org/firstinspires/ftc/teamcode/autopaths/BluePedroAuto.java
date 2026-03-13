@@ -61,7 +61,7 @@ public class BluePedroAuto extends OpMode {
     private BNO055IMU imu = null;
 
     private FlywheelController flywheel;
-    private BearingTurretController bearingTurretController;
+    private BearingTurretController bearingTurretController; // unused for hold in this auto
     private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
@@ -72,6 +72,9 @@ public class BluePedroAuto extends OpMode {
     private int intakeSegmentEnd = -1;
 
     private final boolean turretForceManualNoMove = false;
+
+    // Turret BRAKE hold after reaching target ticks
+    private boolean turretBrakeHoldActive = false;
 
     // ── Velocity-based shoot gating ──
     private double lastPoseX = Double.NaN;
@@ -281,6 +284,7 @@ public class BluePedroAuto extends OpMode {
         preActionEntered = false;
         timedIntakeActive = false;
         speedStableTimerStarted = false;
+        turretBrakeHoldActive = false;
         lastPoseTimeMs = -1L;
         lastPoseX = Double.NaN;
         lastPoseY = Double.NaN;
@@ -318,8 +322,6 @@ public class BluePedroAuto extends OpMode {
                 panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
             }
 
-
-
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
 
             if (imu != null) {
@@ -337,12 +339,10 @@ public class BluePedroAuto extends OpMode {
 
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
-            if (turretMotor != null) {
-                bearingTurretController = new BearingTurretController(turretMotor, follower, telemetry);
-                bearingTurretController.clearPid();
-                bearingTurretController.freeze();
-                bearingTurretController.freezeTargetTicks = 230;
-            }
+
+            // Disable turret controller hold logic in this auto; BRAKE mode is used.
+            bearingTurretController = null;
+
             if (flywheel != null) {
                 flywheel.setShooterOn(false);
             }
@@ -389,11 +389,7 @@ public class BluePedroAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        if (flywheel != null) {
-        }
-        if (bearingTurretController != null) {
-            bearingTurretController.update(false, 0.0);
-        }
+        moveTurretTo230ThenBrake();
     }
 
     @Override
@@ -404,9 +400,8 @@ public class BluePedroAuto extends OpMode {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
         }
-        if (bearingTurretController != null) {
-            bearingTurretController.clearPid();
-        }
+
+        releaseTurretBrakeHold(); // allow one approach to 230 each run
 
         shooterWaitStartMs = System.currentTimeMillis();
         state = AutoState.WAIT_FOR_SHOOTER;
@@ -422,9 +417,9 @@ public class BluePedroAuto extends OpMode {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
         }
-        if (bearingTurretController != null) {
-            bearingTurretController.update(false, 0.0);
-        }
+
+        // Turret: move to 230 once, then hold with BRAKE at zero power
+        moveTurretTo230ThenBrake();
 
         runStateMachine(nowMs);
 
@@ -452,10 +447,11 @@ public class BluePedroAuto extends OpMode {
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
         }
-        if (turretMotor != null && bearingTurretController != null) {
+        if (turretMotor != null) {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
-            panelsTelemetry.debug("Turret Power", bearingTurretController.getAppliedPower());
-            panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
+            panelsTelemetry.debug("Turret Power", turretMotor.getPower());
+            panelsTelemetry.debug("TurretBrakeHold", String.valueOf(turretBrakeHoldActive));
+            panelsTelemetry.debug("TurretTrackingEnabled", "false");
         }
         panelsTelemetry.debug("V_trans (in/s)", String.format("%.2f", translationalSpeedInPerS));
         panelsTelemetry.debug("V_ang (deg/s)", String.format("%.2f", angularSpeedDegPerS));
@@ -502,11 +498,10 @@ public class BluePedroAuto extends OpMode {
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
         }
-        if (bearingTurretController != null) {
-            bearingTurretController.disable();
-        } else if (turretMotor != null) {
+        if (turretMotor != null) {
             try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
         }
+        releaseTurretBrakeHold();
     }
 
     @Override
@@ -598,6 +593,33 @@ public class BluePedroAuto extends OpMode {
     }
 
     private Timer gateAlignWaitTimer;
+
+    // Moves turret toward tick 230 once, then uses BRAKE at 0 power to hold.
+    private void moveTurretTo230ThenBrake() {
+        if (turretMotor == null) return;
+
+        final int targetTicks = 230;
+        final int toleranceTicks = 8;
+        final double approachPower = 0.22;
+
+        int pos = turretMotor.getCurrentPosition();
+
+        if (!turretBrakeHoldActive) {
+            int error = targetTicks - pos;
+            if (Math.abs(error) <= toleranceTicks) {
+                turretMotor.setPower(0.0); // BRAKE holds
+                turretBrakeHoldActive = true;
+            } else {
+                turretMotor.setPower(Math.signum(error) * approachPower);
+            }
+        } else {
+            turretMotor.setPower(0.0); // keep BRAKE hold
+        }
+    }
+
+    private void releaseTurretBrakeHold() {
+        turretBrakeHoldActive = false;
+    }
 
     private void startPath(int idx) {
         if (idx < 1 || idx > 12) {
