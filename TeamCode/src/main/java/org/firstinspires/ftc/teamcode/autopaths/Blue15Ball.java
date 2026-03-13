@@ -9,6 +9,7 @@ import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
+import com.pedropathing.paths.PathConstraints;
 import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
@@ -22,7 +23,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 
-@Autonomous(name = "Blue 15 New", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
+@Autonomous(name = "Blue 15 Ball 🔷", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
 @Configurable
 public class Blue15Ball extends OpMode {
 
@@ -31,15 +32,8 @@ public class Blue15Ball extends OpMode {
     private Paths paths;
 
     private enum AutoState {
-        IDLE,
-        WAIT_FOR_SHOOTER,
-        RUNNING_PATH,
-        WAIT_FIRST_SHOOT,
-        CLOSED_INTAKE_SEQUENCE,
-        PRE_ACTION,
-        INTAKE_RUN,
-        CLAW_ACTION,
-        FINISHED
+        IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, WAIT_FIRST_SHOOT,
+        CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED
     }
 
     private AutoState state = AutoState.IDLE;
@@ -71,7 +65,7 @@ public class Blue15Ball extends OpMode {
     private Servo clawServo;
     private Servo rightHoodServo;
     private Servo gateServo;
-    private boolean gateClosed = false;
+    private boolean gateClosed = true;
 
     private BNO055IMU pinpointImu = null;
     private BNO055IMU hubImu = null;
@@ -79,10 +73,11 @@ public class Blue15Ball extends OpMode {
 
     private FlywheelController flywheel;
     private BearingTurretController bearingTurretController;
-
     private boolean turretTrackingEnabled = false;
 
-    // velocity gating
+    private static final double AUTO_SHOOTER_RPM = 2400;
+
+    // Velocity tracking
     private double lastPoseX = Double.NaN;
     private double lastPoseY = Double.NaN;
     private double lastPoseHeadingRad = Double.NaN;
@@ -90,9 +85,7 @@ public class Blue15Ball extends OpMode {
     private double translationalSpeedInPerS = 0.0;
     private double angularSpeedDegPerS = 0.0;
 
-    private static final double AUTO_SHOOTER_RPM = 2400;
-
-    // Timing / behavior (from BluePedroAuto style)
+    // ====== Tunables ======
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.30;
     @Sorter(sort = 1)  public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 2)  public static double PRE_ACTION_FIRST_SHOOT_WAIT_SECONDS = 0.8;
@@ -110,9 +103,23 @@ public class Blue15Ball extends OpMode {
 
     @Sorter(sort = 30) public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31) public static double GATE_CLOSED = 0.485;
-    @Sorter(sort = 32) public static double GATE_OPEN_TOLERANCE_IN = 2.0;
+    @Sorter(sort = 32) public static double GATE_OPEN_TOLERANCE_IN = 2.2;
     @Sorter(sort = 33) public static double GATE_CLOSE_TOLERANCE_IN = 4.0;
 
+    // Gate opens only when robot is settled near shoot
+    @Sorter(sort = 34) public static double GATE_OPEN_MAX_TRANS_SPEED = 1.1;
+    @Sorter(sort = 35) public static double GATE_OPEN_MAX_ANG_SPEED = 14.0;
+
+    // Path slowdown tunables
+    @Sorter(sort = 40) public static double SLOW_T_VALUE_CONSTRAINT = 0.995;
+    @Sorter(sort = 41) public static double SLOW_TIMEOUT_MS = 180;
+    @Sorter(sort = 42) public static double SLOW_BRAKING_STRENGTH = 0.70;
+    @Sorter(sort = 43) public static double SLOW_BRAKING_START = 0.84;
+    @Sorter(sort = 44) public static double SLOW_VELOCITY_CONSTRAINT = 0.10;
+    @Sorter(sort = 45) public static double SLOW_TRANSLATIONAL_CONSTRAINT = 0.10;
+    @Sorter(sort = 46) public static double SLOW_HEADING_CONSTRAINT_RAD = 0.007;
+
+    // Shoot pose for gate logic
     public static double SHOOT_POSE_X = 54.0;
     public static double SHOOT_POSE_Y = 84.0;
 
@@ -145,10 +152,10 @@ public class Blue15Ball extends OpMode {
             }
             if (turretMotor != null) {
                 turretMotor.setDirection(DcMotor.Direction.FORWARD);
-                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); // keep at 0 on init
+                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                 turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-                turretMotor.setPower(0.0);
+                turretMotor.setPower(0.0); // no premove in init
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Motor map error: " + e.getMessage());
@@ -156,18 +163,17 @@ public class Blue15Ball extends OpMode {
 
         try {
             try { pinpointImu = hardwareMap.get(BNO055IMU.class, "pinpoint"); }
-            catch (Exception e) { pinpointImu = null; }
+            catch (Exception ignored) { pinpointImu = null; }
 
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
-
             if (imu != null) {
-                BNO055IMU.Parameters imuParams = new BNO055IMU.Parameters();
-                imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-                imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
-                imu.initialize(imuParams);
+                BNO055IMU.Parameters p = new BNO055IMU.Parameters();
+                p.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+                p.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+                imu.initialize(p);
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "IMU init failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "IMU error: " + e.getMessage());
         }
 
         try {
@@ -175,10 +181,9 @@ public class Blue15Ball extends OpMode {
                 flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
                 flywheel.setShooterOn(false);
             }
-
             if (turretMotor != null) {
                 bearingTurretController = new BearingTurretController(turretMotor, follower, telemetry);
-                bearingTurretController.zeroEncoder(); // ensure 0
+                bearingTurretController.zeroEncoder();
                 bearingTurretController.clearPid();
             }
         } catch (Exception e) {
@@ -190,22 +195,18 @@ public class Blue15Ball extends OpMode {
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake map failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Intake map error: " + e.getMessage());
         }
 
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
             if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Claw map failed: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
 
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Hood map failed: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
 
         try {
             gateServo = hardwareMap.get(Servo.class, "gateServo");
@@ -213,18 +214,15 @@ public class Blue15Ball extends OpMode {
                 gateServo.setPosition(GATE_CLOSED);
                 gateClosed = true;
             }
-        } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Gate map failed: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
 
         turretTrackingEnabled = false;
-        panelsTelemetry.debug("Status", "Initialized (turret brake hold only)");
+        panelsTelemetry.debug("Status", "Initialized (turret BRAKE only, no tracking)");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
     public void init_loop() {
-        // No premove in init
         if (turretMotor != null) turretMotor.setPower(0.0);
     }
 
@@ -266,9 +264,7 @@ public class Blue15Ball extends OpMode {
         if (state != AutoState.WAIT_FIRST_SHOOT) updateGate();
 
         if (state != AutoState.IDLE && state != AutoState.FINISHED) {
-            if (intakeMotor != null && intakeMotor.getPower() == 0.0) {
-                intakeMotor.setPower(INTAKE_HOLD_POWER);
-            }
+            if (intakeMotor != null && intakeMotor.getPower() == 0.0) intakeMotor.setPower(INTAKE_HOLD_POWER);
         }
 
         panelsTelemetry.debug("State", state.name());
@@ -276,8 +272,11 @@ public class Blue15Ball extends OpMode {
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
-        panelsTelemetry.debug("TurretEnc", turretMotor != null ? turretMotor.getCurrentPosition() : -9999);
-        panelsTelemetry.debug("IntakePower", intakeMotor != null ? intakeMotor.getPower() : 0.0);
+        panelsTelemetry.debug("Vtrans", String.format("%.2f", translationalSpeedInPerS));
+        panelsTelemetry.debug("Vang", String.format("%.2f", angularSpeedDegPerS));
+        panelsTelemetry.debug("GateClosed", gateClosed);
+        if (turretMotor != null) panelsTelemetry.debug("TurretEnc", turretMotor.getCurrentPosition());
+        if (intakeMotor != null) panelsTelemetry.debug("IntakePower", intakeMotor.getPower());
         panelsTelemetry.update(telemetry);
 
         if (state == AutoState.FINISHED && !shutdownDone) {
@@ -287,11 +286,9 @@ public class Blue15Ball extends OpMode {
     }
 
     private void runStateMachine() {
-        if (timedIntakeActive) {
-            if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                startIntake(INTAKE_ON_POWER);
-                timedIntakeActive = false;
-            }
+        if (timedIntakeActive && timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
+            startIntake(INTAKE_ON_POWER);
+            timedIntakeActive = false;
         }
 
         switch (state) {
@@ -337,10 +334,12 @@ public class Blue15Ball extends OpMode {
             case CLOSED_INTAKE_SEQUENCE:
                 if (isShootMotionStable()) {
                     startIntake(CLOSED_INTAKE_POWER);
+
                     if (!speedStableTimerStarted) {
                         speedStableTimer.resetTimer();
                         speedStableTimerStarted = true;
                     }
+
                     if (speedStableTimer.getElapsedTimeSeconds() >= SPEED_STABLE_HOLD_SECONDS) {
                         state = AutoState.PRE_ACTION;
                         speedStableTimerStarted = false;
@@ -385,8 +384,6 @@ public class Blue15Ball extends OpMode {
                 }
                 break;
 
-            case FINISHED:
-            case IDLE:
             default:
                 break;
         }
@@ -394,32 +391,28 @@ public class Blue15Ball extends OpMode {
 
     private void startPath(int idx) {
         if (idx < 1 || idx > 14) {
-            currentPathIndex = 0;
             state = AutoState.FINISHED;
             return;
         }
 
-        // Intake behavior by segment type
-        if (isIntakePath(idx)) {
-            startIntake(INTAKE_ON_POWER);
-            if (isTimedIntakePath(idx)) {
-                timedIntakeTimer.resetTimer();
-                timedIntakeActive = true;
-            }
-        } else {
-            stopIntake();
+        if (isIntakePath(idx)) startIntake(INTAKE_ON_POWER);
+        else stopIntake();
+
+        if (isTimedIntakePath(idx)) {
+            timedIntakeTimer.resetTimer();
+            timedIntakeActive = true;
         }
 
         switch (idx) {
-            case 1: follower.followPath(paths.startToShoot); break;
-            case 2: follower.followPath(paths.collectFirst3); break;
-            case 3: follower.followPath(paths.backToShootFirst3); break;
-            case 4: follower.followPath(paths.gateOpen1); break;
-            case 5: follower.followPath(paths.gateMoveCollect1); break;
-            case 6: follower.followPath(paths.gateExtendedCollect1); break;
-            case 7: follower.followPath(paths.backToShootSecond3); break;
-            case 8: follower.followPath(paths.gateOpen2); break;
-            case 9: follower.followPath(paths.gateMoveCollect2); break;
+            case 1:  follower.followPath(paths.startToShoot); break;
+            case 2:  follower.followPath(paths.collectFirst3); break;
+            case 3:  follower.followPath(paths.backToShootFirst3); break;
+            case 4:  follower.followPath(paths.gateOpen1); break;
+            case 5:  follower.followPath(paths.gateMoveCollect1); break;
+            case 6:  follower.followPath(paths.gateExtendedCollect1); break;
+            case 7:  follower.followPath(paths.backToShootSecond3); break;
+            case 8:  follower.followPath(paths.gateOpen2); break;
+            case 9:  follower.followPath(paths.gateMoveCollect2); break;
             case 10: follower.followPath(paths.gateExtendedCollect2); break;
             case 11: follower.followPath(paths.backToShootThird3); break;
             case 12: follower.followPath(paths.collectForth3); break;
@@ -443,17 +436,9 @@ public class Blue15Ball extends OpMode {
         return idx == 3 || idx == 7 || idx == 11 || idx == 13;
     }
 
-    private void startIntake(double p) {
-        if (intakeMotor != null) intakeMotor.setPower(p);
-    }
-
-    private void stopIntake() {
-        if (intakeMotor != null) intakeMotor.setPower(INTAKE_HOLD_POWER);
-    }
-
-    private void fullStopIntake() {
-        if (intakeMotor != null) intakeMotor.setPower(0.0);
-    }
+    private void startIntake(double p) { if (intakeMotor != null) intakeMotor.setPower(p); }
+    private void stopIntake() { if (intakeMotor != null) intakeMotor.setPower(INTAKE_HOLD_POWER); }
+    private void fullStopIntake() { if (intakeMotor != null) intakeMotor.setPower(0.0); }
 
     private void forceGateClosed() {
         if (gateServo != null && !gateClosed) {
@@ -463,16 +448,19 @@ public class Blue15Ball extends OpMode {
     }
 
     private void updateGate() {
-        try {
-            double dist = distanceToShootPose();
-            if (dist <= GATE_OPEN_TOLERANCE_IN && gateServo != null && gateClosed) {
-                gateServo.setPosition(GATE_OPEN);
-                gateClosed = false;
-            } else if (dist >= GATE_CLOSE_TOLERANCE_IN && gateServo != null && !gateClosed) {
-                gateServo.setPosition(GATE_CLOSED);
-                gateClosed = true;
-            }
-        } catch (Exception ignored) {}
+        if (gateServo == null) return;
+        double dist = distanceToShootPose();
+
+        boolean slowEnoughForGate = translationalSpeedInPerS <= GATE_OPEN_MAX_TRANS_SPEED
+                && angularSpeedDegPerS <= GATE_OPEN_MAX_ANG_SPEED;
+
+        if (dist <= GATE_OPEN_TOLERANCE_IN && slowEnoughForGate && gateClosed) {
+            gateServo.setPosition(GATE_OPEN);
+            gateClosed = false;
+        } else if ((dist >= GATE_CLOSE_TOLERANCE_IN || !slowEnoughForGate) && !gateClosed) {
+            gateServo.setPosition(GATE_CLOSED);
+            gateClosed = true;
+        }
     }
 
     private double distanceToShootPose() {
@@ -489,24 +477,15 @@ public class Blue15Ball extends OpMode {
             Pose p = follower.getPose();
             if (p == null) return;
 
-            double x = p.getX();
-            double y = p.getY();
-            double h = p.getHeading();
+            double x = p.getX(), y = p.getY(), h = p.getHeading();
 
             if (lastPoseTimeMs > 0 && !Double.isNaN(lastPoseX) && !Double.isNaN(lastPoseY) && !Double.isNaN(lastPoseHeadingRad)) {
                 double dt = Math.max(1, nowMs - lastPoseTimeMs) / 1000.0;
-                double dx = x - lastPoseX;
-                double dy = y - lastPoseY;
-                double dh = normalizeAngleRad(h - lastPoseHeadingRad);
-
-                translationalSpeedInPerS = Math.hypot(dx, dy) / dt;
-                angularSpeedDegPerS = Math.toDegrees(Math.abs(dh)) / dt;
+                translationalSpeedInPerS = Math.hypot(x - lastPoseX, y - lastPoseY) / dt;
+                angularSpeedDegPerS = Math.toDegrees(Math.abs(normalizeAngleRad(h - lastPoseHeadingRad))) / dt;
             }
 
-            lastPoseX = x;
-            lastPoseY = y;
-            lastPoseHeadingRad = h;
-            lastPoseTimeMs = nowMs;
+            lastPoseX = x; lastPoseY = y; lastPoseHeadingRad = h; lastPoseTimeMs = nowMs;
         } catch (Exception ignored) {}
     }
 
@@ -529,7 +508,6 @@ public class Blue15Ball extends OpMode {
             flywheel.setTargetRPM(0.0);
             flywheel.update(System.currentTimeMillis(), false);
         }
-
         fullStopIntake();
 
         if (gateServo != null) {
@@ -550,78 +528,125 @@ public class Blue15Ball extends OpMode {
         state = AutoState.FINISHED;
     }
 
+    // ================= Paths with per-path slowdown =================
     public static class Paths {
-        public PathChain startToShoot;
-        public PathChain collectFirst3;
-        public PathChain backToShootFirst3;
-        public PathChain gateOpen1;
-        public PathChain gateMoveCollect1;
-        public PathChain gateExtendedCollect1;
-        public PathChain backToShootSecond3;
-        public PathChain gateOpen2;
-        public PathChain gateMoveCollect2;
-        public PathChain gateExtendedCollect2;
-        public PathChain backToShootThird3;
-        public PathChain collectForth3;
-        public PathChain backToShootForth3;
-        public PathChain path14;
+        public PathChain startToShoot, collectFirst3, backToShootFirst3, gateOpen1, gateMoveCollect1, gateExtendedCollect1,
+                backToShootSecond3, gateOpen2, gateMoveCollect2, gateExtendedCollect2,
+                backToShootThird3, collectForth3, backToShootForth3, path14;
+
+        private static PathConstraints slowEndConstraints() {
+            return new PathConstraints(
+                    SLOW_T_VALUE_CONSTRAINT,
+                    SLOW_VELOCITY_CONSTRAINT,
+                    SLOW_TRANSLATIONAL_CONSTRAINT,
+                    SLOW_HEADING_CONSTRAINT_RAD,
+                    SLOW_TIMEOUT_MS,
+                    SLOW_BRAKING_STRENGTH,
+                    10,
+                    SLOW_BRAKING_START
+            );
+        }
 
         public Paths(Follower follower) {
-            startToShoot = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(20.661, 122.000), new Pose(54.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(142.5), Math.toRadians(180)).build();
+            PathConstraints slow = slowEndConstraints();
 
-            collectFirst3 = follower.pathBuilder().addPath(
-                    new BezierCurve(new Pose(54.000, 84.000), new Pose(68.000, 56.000), new Pose(12.000, 56.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180)).build();
+            startToShoot = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(20.661, 122.000), new Pose(54.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(142.5), Math.toRadians(180))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            backToShootFirst3 = follower.pathBuilder().addPath(
-                    new BezierCurve(new Pose(12.000, 56.000), new Pose(43.000, 63.000), new Pose(54.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180)).build();
+            collectFirst3 = follower.pathBuilder()
+                    .addPath(new BezierCurve(new Pose(54.000, 84.000), new Pose(68.000, 56.000), new Pose(12.000, 56.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .build();
 
-            gateOpen1 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(54.000, 84.000), new Pose(16.000, 60.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(145)).build();
+            backToShootFirst3 = follower.pathBuilder()
+                    .addPath(new BezierCurve(new Pose(12.000, 56.000), new Pose(43.000, 63.000), new Pose(54.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            gateMoveCollect1 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(16.000, 60.000), new Pose(13.000, 50.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(145), Math.toRadians(120)).build();
+            gateOpen1 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(54.000, 84.000), new Pose(16.000, 60.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(145))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            gateExtendedCollect1 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(13.000, 50.000), new Pose(13.000, 55.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(120), Math.toRadians(135)).build();
+            gateMoveCollect1 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(16.000, 60.000), new Pose(13.000, 50.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(145), Math.toRadians(120))
+                    .build();
 
-            backToShootSecond3 = follower.pathBuilder().addPath(
-                    new BezierCurve(new Pose(13.000, 55.000), new Pose(40.000, 54.000), new Pose(54.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180)).build();
+            gateExtendedCollect1 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(13.000, 50.000), new Pose(13.000, 55.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(120), Math.toRadians(135))
+                    .build();
 
-            gateOpen2 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(54.000, 84.000), new Pose(16.000, 60.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(145)).build();
+            backToShootSecond3 = follower.pathBuilder()
+                    .addPath(new BezierCurve(new Pose(13.000, 55.000), new Pose(40.000, 54.000), new Pose(54.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            gateMoveCollect2 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(16.000, 60.000), new Pose(13.000, 50.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(145), Math.toRadians(120)).build();
+            gateOpen2 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(54.000, 84.000), new Pose(16.000, 60.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(145))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            gateExtendedCollect2 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(13.000, 50.000), new Pose(13.000, 55.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(120), Math.toRadians(135)).build();
+            gateMoveCollect2 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(16.000, 60.000), new Pose(13.000, 50.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(145), Math.toRadians(120))
+                    .build();
 
-            backToShootThird3 = follower.pathBuilder().addPath(
-                    new BezierCurve(new Pose(13.000, 55.000), new Pose(40.000, 54.000), new Pose(54.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180)).build();
+            gateExtendedCollect2 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(13.000, 50.000), new Pose(13.000, 55.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(120), Math.toRadians(135))
+                    .build();
 
-            collectForth3 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(54.000, 84.000), new Pose(20.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180)).build();
+            backToShootThird3 = follower.pathBuilder()
+                    .addPath(new BezierCurve(new Pose(13.000, 55.000), new Pose(40.000, 54.000), new Pose(54.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(135), Math.toRadians(180))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
 
-            backToShootForth3 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(20.000, 84.000), new Pose(54.000, 84.000))
-            ).setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180)).build();
+            collectForth3 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(54.000, 84.000), new Pose(20.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .build();
 
-            path14 = follower.pathBuilder().addPath(
-                    new BezierLine(new Pose(54.000, 84.000), new Pose(36.000, 80.000))
-            ).setConstantHeadingInterpolation(Math.toRadians(135)).build();
+            backToShootForth3 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(20.000, 84.000), new Pose(54.000, 84.000)))
+                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .setConstraintsForLast(slow)
+                    .setBrakingStrength(SLOW_BRAKING_STRENGTH)
+                    .setBrakingStart(SLOW_BRAKING_START)
+                    .setGlobalDeceleration(SLOW_BRAKING_START)
+                    .build();
+
+            path14 = follower.pathBuilder()
+                    .addPath(new BezierLine(new Pose(54.000, 84.000), new Pose(36.000, 80.000)))
+                    .setConstantHeadingInterpolation(Math.toRadians(135))
+                    .build();
         }
     }
 }
