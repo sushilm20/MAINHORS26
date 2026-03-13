@@ -129,7 +129,7 @@ public class BluePedroAuto extends OpMode {
 
     // ── Velocity-based shoot gating thresholds ──
     @Sorter(sort = 21)
-    public static double SHOOT_MAX_TRANSLATIONAL_SPEED_IN_PER_S = 6.0;
+    public static double SHOOT_MAX_TRANSLATIONAL_SPEED_IN_PER_S = 1.5;
     @Sorter(sort = 22)
     public static double SHOOT_MAX_ANGULAR_SPEED_DEG_PER_S = 20.0;
     @Sorter(sort = 23)
@@ -340,6 +340,8 @@ public class BluePedroAuto extends OpMode {
             if (turretMotor != null) {
                 bearingTurretController = new BearingTurretController(turretMotor, follower, telemetry);
                 bearingTurretController.clearPid();
+                bearingTurretController.freeze();
+                bearingTurretController.freezeTargetTicks = 230;
             }
             if (flywheel != null) {
                 flywheel.setShooterOn(false);

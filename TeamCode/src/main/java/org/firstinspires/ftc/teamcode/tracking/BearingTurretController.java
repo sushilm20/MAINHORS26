@@ -139,7 +139,7 @@ public class BearingTurretController {
 
     // Freeze/hold state (after homing finds the limit switch)
     private boolean freezeMode = false;
-    private int freezeTargetTicks = 0;
+    public int freezeTargetTicks = 0;
 
     // Tracks whether the controller has received at least one valid pose.
     // Prevents the turret from lurching on the very first loop cycle
@@ -400,7 +400,7 @@ public class BearingTurretController {
     //  FREEZE HOLD (simple P on raw ticks)
     // ══════════════════════════════════════════════════
 
-    private void holdRawTicks(int targetTicks) {
+    public void holdRawTicks(int targetTicks) {
         int current = turretMotor.getCurrentPosition();
         int err = targetTicks - current;
 

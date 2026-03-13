@@ -63,7 +63,7 @@ public class PinpointTurretHORS extends LinearOpMode {
     private boolean turretUnlocked = false;
 
     // Hood presets
-    private static final double RIGHT_HOOD_CLOSE = 0.16;
+    private static final double RIGHT_HOOD_CLOSE = 0.13;
     private static final double RIGHT_HOOD_FAR = 0.26;
 
     // Gate/Intake constants
@@ -450,6 +450,7 @@ public class PinpointTurretHORS extends LinearOpMode {
 
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor AMPS", intakeMotor.getCurrent(CurrentUnit.AMPS));
             PanelsTelemetry.INSTANCE.getTelemetry().addData("Intake Motor VELO", intakeMotor.getVelocity());
+
 // Define expected ranges for each metric
             double intakeVelo = intakeMotor.getVelocity();
             double flywheelRPM = flywheel.getCurrentRPM();
