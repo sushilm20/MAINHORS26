@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.tracking;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
+import com.bylazar.telemetry.PanelsTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -65,17 +66,17 @@ public class BearingTurretController {
 
     // Encoder geometry
     // Total encoder ticks for one full 360° turret rotation
-    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 1660;
+    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = (17900 * 2);
     // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
     // If turret overturns on rotation, flip this sign.
-    @Sorter(sort = 3) public static double ENCODER_SIGN = - 1.0; //keep liek this to have correct adjustment direction
+    @Sorter(sort = 3) public static double ENCODER_SIGN = -1.0; //keep liek this to have correct adjustment direction
 
     // Encoder hard limits (raw ticks)
-    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -830;
-    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 830;
+    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -17900;
+    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 17900;
 
     // PID gains (error is in degrees)
-    @Sorter(sort = 6)  public static double KP = 0.016;
+    @Sorter(sort = 6)  public static double KP = 0.0016;
     @Sorter(sort = 7)  public static double KI = 0.0;
     @Sorter(sort = 8)  public static double KD = 0.003;
     @Sorter(sort = 9)  public static double MAX_POWER = 1.0;
@@ -214,7 +215,7 @@ public class BearingTurretController {
     public void zeroEncoder() {
         try {
             turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         } catch (Exception ignored) {}
         clearPid();
     }
@@ -686,18 +687,18 @@ public class BearingTurretController {
 
 
     private void publishTelemetry() {
-        if (telemetry == null) return;
-        telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
-        telemetry.addData("aim.robotHead", "%.1f°", tRobotHeadingDeg);
-        telemetry.addData("aim.bearing", "%.1f°", tBearingDeg);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.robotHead", "%.1f°", tRobotHeadingDeg);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.bearing", "%.1f°", tBearingDeg);
 
-        telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
-        telemetry.addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
-        telemetry.addData("aim.power", "%.3f", tAppliedPower);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.dist", "%.1f in", tDistToGoal);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.power", "%.3f", tAppliedPower);
 
-        telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
-        telemetry.addData("aim.velComp", "%.1f °/s → %.1f° lead",
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.velComp", "%.1f °/s → %.1f° lead",
                 filteredBearingRateDegPerSec,
                 tVelCompDeg);
+        PanelsTelemetry.INSTANCE.getFtcTelemetry().update();
     }
 }

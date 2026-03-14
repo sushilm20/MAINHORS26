@@ -602,15 +602,16 @@ public class BluePedroAuto extends OpMode {
     private void moveTurretTo230ThenBrake() {
         if (turretMotor == null) return;
 
-        final int targetTicks = 230;
+        final int targetTicks = 220;
         final int toleranceTicks = 8;
-        final double approachPower = 0.22;
+        final double approachPower = 0.25;
 
         int pos = turretMotor.getCurrentPosition();
 
         if (!turretBrakeHoldActive) {
             int error = targetTicks - pos;
             if (Math.abs(error) <= toleranceTicks) {
+
                 turretMotor.setPower(0.0); // BRAKE holds
                 turretBrakeHoldActive = true;
             } else {

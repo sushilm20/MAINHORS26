@@ -171,7 +171,7 @@ public class PinpointTurretHORS extends LinearOpMode {
 
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Follower init (Pedro Pathing — sole source of pose + heading)
@@ -449,6 +449,14 @@ public class PinpointTurretHORS extends LinearOpMode {
             // ════════════════════════════════════════════
 
             // Pose
+
+            telemetry.addData("Turret Enc", "%d -> %d",
+                    bearingTurret.getEncoderTicks(),
+                    bearingTurret.getDesiredTicks());
+            telemetry.addData("Turret Err", "%.2f deg", bearingTurret.getErrorDeg());
+            telemetry.addData("Turret Pwr", "%.3f", bearingTurret.getAppliedPower());
+            telemetry.addData("Turret VelComp", "%.2f deg", bearingTurret.getVelCompDeg());
+
             telemetry.addData("Pose", "(%.1f, %.1f) %.1f°",
                     currentPose.getX(), currentPose.getY(),
                     Math.toDegrees(currentPose.getHeading()));
@@ -459,14 +467,7 @@ public class PinpointTurretHORS extends LinearOpMode {
                     flywheel.getTargetRPM(),
                     flywheel.isAtTarget() ? "✓" : "");
 
-            // Turret offset + mode (updated to show LOCKED state)
-            telemetry.addData("Turret Offset", "%.1f°", bearingTurret.getManualOffsetDeg());
-            telemetry.addData("Turret Mode",
-                    !turretUnlocked ? "LOCKED (press A to unlock)" :
-                            bearingTurret.isFreezeMode() ? "FROZEN (press A to reset)" :
-                                    bearingTurret.isHomingMode() ? "HOMING" : "TRACKING");
 
-            // Loop
             telemetry.addData("Loop", "%.0f ms (%.0f Hz)",
                     loopTimeMs,
                     loopTimeMs > 0 ? 1000.0 / loopTimeMs : 0);

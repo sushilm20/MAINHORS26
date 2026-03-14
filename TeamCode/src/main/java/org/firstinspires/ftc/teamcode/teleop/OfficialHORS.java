@@ -27,7 +27,7 @@ import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 import java.util.List;
 
-@Disabled
+
 @TeleOp(name="A HORS OFFICIAL ⭐", group="Linear OpMode")
 public class OfficialHORS extends LinearOpMode {
 
