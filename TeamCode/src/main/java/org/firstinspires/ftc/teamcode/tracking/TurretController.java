@@ -646,5 +646,6 @@ public class TurretController {
         telemetry.addData("turret.offset", encoderOffset);
         telemetry.addData("turret.freeze", freezeMode);
         telemetry.addData("turret.homing", homingMode);
+        telemetry.addData("turret.imu", imu.getAngularOrientation());
     }
 }

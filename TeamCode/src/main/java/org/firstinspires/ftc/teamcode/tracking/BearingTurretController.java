@@ -111,6 +111,13 @@ public class BearingTurretController {
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
     @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
 
+    // Rightward asymmetry damping (bias desired target toward current)
+    // Same behavior concept as TurretController:
+    // - applies only when desired is to the "rightward" side (delta > 0 in tick space)
+    // - only when within a small error window
+    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.9;
+    @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
+
     // ══════════════════════════════════════════════════
     //  INTERNAL STATE
     // ══════════════════════════════════════════════════
@@ -563,7 +570,7 @@ public class BearingTurretController {
             // Low-pass filter to reject noise
             filteredBearingRateDegPerSec =
                     BEARING_RATE_FILTER * filteredBearingRateDegPerSec
-                  + (1.0 - BEARING_RATE_FILTER) * rawRateDegPerSec;
+                            + (1.0 - BEARING_RATE_FILTER) * rawRateDegPerSec;
 
             // Lead = gain × rate
             velCompDeg = VELOCITY_COMP_GAIN * filteredBearingRateDegPerSec;
@@ -582,9 +589,26 @@ public class BearingTurretController {
         if (desiredTicks > TURRET_MAX_TICKS) desiredTicks = TURRET_MAX_TICKS;
         if (desiredTicks < TURRET_MIN_TICKS) desiredTicks = TURRET_MIN_TICKS;
 
-        // 5. Compute error in DEGREES (for PID)
+        // 5) Apply rightward damping by biasing desired target itself
         rawTicks = turretMotor.getCurrentPosition();
-        int errorTicks = desiredTicks - rawTicks;
+
+        int delta = desiredTicks - rawTicks;
+        int desiredBiased = desiredTicks;
+
+        // Match TurretController behavior:
+        // rightward means positive delta in encoder tick space
+        boolean rightDampActive = delta > 0 && Math.abs(delta) <= RIGHTWARD_DAMP_ERROR_WINDOW;
+        if (rightDampActive) {
+            double scale = Math.max(0.0, 1.0 - RIGHTWARD_ENCODER_DAMP);
+            desiredBiased = rawTicks + (int) Math.round(delta * scale);
+        }
+
+        // Clamp biased desired to limits
+        if (desiredBiased > TURRET_MAX_TICKS) desiredBiased = TURRET_MAX_TICKS;
+        if (desiredBiased < TURRET_MIN_TICKS) desiredBiased = TURRET_MIN_TICKS;
+
+        // Compute error in DEGREES (for PID)
+        int errorTicks = desiredBiased - rawTicks;
         double ticksPerDeg = TICKS_PER_FULL_ROTATION / 360.0;
         double errorDeg = errorTicks / ticksPerDeg;
 
@@ -640,7 +664,7 @@ public class BearingTurretController {
         tDistToGoal = distToGoal;
         tAppliedPower = applied;
         tEncoderTicks = rawTicks;
-        tDesiredTicks = desiredTicks;
+        tDesiredTicks = desiredBiased;
         tVelCompDeg = velCompDeg;
 
         publishTelemetry();
@@ -660,7 +684,7 @@ public class BearingTurretController {
     public double getAppliedPower()      { return tAppliedPower; }
     public double getVelCompDeg()        { return tVelCompDeg; }
 
-    
+
     private void publishTelemetry() {
         if (telemetry == null) return;
         telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
