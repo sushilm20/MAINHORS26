@@ -66,19 +66,19 @@ public class BearingTurretController {
 
     // Encoder geometry
     // Total encoder ticks for one full 360° turret rotation
-    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = (18000 * 2);
+    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = (17000 * 2);
     // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
     // If turret overturns on rotation, flip this sign.
     @Sorter(sort = 3) public static double ENCODER_SIGN = 1.0; //keep liek this to have correct adjustment direction
 
     // Encoder hard limits (raw ticks)
-    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -18000;
-    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 18000;
+    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -17000;
+    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 17000;
 
     // PID gains (error is in degrees)
-    @Sorter(sort = 6)  public static double KP = 0.0017;
+    @Sorter(sort = 6)  public static double KP = 0.004;
     @Sorter(sort = 7)  public static double KI = 0.0;
-    @Sorter(sort = 8)  public static double KD = 0.02;
+    @Sorter(sort = 8)  public static double KD = 0.0;
     @Sorter(sort = 9)  public static double MAX_POWER = 1.0;
 
     // Deadband: if error < this many degrees, output 0 (prevents jitter)
@@ -88,7 +88,7 @@ public class BearingTurretController {
     @Sorter(sort = 11) public static double INTEGRAL_CLAMP_DEG = 100.0;
 
     // Power smoothing (EMA alpha: 0 = no smoothing, 1 = never changes)
-    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.67;
+    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.5;
 
     // Minimum distance to goal (inches). If closer than this, hold last known aim.
     // Prevents wild oscillation when robot is nearly on top of the goal.
@@ -107,17 +107,17 @@ public class BearingTurretController {
     // ── Velocity compensation ──
     // Feedforward gain: how many degrees of turret lead per degree/sec of bearing rate.
     // Higher = more aggressive lead. Start at ~0.05, tune up.
-    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.25;
+    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.0;
 
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
-    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
+    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.0;
 
     // Rightward asymmetry damping (bias desired target toward current)
     // Same behavior concept as TurretController:
     // - applies only when desired is to the "rightward" side (delta > 0 in tick space)
     // - only when within a small error window
-    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.9;
-    @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 50;
+    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.0;
+    @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 0;
 
     // ══════════════════════════════════════════════════
     //  INTERNAL STATE
