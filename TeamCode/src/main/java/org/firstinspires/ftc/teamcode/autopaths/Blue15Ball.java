@@ -109,8 +109,8 @@ public class Blue15Ball extends OpMode {
     @Sorter(sort = 33) public static double GATE_CLOSE_TOLERANCE_IN = 4.0;
 
     // Gate opens only when robot is settled near shoot
-    @Sorter(sort = 34) public static double GATE_OPEN_MAX_TRANS_SPEED = 1.1;
-    @Sorter(sort = 35) public static double GATE_OPEN_MAX_ANG_SPEED = 14.0;
+    @Sorter(sort = 34) public static double GATE_OPEN_MAX_TRANS_SPEED = 0.7;
+    @Sorter(sort = 35) public static double GATE_OPEN_MAX_ANG_SPEED = 12.0;
 
     // Path slowdown tunables
     @Sorter(sort = 40) public static double SLOW_T_VALUE_CONSTRAINT = 0.995;
@@ -130,7 +130,7 @@ public class Blue15Ball extends OpMode {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(20.661, 122.000, Math.toRadians(142.5)));
+        follower.setStartingPose(new Pose(20, 122.000, Math.toRadians(142.5)));
         paths = new Paths(follower);
 
         intakeTimer = new Timer();
