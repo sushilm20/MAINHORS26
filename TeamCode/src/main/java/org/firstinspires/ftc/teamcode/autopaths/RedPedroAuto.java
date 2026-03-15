@@ -60,7 +60,7 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2330;
+    private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
 
@@ -86,11 +86,11 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 0)
     public static double INTAKE_RUN_SECONDS = 0.5;
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 1.0;
+    public static double TIMED_INTAKE_SECONDS = 0.6;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 1;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.5;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 2.0;
     @Sorter(sort = 5)
     public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
 
@@ -110,7 +110,7 @@ public class RedPedroAuto extends OpMode {
     // TOLERANCE SETTINGS
     // ========================================
     @Sorter(sort = 20)
-    public static double START_POSE_TOLERANCE_IN = 4.0;
+    public static double START_POSE_TOLERANCE_IN = 2.0;
 
     // ========================================
     // GATE SETTINGS
@@ -120,7 +120,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 31)
     public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 3.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 2.0;
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
     @Sorter(sort = 34)
@@ -148,11 +148,11 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 0.0;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 0.0;
+    public static double SHOOT_HEADING_FIRST3 = 3.0;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 0.0;
+    public static double SHOOT_SECOND3_HEADING = 6.0;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 0.0;
+    public static double SHOOT_FINAL_HEADING = 9.0;
 
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
@@ -340,7 +340,7 @@ public class RedPedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.12);
+                rightHoodServo.setPosition(0.22);
                 panelsTelemetry.debug("Init", "Right hood servo initialized to 0.19");
             }
         } catch (Exception e) {
