@@ -12,7 +12,6 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -20,7 +19,6 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
-import org.firstinspires.ftc.teamcode.subsystems.IntakeBallDetector;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
 @Autonomous(name = "Red 12 Ball 🔴", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
@@ -62,9 +60,9 @@ public class RedPedroAuto extends OpMode {
 
     private FlywheelController flywheel;
     private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2300;
+    private static final double AUTO_SHOOTER_RPM = 2330;
 
-    private DcMotorEx intakeMotor;
+    private DcMotor intakeMotor;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -323,7 +321,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         try {
-            intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
+            intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
@@ -342,7 +340,7 @@ public class RedPedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.14);
+                rightHoodServo.setPosition(0.12);
                 panelsTelemetry.debug("Init", "Right hood servo initialized to 0.19");
             }
         } catch (Exception e) {
@@ -647,18 +645,7 @@ public class RedPedroAuto extends OpMode {
                     startIntake(CLOSED_INTAKE_POWER);
                 }
                 if (distPre <= START_POSE_TOLERANCE_IN) {
-                    // ── Intake is slowed & robot settled — reliably check for balls ──
-                    if (currentPathIndex != 1 && !IntakeBallDetector.hasBalls(intakeMotor)) {
-                        panelsTelemetry.debug("SKIP_SHOOT", "Path " + currentPathIndex + " has 0 balls – skipping shoot");
-                        if (nextPathIndex > 0 && nextPathIndex <= 12) {
-                            startPath(nextPathIndex);
-                            nextPathIndex = -1;
-                        } else {
-                            state = AutoState.FINISHED;
-                        }
-                    } else {
-                        state = AutoState.PRE_ACTION;
-                    }
+                    state = AutoState.PRE_ACTION;
                 }
                 break;
 

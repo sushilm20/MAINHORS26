@@ -116,7 +116,7 @@ public class Blue15Ball extends OpMode {
     @Sorter(sort = 40) public static double SLOW_T_VALUE_CONSTRAINT = 0.995;
     @Sorter(sort = 41) public static double SLOW_TIMEOUT_MS = 180;
     @Sorter(sort = 42) public static double SLOW_BRAKING_STRENGTH = 0.70;
-    @Sorter(sort = 43) public static double SLOW_BRAKING_START = 0.84;
+    @Sorter(sort = 43) public static double SLOW_BRAKING_START = 0.65;
     @Sorter(sort = 44) public static double SLOW_VELOCITY_CONSTRAINT = 0.10;
     @Sorter(sort = 45) public static double SLOW_TRANSLATIONAL_CONSTRAINT = 0.10;
     @Sorter(sort = 46) public static double SLOW_HEADING_CONSTRAINT_RAD = 0.007;
