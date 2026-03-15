@@ -84,15 +84,15 @@ public class RedPedroAuto extends OpMode {
     // TIMING PARAMETERS
     // ========================================
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.5;
+    public static double INTAKE_RUN_SECONDS = 0.6;
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 0.6;
+    public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 1.5;
+    public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 2.0;
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1100L;
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1300L;
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -120,7 +120,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 31)
     public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32)
-    public static double GATE_OPEN_TOLERANCE_IN = 2.0;
+    public static double GATE_OPEN_TOLERANCE_IN = 2.3;
     @Sorter(sort = 33)
     public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
     @Sorter(sort = 34)
@@ -148,11 +148,11 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 0.0;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 3.0;
+    public static double SHOOT_HEADING_FIRST3 = 4.0;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 6.0;
+    public static double SHOOT_SECOND3_HEADING = 12.0;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 9.0;
+    public static double SHOOT_FINAL_HEADING = 14.0;
 
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
@@ -206,7 +206,7 @@ public class RedPedroAuto extends OpMode {
     // PATH POSES - COLLECT THIRD 3 POSITION
     // ========================================
     @Sorter(sort = 170)
-    public static double COLLECT_THIRD3_X = 138.0;
+    public static double COLLECT_THIRD3_X = 140.0;
     @Sorter(sort = 171)
     public static double COLLECT_THIRD3_Y = 36.0;
     @Sorter(sort = 172)
@@ -340,7 +340,7 @@ public class RedPedroAuto extends OpMode {
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
-                rightHoodServo.setPosition(0.22);
+                rightHoodServo.setPosition(0.16);
                 panelsTelemetry.debug("Init", "Right hood servo initialized to 0.19");
             }
         } catch (Exception e) {
@@ -778,6 +778,8 @@ public class RedPedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(
                             Math.toRadians(COLLECT_FIRST3_HEADING),
                             Math.toRadians(GATE_ALIGN_HEADING))
+                    .setBrakingStart(.55)
+                    .setBrakingStrength(1.0)
                     .build();
 
             // Path 4: Gate align -> Gate clear
