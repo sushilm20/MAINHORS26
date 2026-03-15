@@ -630,22 +630,9 @@ public class FarBlue12 extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(90))
                     .build();
 
-            // CollectThird3 — same geometry as CollectSecond3
-            CollectThird3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(58.000, 14.000),
-                            new Pose(56.042, 22.067),
-                            new Pose(10.865, 21.577)))
-                    .setConstantHeadingInterpolation(Math.toRadians(180))
-                    .build();
-
-            // BackShootThird3 — same geometry as BackShootSecond3
-            BackShootThird3 = follower.pathBuilder()
-                    .addPath(new BezierLine(
-                            new Pose(10.865, 21.577),
-                            new Pose(58.000, 14.000)))
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(90))
-                    .build();
+            // Keep requested names, reuse identical paths
+            CollectThird3 = CollectSecond3;
+            BackShootThird3 = BackShootSecond3;
 
             MoveForRP = follower.pathBuilder()
                     .addPath(new BezierLine(
