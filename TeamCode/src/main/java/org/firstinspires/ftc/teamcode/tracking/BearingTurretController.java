@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.tracking;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.configurables.annotations.Sorter;
-import com.bylazar.telemetry.PanelsTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -66,19 +65,19 @@ public class BearingTurretController {
 
     // Encoder geometry
     // Total encoder ticks for one full 360° turret rotation
-    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = (17000 * 2);
+    @Sorter(sort = 2) public static double TICKS_PER_FULL_ROTATION = 1660;
     // +1 if positive ticks = CCW (left), -1 if positive ticks = CW (right)
     // If turret overturns on rotation, flip this sign.
-    @Sorter(sort = 3) public static double ENCODER_SIGN = 1.0; //keep liek this to have correct adjustment direction
+    @Sorter(sort = 3) public static double ENCODER_SIGN = - 1.0; //keep liek this to have correct adjustment direction
 
     // Encoder hard limits (raw ticks)
-    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -17000;
-    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 17000;
+    @Sorter(sort = 4) public static int TURRET_MIN_TICKS = -830;
+    @Sorter(sort = 5) public static int TURRET_MAX_TICKS = 830;
 
     // PID gains (error is in degrees)
-    @Sorter(sort = 6)  public static double KP = 0.004;
+    @Sorter(sort = 6)  public static double KP = 0.016;
     @Sorter(sort = 7)  public static double KI = 0.0;
-    @Sorter(sort = 8)  public static double KD = 0.0;
+    @Sorter(sort = 8)  public static double KD = 0.003;
     @Sorter(sort = 9)  public static double MAX_POWER = 1.0;
 
     // Deadband: if error < this many degrees, output 0 (prevents jitter)
@@ -88,7 +87,7 @@ public class BearingTurretController {
     @Sorter(sort = 11) public static double INTEGRAL_CLAMP_DEG = 100.0;
 
     // Power smoothing (EMA alpha: 0 = no smoothing, 1 = never changes)
-    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.5;
+    @Sorter(sort = 12) public static double POWER_SMOOTH = 0.67;
 
     // Minimum distance to goal (inches). If closer than this, hold last known aim.
     // Prevents wild oscillation when robot is nearly on top of the goal.
@@ -96,7 +95,7 @@ public class BearingTurretController {
 
     // Turret forward offset in radians: if the turret's "zero" doesn't point
     // exactly along the robot's +X axis, add an offset here.
-    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = 0.0;
+    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = Math.toRadians(15);
 
     // Homing sweep configuration
     @Sorter(sort = 15) public static int HOMING_AMP_TICKS = 300;
@@ -107,17 +106,17 @@ public class BearingTurretController {
     // ── Velocity compensation ──
     // Feedforward gain: how many degrees of turret lead per degree/sec of bearing rate.
     // Higher = more aggressive lead. Start at ~0.05, tune up.
-    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.0;
+    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.25;
 
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
-    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.0;
+    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
 
     // Rightward asymmetry damping (bias desired target toward current)
     // Same behavior concept as TurretController:
     // - applies only when desired is to the "rightward" side (delta > 0 in tick space)
     // - only when within a small error window
-    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.0;
-    @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 0;
+    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.70;
+    @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 100;
 
     // ══════════════════════════════════════════════════
     //  INTERNAL STATE
@@ -215,7 +214,7 @@ public class BearingTurretController {
     public void zeroEncoder() {
         try {
             turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         } catch (Exception ignored) {}
         clearPid();
     }
@@ -633,7 +632,7 @@ public class BearingTurretController {
         lastErrorDeg = errorDeg;
 
         // PID output
-        double pidOut = (KP * errorDeg + KI * integral + KD * derivative) * -1;
+        double pidOut = KP * errorDeg + KI * integral + KD * derivative;
 
         // Zero output in deadband
         if (Math.abs(errorDeg) <= DEADBAND_DEG) pidOut = 0.0;
@@ -685,45 +684,20 @@ public class BearingTurretController {
     public double getAppliedPower()      { return tAppliedPower; }
     public double getVelCompDeg()        { return tVelCompDeg; }
 
+
     private void publishTelemetry() {
-        // Core state
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.mode",
-                freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.pose", "(%.2f, %.2f, %.2f°)",
-                tRobotX, tRobotY, tRobotHeadingDeg);
+        if (telemetry == null) return;
+        telemetry.addData("aim.robotPos", "(%.1f, %.1f)", tRobotX, tRobotY);
+        telemetry.addData("aim.robotHead", "%.1f°", tRobotHeadingDeg);
+        telemetry.addData("aim.bearing", "%.1f°", tBearingDeg);
 
-        // Targeting geometry
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.goal", "(%.2f, %.2f)", GOAL_X, GOAL_Y);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.dist.in", "%.2f", tDistToGoal);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.bearing.deg", "%.2f", tBearingDeg);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("aim.turretDesired.deg", "%.2f", tTurretDesiredDeg);
+        telemetry.addData("aim.dist", "%.1f in", tDistToGoal);
+        telemetry.addData("aim.encoder", "%d → %d", tEncoderTicks, tDesiredTicks);
+        telemetry.addData("aim.power", "%.3f", tAppliedPower);
 
-        // Encoder setpoint / measurement / error
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.setpoint.ticks", tDesiredTicks);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.measurement.ticks", tEncoderTicks);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.error.deg", "%.3f", tErrorDeg);
-
-        // PID gains + config currently active
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.gains", "Kp=%.4f Ki=%.4f Kd=%.4f", KP, KI, KD);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.deadband.deg", "%.3f", DEADBAND_DEG);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.intClamp", "%.3f", INTEGRAL_CLAMP_DEG);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.maxPower", "%.3f", MAX_POWER);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("pid.smooth", "%.3f", POWER_SMOOTH);
-
-        // Velocity compensation
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("ff.bearingRate.deg_s", "%.2f", filteredBearingRateDegPerSec);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("ff.velComp.deg", "%.2f", tVelCompDeg);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("ff.velGain", "%.3f", VELOCITY_COMP_GAIN);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("ff.rateFilter", "%.3f", BEARING_RATE_FILTER);
-
-        // Rightward damping config (if you enabled it)
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("damp.right.gain", "%.3f", RIGHTWARD_ENCODER_DAMP);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("damp.right.window", RIGHTWARD_DAMP_ERROR_WINDOW);
-
-        // Final output
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("motor.power.applied", "%.4f", tAppliedPower);
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().addData("manual.offset.deg", "%.2f", getManualOffsetDeg());
-
-        PanelsTelemetry.INSTANCE.getFtcTelemetry().update();
+        telemetry.addData("aim.mode", freezeMode ? "FREEZE" : (homingMode ? "HOMING" : "TRACKING"));
+        telemetry.addData("aim.velComp", "%.1f °/s → %.1f° lead",
+                filteredBearingRateDegPerSec,
+                tVelCompDeg);
     }
 }

@@ -11,17 +11,21 @@ import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
+@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
 @Configurable
 public class BluePedroAuto extends OpMode {
 
@@ -29,7 +33,11 @@ public class BluePedroAuto extends OpMode {
     public Follower follower;
     private Paths paths;
 
-    private enum AutoState { IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, WAIT_FIRST_SHOOT, CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, WAIT_GATE_CLEAR, FINISHED }
+    private enum AutoState {
+        IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, WAIT_FIRST_SHOOT, CLOSED_INTAKE_SEQUENCE,
+        PRE_ACTION, INTAKE_RUN, CLAW_ACTION, WAIT_GATE_ALIGN, WAIT_GATE_CLEAR, FINISHED
+    }
+
     private AutoState state = AutoState.IDLE;
 
     private int currentPathIndex = 0;
@@ -43,8 +51,8 @@ public class BluePedroAuto extends OpMode {
 
     private Timer preActionTimer;
     private Timer poseWaitTimer;
+    private Timer gateAlignWaitTimer;
     private Timer gateClearWaitTimer;
-
     private Timer firstShootWaitTimer;
 
     private boolean preActionTimerStarted = false;
@@ -93,7 +101,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 4)
     public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1200L;
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1300L;
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -185,8 +193,7 @@ public class BluePedroAuto extends OpMode {
     @Sorter(sort = 131)
     public static double GATE_CLEAR_Y = 74.0;
     @Sorter(sort = 132)
-    public static double GATE_CLEAR_HEADING =
-            180.0;
+    public static double GATE_CLEAR_HEADING = 180.0;
 
     // ========================================
     // PATH POSES - ALIGN SECOND 3 POSITION
@@ -247,6 +254,7 @@ public class BluePedroAuto extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
         follower.setStartingPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING)));
+
         intakeTimer = new Timer();
         timedIntakeTimer = new Timer();
         preActionTimer = new Timer();
@@ -254,6 +262,7 @@ public class BluePedroAuto extends OpMode {
         gateAlignWaitTimer = new Timer();
         gateClearWaitTimer = new Timer();
         firstShootWaitTimer = new Timer();
+
         nextPathIndex = -1;
         intakeSegmentEnd = -1;
         preActionTimerStarted = false;
@@ -293,7 +302,13 @@ public class BluePedroAuto extends OpMode {
                 panelsTelemetry.debug("Init", "PinPoint IMU 'pinpoint' not found: " + e.getMessage());
             }
 
-
+            try {
+                hubImu = hardwareMap.get(BNO055IMU.class, "imu");
+                panelsTelemetry.debug("Init", "Found Hub IMU as 'imu'");
+            } catch (Exception e) {
+                hubImu = null;
+                panelsTelemetry.debug("Init", "Hub IMU 'imu' not found: " + e.getMessage());
+            }
 
             imu = (pinpointImu != null) ? pinpointImu : hubImu;
 
@@ -302,7 +317,7 @@ public class BluePedroAuto extends OpMode {
                 imuParams.angleUnit = BNO055IMU.AngleUnit.RADIANS;
                 imuParams.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
                 imu.initialize(imuParams);
-                panelsTelemetry.debug("Init", "IMU initialized (using " + ((pinpointImu != null) ? "PinPoint" : "Expansion Hub") + ")");
+                panelsTelemetry.debug("Init", "IMU initialized (using " + ((imu == pinpointImu) ? "PinPoint" : "Expansion Hub") + ")");
             } else {
                 panelsTelemetry.debug("Init", "No IMU found (neither 'pinpoint' nor 'imu'). Turret will not have heading data.");
             }
@@ -312,9 +327,8 @@ public class BluePedroAuto extends OpMode {
 
         try {
             if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
-            if (turretMotor != null) {
-                turretController = new TurretController(turretMotor, imu, telemetry);
-            }
+            if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
+
             if (turretController != null) {
                 turretController.captureReferences();
                 turretController.resetPidState();
@@ -325,6 +339,7 @@ public class BluePedroAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Flywheel/TurretController creation error: " + e.getMessage());
         }
+
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
@@ -332,14 +347,14 @@ public class BluePedroAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Intake Motor mapping failed: " + e.getMessage());
         }
+
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
-            if (clawServo != null) {
-                clawServo.setPosition(ClawController.CLAW_OPEN);
-            }
+            if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Claw servo mapping failed: " + e.getMessage());
         }
+
         try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
@@ -349,6 +364,7 @@ public class BluePedroAuto extends OpMode {
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Right hood servo mapping failed: " + e.getMessage());
         }
+
         try {
             gateServo = hardwareMap.get(Servo.class, "gateServo");
             if (gateServo != null) {
@@ -365,11 +381,25 @@ public class BluePedroAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        if (flywheel != null) {
-        }
         if (turretController != null && turretForceHold) {
             turretController.holdPositionTicks(turretHoldTarget);
         }
+
+        // safe orientation read to avoid angularOrientation() style errors
+        try {
+            if (imu != null) {
+                Orientation o = imu.getAngularOrientation(
+                        AxesReference.INTRINSIC,
+                        AxesOrder.ZYX,
+                        AngleUnit.RADIANS
+                );
+                panelsTelemetry.debug("IMU Heading(rad)", o.firstAngle);
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("IMU", "getAngularOrientation failed: " + e.getMessage());
+        }
+
+        panelsTelemetry.update(telemetry);
     }
 
     @Override
@@ -407,12 +437,12 @@ public class BluePedroAuto extends OpMode {
 
         runStateMachine(nowMs);
 
-        // ── Skip gate updates while in WAIT_FIRST_SHOOT so the gate stays closed ──
+        // Skip gate updates while in WAIT_FIRST_SHOOT so gate stays closed
         if (state != AutoState.WAIT_FIRST_SHOOT) {
             updateGate();
         }
 
-        // ── SAFETY NET: if the auto is running and the intake is at 0, force hold power ──
+        // Safety net: keep intake hold power during auto unless finished
         if (state != AutoState.IDLE && state != AutoState.FINISHED) {
             if (intakeMotor != null && intakeMotor.getPower() == 0.0) {
                 intakeMotor.setPower(INTAKE_HOLD_POWER);
@@ -426,23 +456,23 @@ public class BluePedroAuto extends OpMode {
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
+
         if (flywheel != null) {
             panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
             panelsTelemetry.debug("Fly On", flywheel.isShooterOn());
         }
+
         if (turretMotor != null && turretController != null) {
             panelsTelemetry.debug("Turret Enc", turretMotor.getCurrentPosition());
             panelsTelemetry.debug("Turret Power", turretController.getLastAppliedPower());
             panelsTelemetry.debug("TurretTrackingEnabled", String.valueOf(!turretForceManualNoMove));
             panelsTelemetry.debug("TurretHoldingEncoder", String.valueOf(turretForceHold));
         }
-        if (intakeMotor != null) {
-            panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
-        }
-        if (clawServo != null) {
-            panelsTelemetry.debug("ClawPos", clawServo.getPosition());
-        }
+
+        if (intakeMotor != null) panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
+        if (clawServo != null) panelsTelemetry.debug("ClawPos", clawServo.getPosition());
+
         double dist = distanceToShootPose();
         panelsTelemetry.debug("DistToShootPose", String.format("%.2f", dist));
         panelsTelemetry.debug("GateClosed", String.valueOf(gateClosed));
@@ -454,6 +484,21 @@ public class BluePedroAuto extends OpMode {
         } else {
             panelsTelemetry.debug("IMU Source", "None");
         }
+
+        // Optional live heading telemetry
+        try {
+            if (imu != null) {
+                Orientation o = imu.getAngularOrientation(
+                        AxesReference.INTRINSIC,
+                        AxesOrder.ZYX,
+                        AngleUnit.RADIANS
+                );
+                panelsTelemetry.debug("IMU Z(rad)", o.firstAngle);
+            }
+        } catch (Exception e) {
+            panelsTelemetry.debug("IMU", "read fail: " + e.getMessage());
+        }
+
         panelsTelemetry.update(telemetry);
 
         if (state == AutoState.FINISHED && !shutdownDone) {
@@ -468,21 +513,22 @@ public class BluePedroAuto extends OpMode {
             flywheel.setTargetRPM(0.0);
             flywheel.update(System.currentTimeMillis(), false);
         }
+
         fullStopIntake();
+
         if (gateServo != null) {
             gateServo.setPosition(GATE_CLOSED);
             gateClosed = true;
         }
-        if (clawServo != null) {
-            clawServo.setPosition(ClawController.CLAW_OPEN);
-        }
-        if (rightHoodServo != null) {
-            rightHoodServo.setPosition(0.16);
-        }
+
+        if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
+        if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
+
         if (turretController != null && turretForceHold) {
             turretHoldTarget = 0;
             turretController.holdPositionTicks(turretHoldTarget);
         }
+
         if (turretMotor != null) {
             try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
         }
@@ -506,7 +552,7 @@ public class BluePedroAuto extends OpMode {
         }
     }
 
-    // stopIntake now sets hold power instead of 0 — balls stay in
+    // hold power to keep balls in
     private void stopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(INTAKE_HOLD_POWER);
@@ -515,7 +561,7 @@ public class BluePedroAuto extends OpMode {
         }
     }
 
-    // true stop — only used during FINISHED/reset
+    // true stop only for finish/reset
     private void fullStopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(0.0);
@@ -538,8 +584,6 @@ public class BluePedroAuto extends OpMode {
             return Double.POSITIVE_INFINITY;
         }
     }
-
-    private Timer gateAlignWaitTimer;
 
     private void startPath(int idx) {
         if (idx < 1 || idx > 12) {
@@ -579,12 +623,13 @@ public class BluePedroAuto extends OpMode {
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                // timed burst done — keep intake at full travel power for backToShoot paths
                 startIntake(INTAKE_ON_POWER);
                 timedIntakeActive = false;
                 panelsTelemetry.debug("TimedIntake", "Timed intake period done; continuing at INTAKE_ON_POWER");
             } else {
-                panelsTelemetry.debug("TimedIntake", String.format("remaining=%.2fs", TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
+                panelsTelemetry.debug("TimedIntake",
+                        String.format("remaining=%.2fs",
+                                TIMED_INTAKE_SECONDS - timedIntakeTimer.getElapsedTimeSeconds()));
             }
         }
 
@@ -620,40 +665,39 @@ public class BluePedroAuto extends OpMode {
                         preActionTimerStarted = false;
                         preActionEntered = false;
 
-                        // ── Only for startToShoot (path 1): stop everything and wait before shooting ──
                         if (finished == 1) {
-                            stopIntake();  // sets hold power, not 0
-                            // Force gate closed during the wait
+                            stopIntake();
                             if (gateServo != null && !gateClosed) {
                                 gateServo.setPosition(GATE_CLOSED);
                                 gateClosed = true;
                             }
                             firstShootWaitTimer.resetTimer();
                             state = AutoState.WAIT_FIRST_SHOOT;
-                            panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Path 1 done, waiting " +  "s (intake hold, gate closed)");
+                            panelsTelemetry.debug("WAIT_FIRST_SHOOT", "Path 1 done, waiting (intake hold, gate closed)");
                         } else {
                             state = AutoState.CLOSED_INTAKE_SEQUENCE;
                         }
                     } else {
                         int next = finished + 1;
-                        if (next > 12) {
-                            state = AutoState.FINISHED;
-                        } else {
-                            startPath(next);
-                        }
+                        if (next > 12) state = AutoState.FINISHED;
+                        else startPath(next);
                     }
                 }
                 break;
 
+            case WAIT_FIRST_SHOOT:
+                // keep gate closed here; after small wait continue sequence
+                if (firstShootWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
+                    state = AutoState.CLOSED_INTAKE_SEQUENCE;
+                }
+                break;
 
             case WAIT_GATE_ALIGN:
                 if (gateAlignWaitTimer.getElapsedTimeSeconds() >= GATE_ALIGN_WAIT_SECONDS) {
                     if (nextPathIndex > 0) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
-                    } else {
-                        state = AutoState.FINISHED;
-                    }
+                    } else state = AutoState.FINISHED;
                 }
                 break;
 
@@ -662,20 +706,14 @@ public class BluePedroAuto extends OpMode {
                     if (nextPathIndex > 0) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
-                    } else {
-                        state = AutoState.FINISHED;
-                    }
+                    } else state = AutoState.FINISHED;
                 }
                 break;
 
             case CLOSED_INTAKE_SEQUENCE:
                 double distPre = distanceToShootPose();
-                if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) {
-                    startIntake(CLOSED_INTAKE_POWER);
-                }
-                if (distPre <= START_POSE_TOLERANCE_IN) {
-                    state = AutoState.PRE_ACTION;
-                }
+                if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) startIntake(CLOSED_INTAKE_POWER);
+                if (distPre <= START_POSE_TOLERANCE_IN) state = AutoState.PRE_ACTION;
                 break;
 
             case PRE_ACTION:
@@ -699,19 +737,17 @@ public class BluePedroAuto extends OpMode {
                     } else {
                         panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
                     }
-                } else {
-                    if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
-                        startIntake(SHOOT_POSE_INTAKE_POWER);
-                        intakeTimer.resetTimer();
-                        state = AutoState.INTAKE_RUN;
-                    }
+                } else if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
+                    startIntake(SHOOT_POSE_INTAKE_POWER);
+                    intakeTimer.resetTimer();
+                    state = AutoState.INTAKE_RUN;
                 }
                 break;
 
             case INTAKE_RUN:
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     startIntake(INTAKE_ON_POWER);
-                    flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
+                    if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
@@ -724,16 +760,12 @@ public class BluePedroAuto extends OpMode {
                     if (nextPathIndex > 0 && nextPathIndex <= 12) {
                         startPath(nextPathIndex);
                         nextPathIndex = -1;
-                    } else {
-                        state = AutoState.FINISHED;
-                    }
+                    } else state = AutoState.FINISHED;
                 }
                 break;
 
             case FINISHED:
-                if (turretForceHold) {
-                    turretHoldTarget = 0;
-                }
+                if (turretForceHold) turretHoldTarget = 0;
                 break;
 
             case IDLE:
@@ -775,7 +807,6 @@ public class BluePedroAuto extends OpMode {
         public PathChain moveForRP;
 
         public Paths(Follower follower) {
-            // Path 1: Start -> Primary shoot pose
             startToShoot = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(START_X, START_Y),
@@ -783,7 +814,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(START_HEADING), Math.toRadians(SHOOT_HEADING_INITIAL))
                     .build();
 
-            // Path 2: Shoot -> Collect first 3
             collectFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -791,7 +821,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_INITIAL), Math.toRadians(COLLECT_FIRST3_HEADING))
                     .build();
 
-            // Path 3: Collect first 3 -> Gate align
             gateAlign = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
@@ -799,7 +828,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_FIRST3_HEADING), Math.toRadians(GATE_ALIGN_HEADING))
                     .build();
 
-            // Path 4: Gate align -> Gate clear
             gateClear = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_ALIGN_X, GATE_ALIGN_Y),
@@ -807,7 +835,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_ALIGN_HEADING), Math.toRadians(GATE_CLEAR_HEADING))
                     .build();
 
-            // Path 5: Gate clear -> Shoot (angled for first 3)
             backToShootFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(GATE_CLEAR_X, GATE_CLEAR_Y),
@@ -815,7 +842,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(GATE_CLEAR_HEADING), Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
-            // Path 6: Shoot -> Align for second 3
             alignToCollectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -823,7 +849,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_HEADING_FIRST3), Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 
-            // Path 7: Align -> Collect second 3
             collectSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_SECOND3_X, ALIGN_SECOND3_Y),
@@ -831,7 +856,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_SECOND3_HEADING), Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
-            // Path 8: Collect second 3 -> Shoot (angled for second 3)
             backToShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
@@ -839,7 +863,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_SECOND3_HEADING), Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
-            // Path 9: Shoot -> Align for third 3
             alignToCollectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
@@ -847,7 +870,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(SHOOT_SECOND3_HEADING), Math.toRadians(ALIGN_THIRD3_HEADING))
                     .build();
 
-            // Path 10: Align -> Collect third 3
             collectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y),
@@ -855,7 +877,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(ALIGN_THIRD3_HEADING), Math.toRadians(COLLECT_THIRD3_HEADING))
                     .build();
 
-            // Path 11: Collect third 3 -> Shoot (final)
             backToShootThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
@@ -863,7 +884,6 @@ public class BluePedroAuto extends OpMode {
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_THIRD3_HEADING), Math.toRadians(SHOOT_FINAL_HEADING))
                     .build();
 
-            // Path 12: Shoot -> Move for RP
             moveForRP = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(SHOOT_POSE_X, SHOOT_POSE_Y),
