@@ -59,7 +59,7 @@ public class FarRed12 extends OpMode {
     private BNO055IMU hubImu = null;
 
     private TurretController turretController;
-    private static final int TURRET_START_POS = -107;
+    private static final int TURRET_START_POS = 110;
     private boolean turretRefCaptured = false;
 
     private DcMotor intakeMotor;
@@ -68,32 +68,28 @@ public class FarRed12 extends OpMode {
     private Servo rightHoodServo;
     private boolean gateClosed = true;
 
+    private long autoStartMs = -1;
     private int lastFinishedShootPath = -1;
 
-    // ============================
-    // Mirror
-    // ============================
     @Sorter(sort = 90) public static double MIRROR_Y = 72.0;
 
-    // ============================
-    // Timing
-    // ============================
-    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.6;
-    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.0;
+
+    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 1.2;
+    @Sorter(sort = 2)  public static double PRE_ACTION_WAIT_SECONDS = 1.5;
     @Sorter(sort = 3)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.8;
     @Sorter(sort = 4)  public static long   SHOOTER_WAIT_TIMEOUT_MS = 1400L;
 
     // ============================
     // Wait after each shoot sequence
     // ============================
-    @Sorter(sort = 5)  public static double WAIT_AFTER_FIRST_SECONDS  = 2.0;
-    @Sorter(sort = 6)  public static double WAIT_AFTER_SECOND_SECONDS = 2.0;
-    @Sorter(sort = 7)  public static double WAIT_AFTER_THIRD_SECONDS  = 2.0;
+    @Sorter(sort = 5)  public static double WAIT_AFTER_FIRST_SECONDS  = 1;
+    @Sorter(sort = 6)  public static double WAIT_AFTER_SECOND_SECONDS = 1;
+    @Sorter(sort = 7)  public static double WAIT_AFTER_THIRD_SECONDS  = 1;
 
     // ============================
     // Intake power rules
     // ============================
-    @Sorter(sort = 10) public static double INTAKE_IDLE_POWER    = -0.50;
+    @Sorter(sort = 10) public static double INTAKE_IDLE_POWER    = -0.6;
     @Sorter(sort = 11) public static double INTAKE_SHOOT_POWER   = -0.55;
     @Sorter(sort = 12) public static double INTAKE_COLLECT_POWER = -1.00;
 
@@ -120,7 +116,7 @@ public class FarRed12 extends OpMode {
     @Sorter(sort = 102) public static double START_HEADING_DEG = 90.0;
 
     // ========================================
-    // PATH POSES - SHOOT
+    // PATH POSES - SHOOT (fixed as requested)
     // ========================================
     @Sorter(sort = 110) public static double SHOOT_X = 58.000;
     @Sorter(sort = 111) public static double SHOOT_Y = 14.000;
@@ -129,42 +125,34 @@ public class FarRed12 extends OpMode {
     // ========================================
     // PATH POSES - COLLECT FIRST 3
     // ========================================
-    @Sorter(sort = 120) public static double COLLECT_FIRST3_X = 14.000;
-    @Sorter(sort = 121) public static double COLLECT_FIRST3_Y = 22.000;
-    @Sorter(sort = 122) public static double COLLECT_FIRST3_HEADING_DEG = 245.0;
+    @Sorter(sort = 120) public static double COLLECT_FIRST3_X = 53;
+    @Sorter(sort = 121) public static double COLLECT_FIRST3_Y = 45;
+    @Sorter(sort = 122) public static double COLLECT_FIRST3_HEADING_DEG = 180.0;
 
     // Bezier control: Shoot -> Collect First 3
-    @Sorter(sort = 123) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_X = 49.367;
-    @Sorter(sort = 124) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_Y = 7.423;
+    @Sorter(sort = 123) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_X = 58.000;
+    @Sorter(sort = 124) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_Y = 34.000;
 
     // ========================================
     // PATH POSES - EXTEND FIRST 3 COLLECT
     // ========================================
-    @Sorter(sort = 130) public static double EXTEND_FIRST3_X = 13.163;
-    @Sorter(sort = 131) public static double EXTEND_FIRST3_Y = 11.833;
-    @Sorter(sort = 132) public static double EXTEND_FIRST3_HEADING_DEG = 270.0;
-
-    // Bezier control: Collect First 3 -> Extend First 3
-    @Sorter(sort = 133) public static double COLLECT_FIRST3_TO_EXTEND_CTRL_X = 10.000;
-    @Sorter(sort = 134) public static double COLLECT_FIRST3_TO_EXTEND_CTRL_Y = 16.000;
+    @Sorter(sort = 130) public static double EXTEND_FIRST3_X = 12;
+    @Sorter(sort = 131) public static double EXTEND_FIRST3_Y = 45;
+    @Sorter(sort = 132) public static double EXTEND_FIRST3_HEADING_DEG = 180.0;
 
     // ========================================
     // PATH POSES - COLLECT SECOND 3
     // ========================================
-    @Sorter(sort = 140) public static double COLLECT_SECOND3_X = 10.865;
-    @Sorter(sort = 141) public static double COLLECT_SECOND3_Y = 21.577;
+    @Sorter(sort = 140) public static double COLLECT_SECOND3_X = 12;
+    @Sorter(sort = 141) public static double COLLECT_SECOND3_Y = 14.000;
     @Sorter(sort = 142) public static double COLLECT_SECOND3_HEADING_DEG = 180.0;
 
-    // Bezier control: Shoot -> Collect Second 3
-    @Sorter(sort = 143) public static double SHOOT_TO_COLLECT_SECOND3_CTRL_X = 56.042;
-    @Sorter(sort = 144) public static double SHOOT_TO_COLLECT_SECOND3_CTRL_Y = 22.067;
-
     // ========================================
-    // PATH POSES - COLLECT THIRD 3 (same geometry)
+    // PATH POSES - COLLECT THIRD 3 (new extend point)
     // ========================================
-    @Sorter(sort = 150) public static double COLLECT_THIRD3_X = COLLECT_SECOND3_X;
-    @Sorter(sort = 151) public static double COLLECT_THIRD3_Y = COLLECT_SECOND3_Y;
-    @Sorter(sort = 152) public static double COLLECT_THIRD3_HEADING_DEG = COLLECT_SECOND3_HEADING_DEG;
+    @Sorter(sort = 150) public static double COLLECT_THIRD3_X = 13;
+    @Sorter(sort = 151) public static double COLLECT_THIRD3_Y = 14;
+    @Sorter(sort = 152) public static double COLLECT_THIRD3_HEADING_DEG = 180.0;
 
     // ========================================
     // PATH POSES - MOVE FOR RP
@@ -197,7 +185,8 @@ public class FarRed12 extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         paths = new Paths(follower);
 
-        follower.setStartingPose(mirrorPose(START_X, START_Y, START_HEADING_DEG));
+        Pose redStart = mirrorPose(START_X, START_Y, START_HEADING_DEG);
+        follower.setStartingPose(redStart);
 
         intakeTimer = new Timer();
         preActionTimer = new Timer();
@@ -298,6 +287,7 @@ public class FarRed12 extends OpMode {
 
     @Override
     public void start() {
+        autoStartMs = System.currentTimeMillis();
         if (flywheel != null) {
             flywheel.setShooterOn(true);
             flywheel.setTargetRPM(AUTO_SHOOTER_RPM);
@@ -315,22 +305,29 @@ public class FarRed12 extends OpMode {
         follower.update();
         long nowMs = System.currentTimeMillis();
 
-        if (turretController != null && !turretRefCaptured) {
+
+        if (turretController != null) {
+            turretController.holdPositionTicks(TURRET_START_POS);
+        }
+
+        /*if (turretController != null && !turretRefCaptured) {
             boolean done = turretController.driveToPosition(TURRET_START_POS, 10, 0.35);
             if (done) {
                 turretController.captureReferences();
                 turretRefCaptured = true;
+            } else {
+                turretController.update(false, 0.0);
             }
         } else if (turretController != null) {
             turretController.update(false, 0.0);
-        }
+        }*/
 
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
             flywheel.update(nowMs, false);
         }
 
-        runStateMachine();
+        runStateMachine(nowMs);
         updateGate();
         applyIntakePolicy();
 
@@ -361,7 +358,7 @@ public class FarRed12 extends OpMode {
         if (turretMotor != null) { try { turretMotor.setPower(0.0); } catch (Exception ignored) {} }
     }
 
-    private void runStateMachine() {
+    private void runStateMachine(long nowMs) {
         switch (state) {
             case WAIT_FOR_SHOOTER: {
                 boolean atTarget = flywheel != null && flywheel.isAtTarget();
@@ -526,9 +523,9 @@ public class FarRed12 extends OpMode {
     private double distanceToShootPose() {
         try {
             Pose p = follower.getPose();
-            Pose shoot = mirrorPose(SHOOT_X, SHOOT_Y);
-            double dx = p.getX() - shoot.getX();
-            double dy = p.getY() - shoot.getY();
+            Pose redShoot = mirrorPose(SHOOT_X, SHOOT_Y);
+            double dx = p.getX() - redShoot.getX();
+            double dy = p.getY() - redShoot.getY();
             return Math.hypot(dx, dy);
         } catch (Exception e) {
             return Double.POSITIVE_INFINITY;
@@ -572,6 +569,7 @@ public class FarRed12 extends OpMode {
                 gateServo.setPosition(GATE_CLOSED);
                 gateClosed = true;
             }
+
         } catch (Exception e) {
             panelsTelemetry.debug("Gate", "updateGate error: " + e.getMessage());
         }
@@ -593,9 +591,7 @@ public class FarRed12 extends OpMode {
                     .addPath(new BezierLine(
                             mirrorPose(START_X, START_Y),
                             mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(START_HEADING_DEG),
-                            mirrorHeading(SHOOT_HEADING_DEG))
+                    .setLinearHeadingInterpolation(mirrorHeading(START_HEADING_DEG), mirrorHeading(SHOOT_HEADING_DEG))
                     .build();
 
             shootToCollectFirst3 = follower.pathBuilder()
@@ -603,49 +599,52 @@ public class FarRed12 extends OpMode {
                             mirrorPose(SHOOT_X, SHOOT_Y),
                             mirrorPose(SHOOT_TO_COLLECT_FIRST3_CTRL_X, SHOOT_TO_COLLECT_FIRST3_CTRL_Y),
                             mirrorPose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(SHOOT_HEADING_DEG),
-                            mirrorHeading(COLLECT_FIRST3_HEADING_DEG))
+                    .setTangentHeadingInterpolation()
+                    .setBrakingStrength(0.8)
+                    .setBrakingStart(0.4)
                     .build();
 
             extendCollectFirst3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
+                    .addPath(new BezierLine(
                             mirrorPose(COLLECT_FIRST3_X, COLLECT_FIRST3_Y),
-                            mirrorPose(COLLECT_FIRST3_TO_EXTEND_CTRL_X, COLLECT_FIRST3_TO_EXTEND_CTRL_Y),
                             mirrorPose(EXTEND_FIRST3_X, EXTEND_FIRST3_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(COLLECT_FIRST3_HEADING_DEG),
-                            mirrorHeading(EXTEND_FIRST3_HEADING_DEG))
+                    .setTangentHeadingInterpolation()
                     .build();
 
             backShootFirst3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             mirrorPose(EXTEND_FIRST3_X, EXTEND_FIRST3_Y),
                             mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(EXTEND_FIRST3_HEADING_DEG),
-                            mirrorHeading(SHOOT_HEADING_DEG))
+                    .setLinearHeadingInterpolation(mirrorHeading(180), mirrorHeading(SHOOT_HEADING_DEG))
                     .build();
 
             collectSecond3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
+                    .addPath(new BezierLine(
                             mirrorPose(SHOOT_X, SHOOT_Y),
-                            mirrorPose(SHOOT_TO_COLLECT_SECOND3_CTRL_X, SHOOT_TO_COLLECT_SECOND3_CTRL_Y),
                             mirrorPose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y)))
-                    .setConstantHeadingInterpolation(mirrorHeading(COLLECT_SECOND3_HEADING_DEG))
+                    .setTangentHeadingInterpolation()
                     .build();
 
             backShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            mirrorPose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
+                            mirrorPose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
                             mirrorPose(SHOOT_X, SHOOT_Y)))
-                    .setLinearHeadingInterpolation(
-                            mirrorHeading(COLLECT_SECOND3_HEADING_DEG),
-                            mirrorHeading(SHOOT_HEADING_DEG))
+                    .setConstantHeadingInterpolation(mirrorHeading(90))
                     .build();
 
-            collectThird3 = collectSecond3;
-            backShootThird3 = backShootSecond3;
+            collectThird3 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            mirrorPose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y),
+                            mirrorPose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y)))
+                    .setTangentHeadingInterpolation()
+                    .build();
+
+            backShootThird3 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            mirrorPose(COLLECT_THIRD3_X, COLLECT_THIRD3_Y),
+                            mirrorPose(SHOOT_X, SHOOT_Y)))
+                    .setConstantHeadingInterpolation(mirrorHeading(90))
+                    .build();
 
             moveForRP = follower.pathBuilder()
                     .addPath(new BezierLine(

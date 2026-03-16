@@ -92,7 +92,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 4)
     public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 1200L;
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 1300L;
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -172,7 +172,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 125)
     public static double GATE_ALIGN_X = 24.0;
     @Sorter(sort = 126)
-    public static double GATE_ALIGN_Y = 74.0;
+    public static double GATE_ALIGN_Y = 76.0;
     @Sorter(sort = 127)
     public static double GATE_ALIGN_HEADING = 180.0;
 
@@ -182,7 +182,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 130)
     public static double GATE_CLEAR_X = 20.0;
     @Sorter(sort = 131)
-    public static double GATE_CLEAR_Y = 74.0;
+    public static double GATE_CLEAR_Y = 76.0;
     @Sorter(sort = 132)
     public static double GATE_CLEAR_HEADING = 180.0;
 
@@ -194,7 +194,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 141)
     public static double ALIGN_SECOND3_Y = 56.0;
     @Sorter(sort = 142)
-    public static double ALIGN_SECOND3_HEADING = -175.0;
+    public static double ALIGN_SECOND3_HEADING = 180.0;
 
     // ========================================
     // PATH POSES - COLLECT SECOND 3 POSITION
@@ -204,7 +204,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 151)
     public static double COLLECT_SECOND3_Y = 56.0;
     @Sorter(sort = 152)
-    public static double COLLECT_SECOND3_HEADING = -180.0;
+    public static double COLLECT_SECOND3_HEADING = 180.0;
 
     // ========================================
     // PATH POSES - ALIGN THIRD 3 POSITION

@@ -52,7 +52,7 @@ public class FlywheelController {
 
     // --- Target RPM presets ---
     @Sorter(sort = 25) public static double closeRPM = 2350;
-    @Sorter(sort = 26) public static double farRPM = 3100;
+    @Sorter(sort = 26) public static double farRPM = 3000;
 
 
     @Sorter(sort = 31) public static double rpmTolerance = 45.0;
