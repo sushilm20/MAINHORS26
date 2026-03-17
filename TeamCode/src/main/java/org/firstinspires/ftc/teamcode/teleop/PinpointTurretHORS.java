@@ -185,7 +185,7 @@ public class PinpointTurretHORS extends LinearOpMode {
 
         // Create BearingTurretController — uses Follower, no IMU needed
         bearingTurret = new BearingTurretController(turret, follower, telemetry);
-        bearingTurret.setGoal(13, 135);
+        bearingTurret.setGoal(13, 132);//this should fix the turret be turning and shi
         if (turretLimitSwitch != null) {
             bearingTurret.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
