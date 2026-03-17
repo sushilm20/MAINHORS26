@@ -39,14 +39,16 @@ public class Constants {
             .leftFrontMotorDirection(DcMotorSimple.Direction.REVERSE)
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD);
-//            .xVelocity(76.69)
-//            .yVelocity(55.82);
+            .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
+            .xVelocity(76.69)//bro ong who commented this out
+            .yVelocity(55.82);
 
     // ✅ Pinpoint localizer constants
     public static PinpointConstants localizerConstants = new PinpointConstants()
-            .forwardPodY(-3.2)   // adjust based on your robot’s actual offset
-            .strafePodX(-5)   // adjust based on your robot’s actual offset
+            .forwardPodY(-3.2)   //do this today
+            .strafePodX(-5)
+
+
             .distanceUnit(DistanceUnit.INCH)
             .hardwareMapName("pinpoint")   // must match the name in your config
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
