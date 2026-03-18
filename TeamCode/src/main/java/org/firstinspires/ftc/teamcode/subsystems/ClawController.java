@@ -5,7 +5,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 public class ClawController {
     public static final double CLAW_OPEN = 0.62;
     public static final double CLAW_CLOSED = 0.3;
-    public static final long CLAW_CLOSE_MS = 400L;
+    public static final long CLAW_CLOSE_MS = 300L;
 
     private final Servo claw;
     private final double openPos;

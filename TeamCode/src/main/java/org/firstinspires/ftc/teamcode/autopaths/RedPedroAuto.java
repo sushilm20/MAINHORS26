@@ -148,11 +148,11 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 112)
     public static double SHOOT_HEADING_INITIAL = 0.0;
     @Sorter(sort = 113)
-    public static double SHOOT_HEADING_FIRST3 = 4.0;
+    public static double SHOOT_HEADING_FIRST3 = 0.0;
     @Sorter(sort = 114)
-    public static double SHOOT_SECOND3_HEADING = 15.0;
+    public static double SHOOT_SECOND3_HEADING = 0.0;
     @Sorter(sort = 115)
-    public static double SHOOT_FINAL_HEADING = 18.0;
+    public static double SHOOT_FINAL_HEADING = 0.0;
 
     // ========================================
     // PATH POSES - COLLECT FIRST 3 POSITION
