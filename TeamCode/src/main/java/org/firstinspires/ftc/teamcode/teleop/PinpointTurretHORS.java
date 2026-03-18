@@ -90,8 +90,8 @@ public class PinpointTurretHORS extends LinearOpMode {
 
     // ── Ball-detection & shoot-zone slowdown ──
     private static final double INTAKE_VELO_BALL_THRESHOLD = 2100.0; // velocity ≤ this = 1+ balls
-    private static final double SHOOT_ZONE_RADIUS_IN       = 50.0;  // inches from shoot pose
-    private static final double SHOOT_ZONE_SPEED_SCALE     = 0.8;  // 45% speed when loaded in zone
+    private static final double SHOOT_ZONE_RADIUS_IN       = 48.0;  // inches from shoot pose
+    private static final double SHOOT_ZONE_SPEED_SCALE     = 0.8;  // 80% speed when loaded in zone
 
     // Shoot pose coordinates
     private static final double SHOOT_POSE_X2 = 70.0;
