@@ -82,7 +82,7 @@ public class PinpointTurretHORS extends LinearOpMode {
     private static final double INTKE_SEQUENCE_POWER = 1.0;
 
     // Hood constants
-    private static final double HOOD_MIN = 0.12;
+    private static final double HOOD_MIN = 0.12; //yo this commit lowk for funs
     private static final double HOOD_MAX = 0.5;
     private static final double HOOD_LEFT_STEP = 0.025;
     private static final double HOOD_RIGHT_STEP = 0.01;
