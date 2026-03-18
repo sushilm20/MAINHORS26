@@ -3,15 +3,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 
-/**
- * Shared utility for detecting whether the intake currently has 1 or more balls loaded.
- *
- * <p>Detection is velocity-based: when the intake motor is spinning forward but slowed
- * below a threshold, 1+ balls are creating drag against the rollers.</p>
- *
- * <p>Used by autonomous routines to skip the shoot sequence when a pickup path
- * failed to collect any balls (velocity still high → no drag → 0 balls).</p>
- */
+
 public final class IntakeBallDetector {
 
     /** Default velocity threshold — intake velocity ≤ this value means 1+ balls loaded. */
