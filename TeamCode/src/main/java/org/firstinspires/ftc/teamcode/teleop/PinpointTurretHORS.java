@@ -179,7 +179,7 @@ public class PinpointTurretHORS extends LinearOpMode {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(new Pose(START_X, START_Y, Math.toRadians(START_HEADING_DEG)));
         } catch (Exception e) {
-            telemetry.addData("Error", "Follower initialization failed!");
+            telemetry.addData("Error", "Follower init failed!");
             follower = null;
         }
 
