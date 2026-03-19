@@ -95,7 +95,7 @@ public class BearingTurretController {
 
     // Turret forward offset in radians: if the turret's "zero" doesn't point
     // exactly along the robot's +X axis, add an offset here.
-    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = Math.toRadians(15);
+    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = Math.toRadians(0);//enter in degrees prolly
 
     // Homing sweep configuration
     @Sorter(sort = 15) public static int HOMING_AMP_TICKS = 300;
