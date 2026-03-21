@@ -32,12 +32,7 @@ import java.util.function.BooleanSupplier;
  *   3. Provide the Follower reference (call setFollower or pass to constructor).
  *   4. Call update() each loop AFTER follower.update().
  *
- * MANUAL OFFSET:
- *   When the driver uses manual control (bumpers/stick), the controller tracks how
- *   far they moved the turret. On release, that movement is stored as an angular
- *   offset (manualOffsetRad) that persists on top of the bearing calculation.
- *   Call clearManualOffset() to snap back to pure goal tracking.
- *
+
  * BEARING MATH (from StackExchange):
  *   Standard atan2 bearing:  θ = atan2(Δy, Δx)
  *   This matches Pedro Pathing's heading convention (0 = +X east, CCW positive).
