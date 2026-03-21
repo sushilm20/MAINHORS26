@@ -115,7 +115,7 @@ public class BearingTurretController {
     // Same behavior concept as TurretController:
     // - applies only when desired is to the "rightward" side (delta > 0 in tick space)
     // - only when within a small error window
-    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.70;
+    @Sorter(sort = 21) public static double RIGHTWARD_ENCODER_DAMP = 0.9;
     @Sorter(sort = 22) public static int RIGHTWARD_DAMP_ERROR_WINDOW = 100;
 
     // ══════════════════════════════════════════════════
