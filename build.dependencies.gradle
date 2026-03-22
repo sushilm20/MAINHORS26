@@ -7,23 +7,17 @@ repositories {
 dependencies {
     implementation 'org.firstinspires.ftc:Inspection:11.1.0'
     implementation 'org.firstinspires.ftc:Blocks:11.1.0'
+    //noinspection Aligned16KB
     implementation 'org.firstinspires.ftc:RobotCore:11.1.0'
     implementation 'org.firstinspires.ftc:RobotServer:11.1.0'
     implementation 'org.firstinspires.ftc:OnBotJava:11.1.0'
     implementation 'org.firstinspires.ftc:Hardware:11.1.0'
     implementation 'org.firstinspires.ftc:FtcCommon:11.1.0'
     implementation 'org.firstinspires.ftc:Vision:11.1.0'
-    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
 
-    implementation 'com.pedropathing:ftc:2.0.6'
-    implementation 'com.pedropathing:telemetry:1.0.0'
-    implementation "com.bylazar:configurables:1.0.5"
-    implementation 'com.bylazar:fullpanels:1.0.12'
-    implementation "com.bylazar:gamepad:1.0.4"
-    implementation "com.bylazar:graph:1.0.4"
-    implementation "com.bylazar:opmodecontrol:1.0.3"
-    implementation "com.bylazar:themes:1.0.3"
-    implementation "com.bylazar:camerastream:1.0.0"
-    implementation "com.bylazar:telemetry:1.0.5"
+    implementation 'com.pedropathing:ftc:2.1.0'
+    implementation 'com.bylazar:fullpanels:1.0.6'
+
 }
 
