@@ -27,9 +27,9 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor.TagFamily;
 import java.util.List;
 import java.util.Locale;
 
-
+@Disabled
 @Configurable
-@TeleOp(name = "Z Drive and Stream it", group = "TeleOp")
+@TeleOp(name = "Drive and Stream it", group = "TeleOp")
 public class DriveStreamPoseTeleOp extends OpMode {
 
     // Dashboard-configurable parameters

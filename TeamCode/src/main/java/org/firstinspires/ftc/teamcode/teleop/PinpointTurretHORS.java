@@ -62,7 +62,7 @@ public class PinpointTurretHORS extends LinearOpMode {
 
     // ── Post-homing offset state ──
     private boolean pendingHomingOffset = false; // true while waiting for homing to finish
-    private static final int HOMING_OFFSET_TICKS = 90;
+    private static final int HOMING_OFFSET_TICKS = 20;
 
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
