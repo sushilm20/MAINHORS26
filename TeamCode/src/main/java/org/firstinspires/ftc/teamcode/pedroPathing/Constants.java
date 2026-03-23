@@ -40,7 +40,7 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(76.69)
+            .xVelocity(76.6)
             .yVelocity(55.82);
 
     // ✅ Pinpoint localizer constants
