@@ -64,7 +64,7 @@ public class CameraTracking extends LinearOpMode {
 
     // ===================== CONTROLLERS =====================
     private TurretController turretController;           // IMU-based heading compensation
-    private CameraTurretController cameraTurretController; // AprilTag tracking
+    private CameraTurretController cameraTurretController; //or use like the bearing turret
     private DriveController driveController;
     private FlywheelController flywheel;
     private GateController gateController;
