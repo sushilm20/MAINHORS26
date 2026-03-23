@@ -79,7 +79,7 @@ public class CameraTracking extends LinearOpMode {
     // ===================== TELEMETRY =====================
     private TelemetryManager panelsTelemetry;
 
-    // Button latches
+    // tracking the states
     private boolean dpadDownLast = false;
     private boolean dpadLeftLast = false;
     private boolean dpadRightLast = false;
