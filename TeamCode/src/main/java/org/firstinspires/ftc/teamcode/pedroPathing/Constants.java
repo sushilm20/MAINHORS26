@@ -45,8 +45,8 @@ public class Constants {
 
     // ✅ Pinpoint localizer constants
     public static PinpointConstants localizerConstants = new PinpointConstants()
-            .forwardPodY(-3.2)   //do this today
-            .strafePodX(-5)
+            .forwardPodY(0)   //automatc
+            .strafePodX(0)
 
 
             .distanceUnit(DistanceUnit.INCH)
