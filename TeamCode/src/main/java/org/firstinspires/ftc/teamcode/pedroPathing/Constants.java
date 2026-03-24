@@ -29,7 +29,7 @@ public class Constants {
             1.0,
             1.0);
 
-    // ✅ Drivetrain constants (aligned with TeleOp motor names/directions)
+    // ✅ Drivetrain constants (aligned with TeleOp motor names/diretions)
     public static MecanumConstants driveConstants = new MecanumConstants()
             .maxPower(1)
             .leftFrontMotorName("frontLeft")
@@ -45,7 +45,7 @@ public class Constants {
 
     // ✅ Pinpoint localizer constants
     public static PinpointConstants localizerConstants = new PinpointConstants()
-            .forwardPodY(0)   //automatc
+            .forwardPodY(0)   //automatic offsets
             .strafePodX(0)
 
 
@@ -58,8 +58,8 @@ public class Constants {
     public static Follower createFollower(HardwareMap hardwareMap) {
         return new FollowerBuilder(followerConstants, hardwareMap)
                 .pathConstraints(pathConstraints)
-                .mecanumDrivetrain(driveConstants)     // ✅ attach
-                .pinpointLocalizer(localizerConstants) // ✅ attach localizer
+                .mecanumDrivetrain(driveConstants)     // ✅ lowk attach dat and
+                .pinpointLocalizer(localizerConstants) // attach localizer
                 .build();
     }
 }
