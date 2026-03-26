@@ -280,7 +280,7 @@ class LateralTuner extends OpMode {
  * @version 1.0, 5/6/2024
  */
 class TurnTuner extends OpMode {
-    public static double ANGLE = 2 * Math.PI;
+    public static double ANGLE = 2 * Math.PI; // this is not the auto offset tuner gng
 
     @Override
     public void init() {
