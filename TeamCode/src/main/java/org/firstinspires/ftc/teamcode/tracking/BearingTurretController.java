@@ -14,17 +14,7 @@ import java.util.function.BooleanSupplier;
  *
  * Uses the Pedro Pathing Follower pose as the SOLE source of truth.
  * No IMU, no heading-hold layer, no reference-delta system.
- *
- * EVERY LOOP:
- *   1. Get robot pose from Follower: (x, y, heading)
- *   2. Compute field bearing from robot → goal:
- *        bearingRad = atan2(goalY - robotY, goalX - robotX)
- *   3. Compute turret-relative angle:
- *        turretAngleRad = normalize(bearingRad - robotHeading)
- *   4. Convert to encoder ticks:
- *        desiredTicks = turretAngleRad × (TICKS_PER_FULL_ROTATION / 2π) × ENCODER_SIGN
- *   5. PID on the error (desired - current), enforce encoder limits, apply power.
- *
+
  * SETUP:
  *   1. Zero the turret encoder when the turret is pointing straight forward on the robot.
  *      (0 ticks = turret aligned with chassis forward direction)
