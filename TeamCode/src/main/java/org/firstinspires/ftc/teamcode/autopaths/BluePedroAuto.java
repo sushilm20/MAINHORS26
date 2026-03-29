@@ -415,7 +415,7 @@ public class BluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        turretHoldTarget = 220;
+        turretHoldTarget = 220;//fixing drif this way
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();

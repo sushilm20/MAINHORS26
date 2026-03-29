@@ -77,13 +77,13 @@ public class Dynamic12Red extends OpMode {
     private boolean shutdownDone = false;
 
     // ========================================
-    // TIMING PARAMETERS
+    // TIMING PARAMETERS (tuned lower for smoother flow)
     // ========================================
-    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.6;
-    @Sorter(sort = 1)  public static double TIMED_INTAKE_SECONDS = 1.0;
-    @Sorter(sort = 3)  public static double PRE_ACTION_WAIT_SECONDS = 1.0;
-    @Sorter(sort = 4)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
-    @Sorter(sort = 5)  public static long SHOOTER_WAIT_TIMEOUT_MS = 1300L;
+    @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6
+    @Sorter(sort = 1)  public static double TIMED_INTAKE_SECONDS = 0.65;             // was 1.0
+    @Sorter(sort = 3)  public static double PRE_ACTION_WAIT_SECONDS = 0.35;          // was 1.0
+    @Sorter(sort = 4)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.60; // was 1.5
+    @Sorter(sort = 5)  public static long SHOOTER_WAIT_TIMEOUT_MS = 700L;            // was 1300
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -105,8 +105,8 @@ public class Dynamic12Red extends OpMode {
     @Sorter(sort = 31) public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32) public static double GATE_OPEN_TOLERANCE_IN = 2.3;
     @Sorter(sort = 33) public static double GATE_CLOSE_TOLERANCE_IN = 5.0;
-    @Sorter(sort = 34) public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
-    @Sorter(sort = 35) public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
+    @Sorter(sort = 34) public static double GATE_ALIGN_WAIT_SECONDS = 0.20;          // was 0.6
+    @Sorter(sort = 35) public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.25;    // was 0.8
 
     // ========================================
     // PATH POSES - START POSITION
@@ -417,7 +417,11 @@ public class Dynamic12Red extends OpMode {
             return;
         }
 
-        startIntake(INTAKE_ON_POWER);
+        // smoother: avoid intake jolt on tiny gate alignment/clear segments
+        boolean shouldRunIntake = !(idx == 3 || idx == 4);
+        if (shouldRunIntake) {
+            startIntake(INTAKE_ON_POWER);
+        }
 
         if (idx == 5 || idx == 8 || idx == 11) {
             timedIntakeTimer.resetTimer();
