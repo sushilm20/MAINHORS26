@@ -9,6 +9,7 @@ import android.graphics.Path;
 import androidx.annotation.Nullable;
 
 import com.bylazar.camerastream.PanelsCameraStream;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
 import org.firstinspires.ftc.robotcore.external.function.Consumer;
 import org.firstinspires.ftc.robotcore.external.function.Continuation;
@@ -22,6 +23,8 @@ import org.opencv.core.Mat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+
+@Disabled
 
 /** Shared stream/overlay helper for Panels streaming with AprilTag visualization. */
 public class CameraStreamManager {
