@@ -415,7 +415,7 @@ public class BluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        turretHoldTarget = 230;
+        turretHoldTarget = 220;
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
