@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.BearingTurretController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Dynamic 12 Blue 🔷", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
+@Autonomous(name = "Dynamic 12 Blue ", group = "Autonomous", preselectTeleOp ="A HORS OFFICIAL ⭐")
 @Configurable
 public class Dynamic12Blue extends OpMode {
 
