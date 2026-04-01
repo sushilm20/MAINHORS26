@@ -37,7 +37,7 @@ public class Dynamic12Blue extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private Timer timedIntakeTimer;//gang
+    private Timer timedIntakeTimer;//bre
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
