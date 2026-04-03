@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Disabled
+//use with logitech 30 frame tech noah techy
 @TeleOp(name="Camera Tracking TeleOp 🎯", group="Linear OpMode")
 public class CameraTracking extends LinearOpMode {
 
