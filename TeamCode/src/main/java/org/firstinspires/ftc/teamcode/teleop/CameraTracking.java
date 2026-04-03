@@ -144,7 +144,6 @@ public class CameraTracking extends LinearOpMode {
         // ==================== FOLLOWER INIT ====================
         initFollower();
 
-        String imuUsed = (pinpoint != null) ? "pinpoint" : (imu != null) ? "imu (expansion hub)" : "none";
 
         // ==================== CONTROLLERS INIT ====================
         initControllers(imuParams);
@@ -155,7 +154,6 @@ public class CameraTracking extends LinearOpMode {
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
         telemetry.addData("Tracking Mode", "IMU-based (press BACK to toggle)");
         telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
-        telemetry.addData("Turret IMU", imuUsed);
         telemetry.addData("Vision", visionPortal != null ? "Ready" : "Failed");
         telemetry.update();
 
