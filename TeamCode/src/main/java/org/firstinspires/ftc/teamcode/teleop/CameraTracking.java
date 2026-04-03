@@ -64,7 +64,7 @@ public class CameraTracking extends LinearOpMode {
     private DigitalChannel turretLimitSwitch;
 
     // ===================== CONTROLLERS =====================
-    private TurretController turretController;           // IMU-based heading compensation
+    private TurretController turretController;
     private CameraTurretController cameraTurretController; //or use like the bearing turret
     private DriveController driveController;
     private FlywheelController flywheel;
@@ -98,7 +98,7 @@ public class CameraTracking extends LinearOpMode {
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
 
-    // Turret tracking mode: false = IMU-based (TurretController), true = Camera-based (CameraTurretController)
+    //if camerae based turrot but like not true at all and is final declare
     private boolean useCameraTracking = false;
 
     // ===================== CONSTANTS =====================
