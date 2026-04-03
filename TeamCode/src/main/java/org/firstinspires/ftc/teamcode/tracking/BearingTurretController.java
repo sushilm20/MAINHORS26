@@ -98,10 +98,10 @@ public class BearingTurretController {
     @Sorter(sort = 17) public static int HOMING_DEADBAND = 10;
     @Sorter(sort = 18) public static long HOMING_TIMEOUT_MS = 3000;
 
-    // ── Velocity compensation ──
+    // ── Velocity compensation ── doesnt really work but like ima 0 it
     // Feedforward gain: how many degrees of turret lead per degree/sec of bearing rate.
     // Higher = more aggressive lead. Start at ~0.05, tune up.
-    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.22;
+    @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.0;
 
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
     @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
