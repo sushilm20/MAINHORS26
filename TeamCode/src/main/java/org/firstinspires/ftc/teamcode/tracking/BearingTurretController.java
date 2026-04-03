@@ -90,7 +90,7 @@ public class BearingTurretController {
 
     // Turret forward offset in radians: if the turret's "zero" doesn't point
     // exactly along the robot's +X axis, add an offset here.
-    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = Math.toRadians(0);//enter in degrees prolly
+    @Sorter(sort = 14) public static double TURRET_FORWARD_OFFSET_RAD = Math.toRadians(0);
 
     // Homing sweep configuration
     @Sorter(sort = 15) public static int HOMING_AMP_TICKS = 300;
@@ -104,7 +104,7 @@ public class BearingTurretController {
     @Sorter(sort = 19) public static double VELOCITY_COMP_GAIN = 0.0;
 
     // Low-pass filter alpha for bearing rate (0 = no smoothing, 1 = infinite smoothing)
-    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.6;
+    @Sorter(sort = 20) public static double BEARING_RATE_FILTER = 0.0;
 
     // Rightward asymmetry damping (bias desired target toward current)
     // Same behavior concept as TurretController:
