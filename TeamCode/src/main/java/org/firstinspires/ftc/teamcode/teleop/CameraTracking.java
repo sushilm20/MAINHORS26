@@ -133,11 +133,10 @@ public class CameraTracking extends LinearOpMode {
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // ==================== HARDWARE INIT ====================
+
         initHardware();
 
-        // ==================== VISION INIT ====================
-        initVision();
+        initVision(); //refactor/remove later
 
         // ==================== IMU INIT ====================
         BNO055IMU.Parameters imuParams = initIMU();
