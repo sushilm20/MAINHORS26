@@ -255,7 +255,7 @@ public class CameraTracking extends LinearOpMode {
             cameraStreamManager = new CameraStreamManager();
 
             aprilTagProcessor = new AprilTagProcessor.Builder()
-                    .setDrawAxes(true)//no
+                    .setDrawAxes(true)//please
                     .setDrawTagOutline(true)
                     .setDrawCubeProjection(true)
                     .setDrawTagID(true)
