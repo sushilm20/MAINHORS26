@@ -39,7 +39,7 @@ public class FlywheelController {
 
     // --- FAR PIDF coefficients (for target RPM at or above threshold) ---
     @Sorter(sort = 14) public static double FAR_kP = 0.00300;//increased from 0.00222
-    @Sorter(sort = 15) public static double FAR_kI = 0.0060;
+    @Sorter(sort = 15) public static double FAR_kI = 0.0064;
     @Sorter(sort = 16) public static double FAR_kD = 0.00001;
     @Sorter(sort = 17) public static double FAR_kF = 1.92;
     @Sorter(sort = 18) public static double FAR_integralLimit = 50;
@@ -52,7 +52,7 @@ public class FlywheelController {
 
     // --- Target RPM presets ---
     @Sorter(sort = 25) public static double closeRPM = 2350;
-    @Sorter(sort = 26) public static double farRPM = 3000;
+    @Sorter(sort = 26) public static double farRPM = 3100;
 
 
     @Sorter(sort = 31) public static double rpmTolerance = 45.0;
