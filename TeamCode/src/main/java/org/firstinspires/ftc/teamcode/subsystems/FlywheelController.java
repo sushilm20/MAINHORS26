@@ -45,7 +45,7 @@ public class FlywheelController {
     @Sorter(sort = 18) public static double FAR_integralLimit = 50;
     @Sorter(sort = 19) public static double FAR_derivativeAlpha = 0.72;
     @Sorter(sort = 20) public static double FAR_rpmFilterAlpha = 0.9;
-    @Sorter(sort = 21) public static double FAR_powerSmoothingAlpha = 0.5;
+    @Sorter(sort = 21) public static double FAR_powerSmoothingAlpha = 0.55555;
     @Sorter(sort = 22) public static double FAR_ffReferenceVoltage = 13.0;
     @Sorter(sort = 23) public static double FAR_ffReferenceMaxTicksPerSec = 4900;
     @Sorter(sort = 24) public static double FAR_rpmTolerance = 50.0;
