@@ -55,7 +55,7 @@ public class FlywheelController {
     @Sorter(sort = 26) public static double farRPM = 3100;
 
 
-    @Sorter(sort = 31) public static double rpmTolerance = 45.0;
+    @Sorter(sort = 31) public static double rpmTolerance = 50.00;
 
 
     // Legacy variable mapped to new
