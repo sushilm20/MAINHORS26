@@ -51,7 +51,7 @@ public class FlywheelController {
     @Sorter(sort = 24) public static double FAR_rpmTolerance = 50.0;
 
     // --- Target RPM presets ---
-    @Sorter(sort = 25) public static double closeRPM = 2361;
+    @Sorter(sort = 25) public static double closeRPM = 2360;//this should be retuned
     @Sorter(sort = 26) public static double farRPM = 3100;
 
 
@@ -85,7 +85,7 @@ public class FlywheelController {
     // legacy controls
     private boolean shooterOn = true;
     private boolean lastAtTarget = false;
-    private boolean justReachedTargetFlag = false;
+    private boolean justReachedTargetFlag = false; //ok dude what
     private boolean leftTriggerLast = false;
     private double savedTargetBeforeTrigger = -1.0;
     private boolean savedShooterOnBeforeTrigger = false;
