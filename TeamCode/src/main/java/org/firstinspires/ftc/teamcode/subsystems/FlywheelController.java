@@ -116,6 +116,8 @@ public class FlywheelController {
             }
         }
 
+
+
         timer.reset();
         lastPos = this.shooter.getCurrentPosition();
     }
