@@ -127,7 +127,7 @@ public class FlywheelController {
         this(shooter, null, telemetry, voltageSensor);
     }
 
-    // Backward-compatible ctor without voltage sensor (feedforward will use a fallback voltage)
+//legacy compatablity
     public FlywheelController(DcMotor shooter, DcMotor shooter2, Telemetry telemetry) {
         this(shooter, shooter2, telemetry, null);
     }
