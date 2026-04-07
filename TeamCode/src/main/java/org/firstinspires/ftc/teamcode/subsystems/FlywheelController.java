@@ -138,7 +138,7 @@ public class FlywheelController {
 
     public void setTargetRpm(double rpm) {
         if (rpm != targetRpm) {
-            // reset integral on setpoint changes (anti-windup)
+          //reset on setpoint changes
             integralSum = 0.0;
             lastError = 0.0;
             lastDerivativeEstimate = 0.0;
