@@ -80,9 +80,7 @@ public class Dynamic12Blue extends OpMode {
     private long autoStartMs = -1;
     private boolean shutdownDone = false;
 
-    // ========================================
-    // TIMING PARAMETERS (lowered for smoother flow)
-    // ========================================
+//Timing params
     @Sorter(sort = 0)
     public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6
     @Sorter(sort = 1)
