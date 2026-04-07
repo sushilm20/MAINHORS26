@@ -157,6 +157,8 @@ public class FlywheelController {
     /**
      * Determines whether to use FAR or CLOSE coefficients based on target RPM.
      * @return true if using FAR coefficients, false if using CLOSE coefficients
+     *
+     * not possible
      */
     private boolean shouldUseFarCoefficients() {
         return targetRpm >= RPM_SWITCH_THRESHOLD;
