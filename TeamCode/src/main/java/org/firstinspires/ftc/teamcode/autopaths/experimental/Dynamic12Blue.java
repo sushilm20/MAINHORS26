@@ -37,7 +37,7 @@ public class Dynamic12Blue extends OpMode {
     private int nextPathIndex = -1;
 
     private Timer intakeTimer;
-    private Timer timedIntakeTimer;//breeeeeee
+    private Timer timedIntakeTimer;
     private boolean timedIntakeActive = false;
 
     private long clawActionStartMs = 0L;
@@ -63,7 +63,7 @@ public class Dynamic12Blue extends OpMode {
     private BNO055IMU imu = null;
 
     private FlywheelController flywheel;
-    private TurretController turretController; // kept for compatibility/reset only
+    private TurretController turretController; //reset only
     private BearingTurretController bearingTurretController;
     private static final double AUTO_SHOOTER_RPM = 2400;
 
