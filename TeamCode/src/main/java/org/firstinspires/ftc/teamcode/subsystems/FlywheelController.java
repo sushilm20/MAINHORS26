@@ -192,6 +192,7 @@ public class FlywheelController {
     private double getActiveRpmFilterAlpha() {
         return shouldUseFarCoefficients() ? FAR_rpmFilterAlpha : CLOSE_rpmFilterAlpha;
     }
+    //ig bro
 
     private double getActivePowerSmoothingAlpha() {
         return shouldUseFarCoefficients() ? FAR_powerSmoothingAlpha : CLOSE_powerSmoothingAlpha;
