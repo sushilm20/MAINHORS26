@@ -90,7 +90,7 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 4)
     public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.60; // was 1.5 keep old
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 700L;            // was 1300
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 700L;            // was 1300 keep old
 
     // ========================================
     // INTAKE POWER SETTINGS
