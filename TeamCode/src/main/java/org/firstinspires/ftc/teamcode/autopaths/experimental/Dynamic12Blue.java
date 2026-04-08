@@ -82,9 +82,9 @@ public class Dynamic12Blue extends OpMode {
 
 //Timing params
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6
+    public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6 keep old
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 0.65;             // was 1.0
+    public static double TIMED_INTAKE_SECONDS = 0.65;             // was 1.0 keep old
     @Sorter(sort = 3)
     public static double PRE_ACTION_WAIT_SECONDS = 0.35;          // was 1.0
     @Sorter(sort = 4)
