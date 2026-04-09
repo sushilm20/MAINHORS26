@@ -14,18 +14,20 @@ import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.teamcode.autopaths.util.AutoGuards;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 import org.firstinspires.ftc.teamcode.tracking.TurretController;
 
-@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ⭐")
+@Autonomous(name = "Blue 12 Ball 🔷", group = "Autonomous", preselectTeleOp = "A HORS OFFICIAL ���")
 @Configurable
 public class BluePedroAuto extends OpMode {
 
@@ -73,6 +75,7 @@ public class BluePedroAuto extends OpMode {
     private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
+    private DcMotorEx intakeMotorEx;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -88,6 +91,18 @@ public class BluePedroAuto extends OpMode {
 
     private long autoStartMs = -1;
     private boolean shutdownDone = false;
+
+    // ---------- AutoGuards ----------
+    private AutoGuards.ShooterGate shooterGate;
+    private AutoGuards.JamDetector jamDetector;
+
+    // Chassis speed tracking for shoot gating
+    private double lastPoseX = Double.NaN;
+    private double lastPoseY = Double.NaN;
+    private double lastPoseHeadingRad = Double.NaN;
+    private long lastPoseTimeMs = -1L;
+    private double translationalSpeedInPerS = 0.0;
+    private double angularSpeedDegPerS = 0.0;
 
     // ========================================
     // TIMING PARAMETERS
@@ -138,6 +153,28 @@ public class BluePedroAuto extends OpMode {
     public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
+
+    // ---------- New reliability tunables ----------
+    @Sorter(sort = 36)
+    public static double SHOOT_RPM_TOLERANCE = 50.0;
+    @Sorter(sort = 37)
+    public static double SHOOT_MAX_TRANS_SPEED = 1.5;
+    @Sorter(sort = 38)
+    public static double SHOOT_MAX_ANG_SPEED = 20.0;
+    @Sorter(sort = 39)
+    public static long SHOOT_STABLE_HOLD_MS = 150L;
+
+    @Sorter(sort = 40)
+    public static long FORCE_PARK_CUTOFF_MS = 26500L;
+
+    @Sorter(sort = 41)
+    public static double JAM_VELO_THRESHOLD = 120.0;
+    @Sorter(sort = 42)
+    public static long JAM_DETECT_MS = 160L;
+    @Sorter(sort = 43)
+    public static long JAM_CLEAR_MS = 260L;
+    @Sorter(sort = 44)
+    public static double JAM_CLEAR_POWER = 0.45; // opposite sign from intake (reverse pulse)
 
     // ========================================
     // PATH POSES - START POSITION
@@ -263,6 +300,21 @@ public class BluePedroAuto extends OpMode {
         gateClearWaitTimer = new Timer();
         firstShootWaitTimer = new Timer();
 
+        shooterGate = new AutoGuards.ShooterGate(
+                START_POSE_TOLERANCE_IN,
+                SHOOT_RPM_TOLERANCE,
+                SHOOT_MAX_TRANS_SPEED,
+                SHOOT_MAX_ANG_SPEED,
+                SHOOT_STABLE_HOLD_MS
+        );
+
+        jamDetector = new AutoGuards.JamDetector(
+                JAM_VELO_THRESHOLD,
+                JAM_DETECT_MS,
+                JAM_CLEAR_MS,
+                JAM_CLEAR_POWER
+        );
+
         nextPathIndex = -1;
         intakeSegmentEnd = -1;
         preActionTimerStarted = false;
@@ -342,6 +394,7 @@ public class BluePedroAuto extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            intakeMotorEx = (intakeMotor instanceof DcMotorEx) ? (DcMotorEx) intakeMotor : null;
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
@@ -385,7 +438,6 @@ public class BluePedroAuto extends OpMode {
             turretController.holdPositionTicks(turretHoldTarget);
         }
 
-        // safe orientation read to avoid angularOrientation() style errors
         try {
             if (imu != null) {
                 Orientation o = imu.getAngularOrientation(
@@ -415,10 +467,13 @@ public class BluePedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        turretHoldTarget = 220;//fixing drif this way
+        turretHoldTarget = 220;
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
+        shooterGate.reset();
+        jamDetector.reset();
+
         state = AutoState.WAIT_FOR_SHOOTER;
     }
 
@@ -426,6 +481,15 @@ public class BluePedroAuto extends OpMode {
     public void loop() {
         follower.update();
         long nowMs = System.currentTimeMillis();
+
+        updateChassisSpeeds(nowMs);
+
+        if (AutoGuards.shouldForcePark(autoStartMs, nowMs, FORCE_PARK_CUTOFF_MS)) {
+            if (state != AutoState.FINISHED) {
+                panelsTelemetry.debug("ForcePark", "Cutoff reached; forcing finish");
+                state = AutoState.FINISHED;
+            }
+        }
 
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
@@ -437,12 +501,10 @@ public class BluePedroAuto extends OpMode {
 
         runStateMachine(nowMs);
 
-        // Skip gate updates while in WAIT_FIRST_SHOOT so gate stays closed
         if (state != AutoState.WAIT_FIRST_SHOOT) {
             updateGate();
         }
 
-        // Safety net: keep intake hold power during auto unless finished
         if (state != AutoState.IDLE && state != AutoState.FINISHED) {
             if (intakeMotor != null && intakeMotor.getPower() == 0.0) {
                 intakeMotor.setPower(INTAKE_HOLD_POWER);
@@ -456,6 +518,8 @@ public class BluePedroAuto extends OpMode {
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
+        panelsTelemetry.debug("TransSpeed(in/s)", String.format("%.2f", translationalSpeedInPerS));
+        panelsTelemetry.debug("AngSpeed(deg/s)", String.format("%.2f", angularSpeedDegPerS));
 
         if (flywheel != null) {
             panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
@@ -471,6 +535,8 @@ public class BluePedroAuto extends OpMode {
         }
 
         if (intakeMotor != null) panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
+        panelsTelemetry.debug("JamClearing", jamDetector != null && jamDetector.isClearing());
+
         if (clawServo != null) panelsTelemetry.debug("ClawPos", clawServo.getPosition());
 
         double dist = distanceToShootPose();
@@ -485,7 +551,6 @@ public class BluePedroAuto extends OpMode {
             panelsTelemetry.debug("IMU Source", "None");
         }
 
-        // Optional live heading telemetry
         try {
             if (imu != null) {
                 Orientation o = imu.getAngularOrientation(
@@ -505,6 +570,36 @@ public class BluePedroAuto extends OpMode {
             resetToInitState();
             shutdownDone = true;
         }
+    }
+
+    private void updateChassisSpeeds(long nowMs) {
+        Pose p = follower != null ? follower.getPose() : null;
+        if (p == null) return;
+
+        if (lastPoseTimeMs < 0) {
+            lastPoseX = p.getX();
+            lastPoseY = p.getY();
+            lastPoseHeadingRad = p.getHeading();
+            lastPoseTimeMs = nowMs;
+            translationalSpeedInPerS = 0.0;
+            angularSpeedDegPerS = 0.0;
+            return;
+        }
+
+        double dt = Math.max(1e-3, (nowMs - lastPoseTimeMs) / 1000.0);
+        double dx = p.getX() - lastPoseX;
+        double dy = p.getY() - lastPoseY;
+        translationalSpeedInPerS = Math.hypot(dx, dy) / dt;
+
+        double dH = p.getHeading() - lastPoseHeadingRad;
+        while (dH > Math.PI) dH -= 2.0 * Math.PI;
+        while (dH < -Math.PI) dH += 2.0 * Math.PI;
+        angularSpeedDegPerS = Math.abs(Math.toDegrees(dH) / dt);
+
+        lastPoseX = p.getX();
+        lastPoseY = p.getY();
+        lastPoseHeadingRad = p.getHeading();
+        lastPoseTimeMs = nowMs;
     }
 
     private void resetToInitState() {
@@ -546,13 +641,20 @@ public class BluePedroAuto extends OpMode {
 
     private void startIntake(double power) {
         try {
-            if (intakeMotor != null) intakeMotor.setPower(power);
+            double finalPower = power;
+            if (jamDetector != null) {
+                double measuredVelocity = 0.0;
+                try {
+                    if (intakeMotorEx != null) measuredVelocity = intakeMotorEx.getVelocity();
+                } catch (Exception ignored) {}
+                finalPower = jamDetector.update(System.currentTimeMillis(), power, measuredVelocity);
+            }
+            if (intakeMotor != null) intakeMotor.setPower(finalPower);
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
         }
     }
 
-    // hold power to keep balls in
     private void stopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(INTAKE_HOLD_POWER);
@@ -561,7 +663,6 @@ public class BluePedroAuto extends OpMode {
         }
     }
 
-    // true stop only for finish/reset
     private void fullStopIntake() {
         try {
             if (intakeMotor != null) intakeMotor.setPower(0.0);
@@ -620,6 +721,18 @@ public class BluePedroAuto extends OpMode {
         state = AutoState.RUNNING_PATH;
     }
 
+    private boolean isReadyToShoot(long nowMs) {
+        Pose current = follower != null ? follower.getPose() : null;
+        Pose shoot = new Pose(SHOOT_POSE_X, SHOOT_POSE_Y, 0.0);
+
+        double curRpm = flywheel != null ? flywheel.getCurrentRPM() : 0.0;
+        double tgtRpm = flywheel != null ? flywheel.getTargetRPM() : 0.0;
+
+        return shooterGate != null && shooterGate.isReady(
+                nowMs, current, shoot, curRpm, tgtRpm, translationalSpeedInPerS, angularSpeedDegPerS
+        );
+    }
+
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
             if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
@@ -664,6 +777,7 @@ public class BluePedroAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
+                        if (shooterGate != null) shooterGate.reset();
 
                         if (finished == 1) {
                             stopIntake();
@@ -686,7 +800,6 @@ public class BluePedroAuto extends OpMode {
                 break;
 
             case WAIT_FIRST_SHOOT:
-                // keep gate closed here; after small wait continue sequence
                 if (firstShootWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                     state = AutoState.CLOSED_INTAKE_SEQUENCE;
                 }
@@ -721,21 +834,22 @@ public class BluePedroAuto extends OpMode {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
+                    if (shooterGate != null) shooterGate.reset();
                     panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
                 }
 
                 if (!preActionTimerStarted) {
-                    double dist = distanceToShootPose();
-                    if (dist <= START_POSE_TOLERANCE_IN) {
+                    boolean ready = isReadyToShoot(nowMs);
+                    if (ready) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
+                        panelsTelemetry.debug("PRE_ACTION", "Shooter gate READY: starting PRE_ACTION timer");
                     } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Pose/motion timeout: starting PRE_ACTION timer");
                     } else {
-                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Waiting shooter gate...");
                     }
                 } else if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
                     startIntake(SHOOT_POSE_INTAKE_POWER);
