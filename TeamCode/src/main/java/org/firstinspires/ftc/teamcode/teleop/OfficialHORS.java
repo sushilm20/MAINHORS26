@@ -60,7 +60,6 @@ public class OfficialHORS extends LinearOpMode {
     private boolean touchpadPressedLast = false;
     private boolean gamepad2TouchpadLast = false;
     private boolean aPressedLast = false;
-    private boolean dpadUpLast = false;
 
     private boolean isFarMode = false;
     private boolean lastPidfMode = false;
@@ -83,6 +82,14 @@ public class OfficialHORS extends LinearOpMode {
     private static final double HOOD_RIGHT_STEP = 0.01;
     private static final long HOOD_DEBOUNCE_MS = 120L;
 
+    // Drive scaling
+    private static final double NORMAL_DRIVE_SCALE = 1.0;
+    private static final double SLOW_DRIVE_SCALE = 0.45;
+
+    // Rumble cooldown
+    private static final long RUMBLE_COOLDOWN_MS = 1200;
+    private long lastAtTargetRumbleMs = 0L;
+
     // Pinpoint IMU only
     private GoBildaPinpointDriver pinpoint;
 
@@ -95,7 +102,7 @@ public class OfficialHORS extends LinearOpMode {
 
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
-        // ════════════ BULK READ — must be first! ════════════
+        // Bulk read
         List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
         for (LynxModule hub : allHubs) {
             hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
@@ -117,7 +124,6 @@ public class OfficialHORS extends LinearOpMode {
         rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
         gateServo = hardwareMap.get(Servo.class, "gateServo");
 
-        // Optional: turret limit switch (active-low example)
         try {
             turretLimitSwitch = hardwareMap.get(DigitalChannel.class, "turret_limit");
             turretLimitSwitch.setMode(DigitalChannel.Mode.INPUT);
@@ -125,17 +131,14 @@ public class OfficialHORS extends LinearOpMode {
             turretLimitSwitch = null;
         }
 
-        // LEDs (per-channel)
         LED led1Red = getLedSafe("led_1_red");
         LED led1Green = getLedSafe("led_1_green");
         LED led2Red = getLedSafe("led_2_red");
         LED led2Green = getLedSafe("led_2_green");
 
-        // Voltage sensor (first available)
         VoltageSensor batterySensor = null;
-        try {
-            batterySensor = hardwareMap.voltageSensor.iterator().next();
-        } catch (Exception ignored) {}
+        try { batterySensor = hardwareMap.voltageSensor.iterator().next(); }
+        catch (Exception ignored) {}
 
         // Directions & modes
         frontLeftDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -152,11 +155,11 @@ public class OfficialHORS extends LinearOpMode {
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Pinpoint IMU init (required — no fallback)
+        // Pinpoint
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.resetPosAndIMU();
 
-        try { // Follower
+        try {
             follower = Constants.createFollower(hardwareMap);
             follower.setStartingPose(new Pose(20, 122, Math.toRadians(135)));
         } catch (Exception e) {
@@ -164,11 +167,11 @@ public class OfficialHORS extends LinearOpMode {
             follower = null;
         }
 
-        // Create controllers — pass null for BNO055IMU, pinpoint only
         turretController = new TurretController(turret, null, pinpoint, telemetry);
         if (turretLimitSwitch != null) {
             turretController.setEncoderResetTrigger(() -> !turretLimitSwitch.getState());
         }
+
         driveController = new DriveController(frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive);
         flywheel = new FlywheelController(shooter, shooter2, telemetry, batterySensor);
         flywheel.setShooterOn(false);
@@ -192,15 +195,11 @@ public class OfficialHORS extends LinearOpMode {
                 HOOD_DEBOUNCE_MS
         );
 
-        // Initial positions
         gateController.setGateClosed(true);
         telemetry.addData("Status", "Initialized (mode = CLOSE, shooter OFF)");
-        telemetry.addData("RPM Switch Threshold", "%.0f RPM", FlywheelController.RPM_SWITCH_THRESHOLD);
-        telemetry.addData("Bulk Read", "AUTO");
-        telemetry.addData("\nTurret IMU", "pinpoint");
+        telemetry.addData("Drive", "Input shaping ON | SlowMode: LT");
         telemetry.update();
 
-        // Prepare subsystems
         turretController.captureReferences();
         turretController.resetPidState();
 
@@ -211,7 +210,6 @@ public class OfficialHORS extends LinearOpMode {
             return;
         }
 
-        // After start: re-zero
         reZeroHeadingAndTurret();
         flywheel.setShooterOn(true);
 
@@ -219,38 +217,30 @@ public class OfficialHORS extends LinearOpMode {
             if (isStopRequested()) break;
             long nowMs = System.currentTimeMillis();
 
-            // ── Update loop time (tracked in TelemetryData) ──
             telemetryData.updateLoopTime();
 
-            // Refresh pinpoint
             try { pinpoint.update(); } catch (Exception ignored) {}
-
             if (follower != null) {
                 follower.update();
                 currentPose = follower.getPose();
             }
 
-            // Touchpad reset (gamepad2)
+            // Reset controls
             boolean gp2Touch = getTouchpad(gamepad2);
             if (gp2Touch && !gamepad2TouchpadLast) {
                 resetTurretEncoderAndReferences();
                 driveController.stop();
-                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp2 touchpad)");
-                telemetry.update();
             }
             gamepad2TouchpadLast = gp2Touch;
 
-            // A button reset (gamepad1)
             boolean aNow = gamepad1.a;
             if (aNow && !aPressedLast) {
                 resetTurretEncoderAndReferences();
                 driveController.stop();
-                telemetry.addData("Reset", "Turret encoder reset & reference captured (gp1 A)");
-                telemetry.update();
             }
             aPressedLast = aNow;
 
-            // Far/close toggle on gamepad1 touchpad only
+            // Far/close
             boolean touchpadNow = getTouchpad(gamepad1);
             if (touchpadNow && !touchpadPressedLast) {
                 isFarMode = !isFarMode;
@@ -259,13 +249,14 @@ public class OfficialHORS extends LinearOpMode {
             }
             touchpadPressedLast = touchpadNow;
 
-            // Drive
+            // Drive (slow mode on left trigger)
             double axial = -gamepad1.left_stick_y;
             double lateral = gamepad1.left_stick_x;
             double yaw = gamepad1.right_stick_x;
-            driveController.setDrive(axial, lateral, yaw, 1.0);
+            double scale = (gamepad1.left_trigger > 0.25) ? SLOW_DRIVE_SCALE : NORMAL_DRIVE_SCALE;
+            driveController.setDrive(axial, lateral, yaw, scale);
 
-            // Flywheel toggles (DPAD)
+            // Flywheel DPAD
             boolean dpadDownNow = gamepad1.dpad_down || gamepad2.dpad_down;
             if (dpadDownNow && !dpadDownLast) flywheel.toggleShooterOn();
             dpadDownLast = dpadDownNow;
@@ -278,85 +269,69 @@ public class OfficialHORS extends LinearOpMode {
             if (dpadRightNow && !dpadRightLast) flywheel.adjustTargetRPM(50.0);
             dpadRightLast = dpadRightNow;
 
-            // Gate manual toggle (B)
+            // Gate
             boolean bNow = gamepad1.b || gamepad2.b;
-            if (bNow && !bPressedLast && !gateController.isBusy()) {
-                gateController.toggleGate();
-            }
+            if (bNow && !bPressedLast && !gateController.isBusy()) gateController.toggleGate();
             bPressedLast = bNow;
 
-            // Intake auto sequence (Y)
             boolean yNow = gamepad1.y || gamepad2.y;
-            if (yNow && !yPressedLast && !gateController.isBusy()) {
-                gateController.startIntakeSequence(nowMs);
-            }
+            if (yNow && !yPressedLast && !gateController.isBusy()) gateController.startIntakeSequence(nowMs);
             yPressedLast = yNow;
 
-            // Gate sequence update + claw auto trigger
             boolean shouldTriggerClaw = gateController.update(nowMs);
-            if (shouldTriggerClaw) {
-                clawController.trigger(nowMs);
-            }
+            if (shouldTriggerClaw) clawController.trigger(nowMs);
 
             // Flywheel update
             boolean calibPressed = gamepad1.back || gamepad2.back;
             flywheel.handleLeftTrigger(gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1);
             flywheel.update(nowMs, calibPressed);
 
-            // Check if PIDF mode changed and update hood accordingly
             boolean currentPidfMode = flywheel.isUsingFarCoefficients();
             if (currentPidfMode != lastPidfMode) {
                 hoodController.setRightPosition(currentPidfMode ? RIGHT_HOOD_FAR : RIGHT_HOOD_CLOSE);
                 lastPidfMode = currentPidfMode;
             }
 
-            // Rumble when at target
-            if (flywheel.isAtTarget()) {
-                final int RUMBLE_MS = 200;
+            // Rumble only on edge + cooldown
+            if (flywheel.justReachedTarget() && (nowMs - lastAtTargetRumbleMs >= RUMBLE_COOLDOWN_MS)) {
+                final int RUMBLE_MS = 220;
                 try { gamepad1.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
                 try { gamepad2.rumble(RUMBLE_MS); } catch (Throwable ignored) {}
+                lastAtTargetRumbleMs = nowMs;
             }
 
-            // Turret control
+            // Turret
             turretController.commandHomingSweep(gamepad1.dpad_up || gamepad2.left_bumper);
 
             boolean manualNow = false;
             double manualPower = 0.0;
-
             if (gamepad1.right_bumper || gamepad2.right_stick_x > 0.2) {
                 manualNow = true; manualPower = 0.35;
             } else if (gamepad1.left_bumper || gamepad2.right_stick_x < -0.2) {
                 manualNow = true; manualPower = -0.35;
             }
-
             turretController.update(manualNow, manualPower);
 
-            // Intake manual (only if gate not busy)
+            // Intake manual
             if (!gateController.isBusy()) {
                 boolean leftTriggerNow = gamepad1.left_trigger > 0.1 || gamepad2.left_trigger > 0.1;
-                if (leftTriggerNow) {
-                    intakeMotor.setPower(-1.0);
-                } else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) {
-                    intakeMotor.setPower(1.0);
-                } else {
-                    intakeMotor.setPower(0.0);
-                }
+                if (leftTriggerNow) intakeMotor.setPower(-1.0);
+                else if (gamepad1.right_trigger > 0.1 || gamepad2.right_trigger > 0.1) intakeMotor.setPower(1.0);
+                else intakeMotor.setPower(0.0);
             }
 
-            // Claw manual (X)
+            // Claw
             boolean xNow = gamepad1.x || gamepad2.x;
-            if (xNow && !xPressedLast) {
-                clawController.trigger(nowMs);
-            }
+            if (xNow && !xPressedLast) clawController.trigger(nowMs);
             xPressedLast = xNow;
             clawController.update(nowMs);
 
-            // Hood adjustments
+            // Hood nudges
             if (gamepad1.a) hoodController.nudgeLeftUp(nowMs);
             if (gamepad1.b) hoodController.nudgeLeftDown(nowMs);
 
-            // Telemetry (centralized in TelemetryData)
             telemetryData.setPose(currentPose);
+            telemetry.addData("DriveScale", "%.2f", scale);
             telemetryData.update();
         }
 
