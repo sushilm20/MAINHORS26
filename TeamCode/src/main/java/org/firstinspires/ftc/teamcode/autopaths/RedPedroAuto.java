@@ -11,11 +11,13 @@ import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.Servo;
 
+import org.firstinspires.ftc.teamcode.autopaths.experimental.util.AutoGuards;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.ClawController;
 import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
@@ -44,6 +46,7 @@ public class RedPedroAuto extends OpMode {
     private Timer preActionTimer;
     private Timer poseWaitTimer;
     private Timer gateClearWaitTimer;
+    private Timer gateAlignWaitTimer;
 
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
@@ -63,6 +66,7 @@ public class RedPedroAuto extends OpMode {
     private static final double AUTO_SHOOTER_RPM = 2400;
 
     private DcMotor intakeMotor;
+    private DcMotorEx intakeMotorEx;
 
     private Servo clawServo;
     private Servo rightHoodServo;
@@ -79,6 +83,18 @@ public class RedPedroAuto extends OpMode {
     // Timing/telemetry helpers
     private long autoStartMs = -1;
     private boolean shutdownDone = false;
+
+    // ---------- AutoGuards ----------
+    private AutoGuards.ShooterGate shooterGate;
+    private AutoGuards.JamDetector jamDetector;
+
+    // Chassis speed tracking for shoot gating
+    private double lastPoseX = Double.NaN;
+    private double lastPoseY = Double.NaN;
+    private double lastPoseHeadingRad = Double.NaN;
+    private long lastPoseTimeMs = -1L;
+    private double translationalSpeedInPerS = 0.0;
+    private double angularSpeedDegPerS = 0.0;
 
     // ========================================
     // TIMING PARAMETERS
@@ -127,6 +143,28 @@ public class RedPedroAuto extends OpMode {
     public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35)
     public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
+
+    // ---------- New reliability tunables ----------
+    @Sorter(sort = 36)
+    public static double SHOOT_RPM_TOLERANCE = 50.0;
+    @Sorter(sort = 37)
+    public static double SHOOT_MAX_TRANS_SPEED = 1.5;
+    @Sorter(sort = 38)
+    public static double SHOOT_MAX_ANG_SPEED = 20.0;
+    @Sorter(sort = 39)
+    public static long SHOOT_STABLE_HOLD_MS = 150L;
+
+    @Sorter(sort = 40)
+    public static long FORCE_PARK_CUTOFF_MS = 26500L;
+
+    @Sorter(sort = 41)
+    public static double JAM_VELO_THRESHOLD = 120.0;
+    @Sorter(sort = 42)
+    public static long JAM_DETECT_MS = 160L;
+    @Sorter(sort = 43)
+    public static long JAM_CLEAR_MS = 260L;
+    @Sorter(sort = 44)
+    public static double JAM_CLEAR_POWER = 0.45; // opposite sign from intake (reverse pulse)
 
     // ========================================
     // PATH POSES - START POSITION
@@ -246,6 +284,21 @@ public class RedPedroAuto extends OpMode {
         timedIntakeActive = false;
         turretHoldTarget = 0;
 
+        shooterGate = new AutoGuards.ShooterGate(
+                START_POSE_TOLERANCE_IN,
+                SHOOT_RPM_TOLERANCE,
+                SHOOT_MAX_TRANS_SPEED,
+                SHOOT_MAX_ANG_SPEED,
+                SHOOT_STABLE_HOLD_MS
+        );
+
+        jamDetector = new AutoGuards.JamDetector(
+                JAM_VELO_THRESHOLD,
+                JAM_DETECT_MS,
+                JAM_CLEAR_MS,
+                JAM_CLEAR_POWER
+        );
+
         try {
             shooterMotor = hardwareMap.get(DcMotor.class, "shooter");
             shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
@@ -322,6 +375,7 @@ public class RedPedroAuto extends OpMode {
 
         try {
             intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
+            intakeMotorEx = (intakeMotor instanceof DcMotorEx) ? (DcMotorEx) intakeMotor : null;
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
@@ -341,7 +395,7 @@ public class RedPedroAuto extends OpMode {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
             if (rightHoodServo != null) {
                 rightHoodServo.setPosition(0.16);
-                panelsTelemetry.debug("Init", "Right hood servo initialized to 0.19");
+                panelsTelemetry.debug("Init", "Right hood servo initialized to 0.16");
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Init", "Right hood servo mapping failed: " + e.getMessage());
@@ -363,9 +417,6 @@ public class RedPedroAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        if (flywheel != null) {
-            // flywheel.update(System.currentTimeMillis(), false);
-        }
         if (turretController != null && turretForceHold) {
             turretController.holdPositionTicks(turretHoldTarget);
         }
@@ -384,11 +435,13 @@ public class RedPedroAuto extends OpMode {
             turretController.resetPidState();
         }
 
-        // Turn turret before any paths run (mirror blue: negative for red side)
         turretHoldTarget = -230;
         turretForceHold = true;
 
         shooterWaitStartMs = System.currentTimeMillis();
+        if (shooterGate != null) shooterGate.reset();
+        if (jamDetector != null) jamDetector.reset();
+
         state = AutoState.WAIT_FOR_SHOOTER;
     }
 
@@ -397,6 +450,15 @@ public class RedPedroAuto extends OpMode {
         follower.update();
 
         long nowMs = System.currentTimeMillis();
+
+        updateChassisSpeeds(nowMs);
+
+        if (AutoGuards.shouldForcePark(autoStartMs, nowMs, FORCE_PARK_CUTOFF_MS)) {
+            if (state != AutoState.FINISHED) {
+                panelsTelemetry.debug("ForcePark", "Cutoff reached; forcing finish");
+                state = AutoState.FINISHED;
+            }
+        }
 
         if (flywheel != null) {
             flywheel.handleLeftTrigger(false);
@@ -418,6 +480,9 @@ public class RedPedroAuto extends OpMode {
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
+        panelsTelemetry.debug("TransSpeed(in/s)", String.format("%.2f", translationalSpeedInPerS));
+        panelsTelemetry.debug("AngSpeed(deg/s)", String.format("%.2f", angularSpeedDegPerS));
+
         if (flywheel != null) {
             panelsTelemetry.debug("Fly RPM", String.format("%.1f", flywheel.getCurrentRPM()));
             panelsTelemetry.debug("Fly Target", String.format("%.1f", flywheel.getTargetRPM()));
@@ -432,6 +497,8 @@ public class RedPedroAuto extends OpMode {
         if (intakeMotor != null) {
             panelsTelemetry.debug("Intake Power", intakeMotor.getPower());
         }
+        panelsTelemetry.debug("JamClearing", jamDetector != null && jamDetector.isClearing());
+
         if (clawServo != null) {
             panelsTelemetry.debug("ClawPos", clawServo.getPosition());
         }
@@ -456,6 +523,36 @@ public class RedPedroAuto extends OpMode {
         }
     }
 
+    private void updateChassisSpeeds(long nowMs) {
+        Pose p = follower != null ? follower.getPose() : null;
+        if (p == null) return;
+
+        if (lastPoseTimeMs < 0) {
+            lastPoseX = p.getX();
+            lastPoseY = p.getY();
+            lastPoseHeadingRad = p.getHeading();
+            lastPoseTimeMs = nowMs;
+            translationalSpeedInPerS = 0.0;
+            angularSpeedDegPerS = 0.0;
+            return;
+        }
+
+        double dt = Math.max(1e-3, (nowMs - lastPoseTimeMs) / 1000.0);
+        double dx = p.getX() - lastPoseX;
+        double dy = p.getY() - lastPoseY;
+        translationalSpeedInPerS = Math.hypot(dx, dy) / dt;
+
+        double dH = p.getHeading() - lastPoseHeadingRad;
+        while (dH > Math.PI) dH -= 2.0 * Math.PI;
+        while (dH < -Math.PI) dH += 2.0 * Math.PI;
+        angularSpeedDegPerS = Math.abs(Math.toDegrees(dH) / dt);
+
+        lastPoseX = p.getX();
+        lastPoseY = p.getY();
+        lastPoseHeadingRad = p.getHeading();
+        lastPoseTimeMs = nowMs;
+    }
+
     private void resetToInitState() {
         if (flywheel != null) {
             flywheel.setShooterOn(false);
@@ -470,7 +567,6 @@ public class RedPedroAuto extends OpMode {
         if (clawServo != null) {
             clawServo.setPosition(ClawController.CLAW_OPEN);
         }
-
 
         if (rightHoodServo != null) {
             rightHoodServo.setPosition(0.16);
@@ -496,7 +592,15 @@ public class RedPedroAuto extends OpMode {
 
     private void startIntake(double power) {
         try {
-            if (intakeMotor != null) intakeMotor.setPower(power);
+            double finalPower = power;
+            if (jamDetector != null) {
+                double measuredVelocity = 0.0;
+                try {
+                    if (intakeMotorEx != null) measuredVelocity = intakeMotorEx.getVelocity();
+                } catch (Exception ignored) {}
+                finalPower = jamDetector.update(System.currentTimeMillis(), power, measuredVelocity);
+            }
+            if (intakeMotor != null) intakeMotor.setPower(finalPower);
         } catch (Exception e) {
             panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
         }
@@ -560,7 +664,17 @@ public class RedPedroAuto extends OpMode {
         state = AutoState.RUNNING_PATH;
     }
 
-    private Timer gateAlignWaitTimer;
+    private boolean isReadyToShoot(long nowMs) {
+        Pose current = follower != null ? follower.getPose() : null;
+        Pose shoot = new Pose(SHOOT_POSE_X, SHOOT_POSE_Y, 0.0);
+
+        double curRpm = flywheel != null ? flywheel.getCurrentRPM() : 0.0;
+        double tgtRpm = flywheel != null ? flywheel.getTargetRPM() : 0.0;
+
+        return shooterGate != null && shooterGate.isReady(
+                nowMs, current, shoot, curRpm, tgtRpm, translationalSpeedInPerS, angularSpeedDegPerS
+        );
+    }
 
     private void runStateMachine(long nowMs) {
         if (timedIntakeActive) {
@@ -586,7 +700,6 @@ public class RedPedroAuto extends OpMode {
                 if (!follower.isBusy()) {
                     int finished = currentPathIndex;
 
-                    // turret turning now happens before paths start; no adjustment after collectFirst3
                     if (finished == 3) {
                         gateAlignWaitTimer.resetTimer();
                         nextPathIndex = 4;
@@ -605,6 +718,7 @@ public class RedPedroAuto extends OpMode {
                         nextPathIndex = finished + 1;
                         preActionTimerStarted = false;
                         preActionEntered = false;
+                        if (shooterGate != null) shooterGate.reset();
                         state = AutoState.CLOSED_INTAKE_SEQUENCE;
                     } else {
                         int next = finished + 1;
@@ -654,21 +768,22 @@ public class RedPedroAuto extends OpMode {
                     poseWaitTimer.resetTimer();
                     preActionTimerStarted = false;
                     preActionEntered = true;
+                    if (shooterGate != null) shooterGate.reset();
                     panelsTelemetry.debug("PRE_ACTION", "Entered PRE_ACTION, starting pose-wait");
                 }
 
                 if (!preActionTimerStarted) {
-                    double dist = distanceToShootPose();
-                    if (dist <= START_POSE_TOLERANCE_IN) {
+                    boolean ready = isReadyToShoot(nowMs);
+                    if (ready) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "At pose: starting PRE_ACTION timer");
+                        panelsTelemetry.debug("PRE_ACTION", "Shooter gate READY: starting PRE_ACTION timer");
                     } else if (poseWaitTimer.getElapsedTimeSeconds() >= PRE_ACTION_MAX_POSE_WAIT_SECONDS) {
                         preActionTimer.resetTimer();
                         preActionTimerStarted = true;
-                        panelsTelemetry.debug("PRE_ACTION", "Pose-wait timeout: starting PRE_ACTION timer anyway (dist=" + String.format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Pose/motion timeout: starting PRE_ACTION timer");
                     } else {
-                        panelsTelemetry.debug("PRE_ACTION", "Waiting for pose (dist=" + String.format("%.2f", dist) + ")");
+                        panelsTelemetry.debug("PRE_ACTION", "Waiting shooter gate...");
                     }
                 } else {
                     if (preActionTimer.getElapsedTimeSeconds() >= PRE_ACTION_WAIT_SECONDS) {
@@ -682,7 +797,7 @@ public class RedPedroAuto extends OpMode {
             case INTAKE_RUN:
                 if (intakeTimer.getElapsedTimeSeconds() >= INTAKE_RUN_SECONDS) {
                     startIntake(INTAKE_ON_POWER);
-                    flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
+                    if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
                     clawActionStartMs = System.currentTimeMillis();
                     state = AutoState.CLAW_ACTION;
@@ -747,7 +862,6 @@ public class RedPedroAuto extends OpMode {
         public PathChain moveForRP;
 
         public Paths(Follower follower) {
-            // Path 1: Start -> Primary shoot pose
             startToShoot = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -758,7 +872,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(SHOOT_HEADING_INITIAL))
                     .build();
 
-            // Path 2: Shoot -> Collect first 3
             collectFirst3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -769,7 +882,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(COLLECT_FIRST3_HEADING))
                     .build();
 
-            // Path 3: Collect first 3 -> Gate align
             gateAlign = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -782,7 +894,6 @@ public class RedPedroAuto extends OpMode {
                     .setBrakingStrength(1.0)
                     .build();
 
-            // Path 4: Gate align -> Gate clear
             gateClear = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -793,7 +904,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(GATE_CLEAR_HEADING))
                     .build();
 
-            // Path 5: Gate clear -> Shoot (angled for first 3)
             backToShootFirst3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -804,7 +914,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(SHOOT_HEADING_FIRST3))
                     .build();
 
-            // Path 6: Shoot -> Align for second 3
             alignToCollectSecond3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -815,7 +924,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(ALIGN_SECOND3_HEADING))
                     .build();
 
-            // Path 7: Align -> Collect second 3
             collectSecond3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -826,7 +934,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(COLLECT_SECOND3_HEADING))
                     .build();
 
-            // Path 8: Collect second 3 -> Shoot (angled for second 3)
             backToShootSecond3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -837,7 +944,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(SHOOT_SECOND3_HEADING))
                     .build();
 
-            // Path 9: Shoot -> Align for third 3
             alignToCollectThird3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -848,7 +954,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(ALIGN_THIRD3_HEADING))
                     .build();
 
-            // Path 10: Align -> Collect third 3
             collectThird3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -859,7 +964,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(COLLECT_THIRD3_HEADING))
                     .build();
 
-            // Path 11: Collect third 3 -> Shoot (final)
             backToShootThird3 = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
@@ -870,7 +974,6 @@ public class RedPedroAuto extends OpMode {
                             Math.toRadians(SHOOT_FINAL_HEADING))
                     .build();
 
-            // Path 12: Shoot -> Move for RP
             moveForRP = follower
                     .pathBuilder()
                     .addPath(new BezierLine(
