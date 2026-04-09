@@ -82,15 +82,15 @@ public class Dynamic12Blue extends OpMode {
 
 //Timing params
     @Sorter(sort = 0)
-    public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6 keep old
+    public static double INTAKE_RUN_SECONDS = 0.45;               // was 0.6
     @Sorter(sort = 1)
-    public static double TIMED_INTAKE_SECONDS = 0.65;             // was 1.0 keep old
+    public static double TIMED_INTAKE_SECONDS = 0.65;             // was 1.0
     @Sorter(sort = 3)
-    public static double PRE_ACTION_WAIT_SECONDS = 0.35;          // was 1.0 keep old
+    public static double PRE_ACTION_WAIT_SECONDS = 0.35;          // was 1.0
     @Sorter(sort = 4)
-    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.60; // was 1.5 keep old
+    public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 0.60; // was 1.5
     @Sorter(sort = 5)
-    public static long SHOOTER_WAIT_TIMEOUT_MS = 700L;            // was 1300 keep old
+    public static long SHOOTER_WAIT_TIMEOUT_MS = 700L;            // was 1300
 
     // ========================================
     // INTAKE POWER SETTINGS
@@ -112,9 +112,9 @@ public class Dynamic12Blue extends OpMode {
     @Sorter(sort = 20)
     public static double START_POSE_TOLERANCE_IN = 4.0;
 
-    // ========================================
+    // ===============
     // GATE SETTINGS
-    // ========================================
+    // ===============
     @Sorter(sort = 30)
     public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31)
