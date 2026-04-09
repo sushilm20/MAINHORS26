@@ -11,7 +11,7 @@ public final class AutoGuards {
     }
 
     public static boolean shouldForcePark(long autoStartMs, long nowMs, long cutoffMs) {
-        if (autoStartMs < 0) return false;
+        if (autoStartMs < 0) return false;//force park
         return nowMs - autoStartMs >= cutoffMs;
     }
 
