@@ -35,7 +35,7 @@ public class RedPedroAuto extends OpMode {
     private AutoState state = AutoState.IDLE;
 
     private int currentPathIndex = 0;
-    private int nextPathIndex = -1;
+    private int nextPathIndex = -1;//update now
 
     private Timer intakeTimer;
     private Timer timedIntakeTimer;
