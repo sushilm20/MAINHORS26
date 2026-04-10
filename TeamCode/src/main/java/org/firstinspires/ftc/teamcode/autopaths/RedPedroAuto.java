@@ -243,7 +243,7 @@ public class RedPedroAuto extends OpMode {
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake map failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Intake mapping failed: " + e.getMessage());
         }
 
         try {
@@ -658,7 +658,7 @@ public class RedPedroAuto extends OpMode {
             backToShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y), new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_SECOND3_HEADING), Math.toRadians(SHOOT_SECOND3_HEADING))
-                    .build();//re write logic for this path
+                    .build();
 
             alignToCollectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(new Pose(SHOOT_POSE_X, SHOOT_POSE_Y), new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y)))
