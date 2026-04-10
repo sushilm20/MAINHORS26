@@ -658,7 +658,7 @@ public class RedPedroAuto extends OpMode {
             backToShootSecond3 = follower.pathBuilder()
                     .addPath(new BezierLine(new Pose(COLLECT_SECOND3_X, COLLECT_SECOND3_Y), new Pose(SHOOT_POSE_X, SHOOT_POSE_Y)))
                     .setLinearHeadingInterpolation(Math.toRadians(COLLECT_SECOND3_HEADING), Math.toRadians(SHOOT_SECOND3_HEADING))
-                    .build();
+                    .build();//re write logic for this path
 
             alignToCollectThird3 = follower.pathBuilder()
                     .addPath(new BezierLine(new Pose(SHOOT_POSE_X, SHOOT_POSE_Y), new Pose(ALIGN_THIRD3_X, ALIGN_THIRD3_Y)))
