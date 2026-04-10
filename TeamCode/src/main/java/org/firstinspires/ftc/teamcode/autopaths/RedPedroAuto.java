@@ -42,49 +42,42 @@ public class RedPedroAuto extends OpMode {
 
     private Timer intakeTimer;
     private Timer timedIntakeTimer;
-    private boolean timedIntakeActive = false;
-
-    private long clawActionStartMs = 0L;
-
     private Timer preActionTimer;
     private Timer poseWaitTimer;
     private Timer gateClearWaitTimer;
     private Timer gateAlignWaitTimer;
 
+    private boolean timedIntakeActive = false;
     private boolean preActionTimerStarted = false;
     private boolean preActionEntered = false;
 
+    private long clawActionStartMs = 0L;
     private long shooterWaitStartMs = -1;
+    private long autoStartMs = -1;
+    private boolean shutdownDone = false;
 
     private DcMotor shooterMotor;
     private DcMotor shooterMotor2;
     private DcMotor turretMotor;
+    private DcMotor intakeMotor;
+    private DcMotorEx intakeMotorEx;
 
     private BNO055IMU pinpointImu = null;
     private BNO055IMU hubImu = null;
     private BNO055IMU imu = null;
 
-    private FlywheelController flywheel;
-    private TurretController turretController;
-    private static final double AUTO_SHOOTER_RPM = 2400;
-
-    private DcMotor intakeMotor;
-    private DcMotorEx intakeMotorEx;
-
     private Servo clawServo;
     private Servo rightHoodServo;
-
-    private int intakeSegmentEnd = -1;
-
-    private final boolean turretForceManualNoMove = false;
-    private boolean turretForceHold = true;
-    private int turretHoldTarget = 0;
-
     private Servo gateServo;
+
+    private FlywheelController flywheel;
+    private TurretController turretController;
+
+    private static final double AUTO_SHOOTER_RPM = 2400;
     private boolean gateClosed = false;
 
-    private long autoStartMs = -1;
-    private boolean shutdownDone = false;
+    private boolean turretForceHold = true;
+    private int turretHoldTarget = 0;
 
     // Guards
     private AutoGuards.ShooterGate shooterGate;
@@ -98,31 +91,23 @@ public class RedPedroAuto extends OpMode {
     private double translationalSpeedInPerS = 0.0;
     private double angularSpeedDegPerS = 0.0;
 
-    // ========================================
-    // TIMING PARAMETERS
-    // ========================================
+    // Timing
     @Sorter(sort = 0)  public static double INTAKE_RUN_SECONDS = 0.6;
     @Sorter(sort = 1)  public static double TIMED_INTAKE_SECONDS = 1.0;
     @Sorter(sort = 3)  public static double PRE_ACTION_WAIT_SECONDS = 1.0;
     @Sorter(sort = 4)  public static double PRE_ACTION_MAX_POSE_WAIT_SECONDS = 1.5;
     @Sorter(sort = 5)  public static long SHOOTER_WAIT_TIMEOUT_MS = 1300L;
 
-    // ========================================
-    // INTAKE POWER SETTINGS
-    // ========================================
+    // Intake power
     @Sorter(sort = 10) public static double INTAKE_ON_POWER = -0.75;
     @Sorter(sort = 11) public static double SHOOT_POSE_INTAKE_POWER = -1.0;
     @Sorter(sort = 12) public static double CLOSED_INTAKE_POWER = -0.67;
     @Sorter(sort = 13) public static double CLOSED_INTAKE_TOLERANCE_IN = 10.0;
 
-    // ========================================
-    // TOLERANCE SETTINGS
-    // ========================================
+    // Tolerances
     @Sorter(sort = 20) public static double START_POSE_TOLERANCE_IN = 2.0;
 
-    // ========================================
-    // GATE SETTINGS
-    // ========================================
+    // Gate
     @Sorter(sort = 30) public static double GATE_OPEN = 0.67;
     @Sorter(sort = 31) public static double GATE_CLOSED = 0.485;
     @Sorter(sort = 32) public static double GATE_OPEN_TOLERANCE_IN = 2.3;
@@ -130,12 +115,11 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 34) public static double GATE_ALIGN_WAIT_SECONDS = 0.6;
     @Sorter(sort = 35) public static double WAIT_AFTER_GATE_CLEAR_SECONDS = 0.8;
 
-    // Reliability tunables
+    // Reliability
     @Sorter(sort = 36) public static double SHOOT_RPM_TOLERANCE = 50.0;
     @Sorter(sort = 37) public static double SHOOT_MAX_TRANS_SPEED = 1.5;
     @Sorter(sort = 38) public static double SHOOT_MAX_ANG_SPEED = 20.0;
     @Sorter(sort = 39) public static long SHOOT_STABLE_HOLD_MS = 150L;
-
     @Sorter(sort = 40) public static long FORCE_PARK_CUTOFF_MS = 26500L;
 
     @Sorter(sort = 41) public static double JAM_VELO_THRESHOLD = 120.0;
@@ -143,9 +127,7 @@ public class RedPedroAuto extends OpMode {
     @Sorter(sort = 43) public static long JAM_CLEAR_MS = 260L;
     @Sorter(sort = 44) public static double JAM_CLEAR_POWER = 0.45;
 
-    // ========================================
-    // POSES
-    // ========================================
+    // Poses
     @Sorter(sort = 100) public static double START_X = 124.0;
     @Sorter(sort = 101) public static double START_Y = 122.0;
     @Sorter(sort = 102) public static double START_HEADING = 45.0;
@@ -204,18 +186,10 @@ public class RedPedroAuto extends OpMode {
         gateAlignWaitTimer = new Timer();
         gateClearWaitTimer = new Timer();
 
-        nextPathIndex = -1;
-        intakeSegmentEnd = -1;
-        preActionTimerStarted = false;
-        preActionEntered = false;
-        timedIntakeActive = false;
-        turretHoldTarget = 0;
-
         shooterGate = new AutoGuards.ShooterGate(
                 START_POSE_TOLERANCE_IN, SHOOT_RPM_TOLERANCE,
                 SHOOT_MAX_TRANS_SPEED, SHOOT_MAX_ANG_SPEED, SHOOT_STABLE_HOLD_MS
         );
-
         jamDetector = new AutoGuards.JamDetector(
                 JAM_VELO_THRESHOLD, JAM_DETECT_MS, JAM_CLEAR_MS, JAM_CLEAR_POWER
         );
@@ -225,22 +199,17 @@ public class RedPedroAuto extends OpMode {
             shooterMotor2 = hardwareMap.get(DcMotor.class, "shooter2");
             turretMotor = hardwareMap.get(DcMotor.class, "turret");
 
-            if (shooterMotor != null) {
-                shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-                shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            }
-            if (shooterMotor2 != null) {
-                shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
-                shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            }
-            if (turretMotor != null) {
-                turretMotor.setDirection(DcMotor.Direction.FORWARD);
-                turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            }
+            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+            shooterMotor2.setDirection(DcMotor.Direction.FORWARD);
+            shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            shooterMotor2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+            turretMotor.setDirection(DcMotor.Direction.FORWARD);
+            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Failed to map shooter/turret motors: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Motor map/config failed: " + e.getMessage());
         }
 
         try {
@@ -259,16 +228,13 @@ public class RedPedroAuto extends OpMode {
         }
 
         try {
-            if (shooterMotor != null) flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
-            if (turretMotor != null) turretController = new TurretController(turretMotor, imu, telemetry);
-
-            if (turretController != null) {
-                turretController.captureReferences();
-                turretController.resetPidState();
-            }
-            if (flywheel != null) flywheel.setShooterOn(false);
+            flywheel = new FlywheelController(shooterMotor, shooterMotor2, telemetry);
+            turretController = new TurretController(turretMotor, imu, telemetry);
+            turretController.captureReferences();
+            turretController.resetPidState();
+            flywheel.setShooterOn(false);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Flywheel/Turret controller error: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Controller init failed: " + e.getMessage());
         }
 
         try {
@@ -277,34 +243,25 @@ public class RedPedroAuto extends OpMode {
             intakeMotor.setDirection(DcMotor.Direction.REVERSE);
             intakeMotor.setPower(0.0);
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Intake mapping failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Intake map failed: " + e.getMessage());
         }
 
         try {
             clawServo = hardwareMap.get(Servo.class, "clawServo");
-            if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Claw mapping failed: " + e.getMessage());
-        }
-
-        try {
             rightHoodServo = hardwareMap.get(Servo.class, "rightHoodServo");
-            if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Hood mapping failed: " + e.getMessage());
-        }
-
-        try {
             gateServo = hardwareMap.get(Servo.class, "gateServo");
+
+            if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
+            if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
             if (gateServo != null) {
                 gateServo.setPosition(GATE_CLOSED);
                 gateClosed = true;
             }
         } catch (Exception e) {
-            panelsTelemetry.debug("Init", "Gate mapping failed: " + e.getMessage());
+            panelsTelemetry.debug("Init", "Servo map failed: " + e.getMessage());
         }
 
-        panelsTelemetry.debug("Status", "Initialized (shooter OFF until start)");
+        panelsTelemetry.debug("Status", "Initialized");
         panelsTelemetry.update(telemetry);
     }
 
@@ -318,6 +275,9 @@ public class RedPedroAuto extends OpMode {
     @Override
     public void start() {
         autoStartMs = System.currentTimeMillis();
+        shutdownDone = false;
+        state = AutoState.WAIT_FOR_SHOOTER;
+        shooterWaitStartMs = System.currentTimeMillis();
 
         if (flywheel != null) {
             flywheel.setShooterOn(true);
@@ -331,11 +291,8 @@ public class RedPedroAuto extends OpMode {
         turretHoldTarget = -230;
         turretForceHold = true;
 
-        shooterWaitStartMs = System.currentTimeMillis();
         if (shooterGate != null) shooterGate.reset();
         if (jamDetector != null) jamDetector.reset();
-
-        state = AutoState.WAIT_FOR_SHOOTER;
     }
 
     @Override
@@ -346,7 +303,6 @@ public class RedPedroAuto extends OpMode {
         updateChassisSpeeds(nowMs);
 
         if (AutoGuards.shouldForcePark(autoStartMs, nowMs, FORCE_PARK_CUTOFF_MS) && state != AutoState.FINISHED) {
-            panelsTelemetry.debug("ForcePark", "Cutoff reached; forcing finish");
             state = AutoState.FINISHED;
         }
 
@@ -364,17 +320,18 @@ public class RedPedroAuto extends OpMode {
 
         panelsTelemetry.debug("State", state.name());
         panelsTelemetry.debug("PathIdx", currentPathIndex);
-        panelsTelemetry.debug("Pose", String.format("(%.1f, %.1f, %.1f°)",
-                follower.getPose().getX(), follower.getPose().getY(), Math.toDegrees(follower.getPose().getHeading())));
-        panelsTelemetry.debug("TransSpeed(in/s)", String.format("%.2f", translationalSpeedInPerS));
-        panelsTelemetry.debug("AngSpeed(deg/s)", String.format("%.2f", angularSpeedDegPerS));
-        panelsTelemetry.debug("JamClearing", jamDetector != null && jamDetector.isClearing());
         panelsTelemetry.update(telemetry);
 
         if (state == AutoState.FINISHED && !shutdownDone) {
             resetToInitState();
             shutdownDone = true;
         }
+    }
+
+    @Override
+    public void stop() {
+        resetToInitState();
+        state = AutoState.FINISHED;
     }
 
     private void updateChassisSpeeds(long nowMs) {
@@ -392,9 +349,7 @@ public class RedPedroAuto extends OpMode {
         }
 
         double dt = Math.max(1e-3, (nowMs - lastPoseTimeMs) / 1000.0);
-        double dx = p.getX() - lastPoseX;
-        double dy = p.getY() - lastPoseY;
-        translationalSpeedInPerS = Math.hypot(dx, dy) / dt;
+        translationalSpeedInPerS = Math.hypot(p.getX() - lastPoseX, p.getY() - lastPoseY) / dt;
 
         double dH = p.getHeading() - lastPoseHeadingRad;
         while (dH > Math.PI) dH -= 2.0 * Math.PI;
@@ -405,114 +360,6 @@ public class RedPedroAuto extends OpMode {
         lastPoseY = p.getY();
         lastPoseHeadingRad = p.getHeading();
         lastPoseTimeMs = nowMs;
-    }
-
-    private void resetToInitState() {
-        if (flywheel != null) {
-            flywheel.setShooterOn(false);
-            flywheel.setTargetRPM(0.0);
-            flywheel.update(System.currentTimeMillis(), false);
-        }
-        stopIntake();
-
-        if (gateServo != null) {
-            gateServo.setPosition(GATE_CLOSED);
-            gateClosed = true;
-        }
-        if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
-        if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
-
-        if (turretController != null && turretForceHold) {
-            turretHoldTarget = 0;
-            turretController.holdPositionTicks(turretHoldTarget);
-        }
-        if (turretMotor != null) {
-            try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
-        }
-    }
-
-    @Override
-    public void stop() {
-        resetToInitState();
-        state = AutoState.FINISHED;
-    }
-
-    private void startIntake() {
-        startIntake(INTAKE_ON_POWER);
-    }
-
-    private void startIntake(double power) {
-        try {
-            double finalPower = power;
-            if (jamDetector != null) {
-                double measuredVelocity = 0.0;
-                try {
-                    if (intakeMotorEx != null) measuredVelocity = intakeMotorEx.getVelocity();
-                } catch (Exception ignored) {}
-                finalPower = jamDetector.update(System.currentTimeMillis(), power, measuredVelocity);
-            }
-            if (intakeMotor != null) intakeMotor.setPower(finalPower);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
-        }
-    }
-
-    private void stopIntake() {
-        try {
-            if (intakeMotor != null) intakeMotor.setPower(0.0);
-        } catch (Exception e) {
-            panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
-        }
-    }
-
-    private boolean endsAtShoot(int pathIndex) {
-        return pathIndex == 1 || pathIndex == 5 || pathIndex == 8 || pathIndex == 11;
-    }
-
-    private double distanceToShootPose() {
-        try {
-            Pose p = follower.getPose();
-            double dx = p.getX() - SHOOT_POSE_X;
-            double dy = p.getY() - SHOOT_POSE_Y;
-            return Math.hypot(dx, dy);
-        } catch (Exception e) {
-            return Double.POSITIVE_INFINITY;
-        }
-    }
-
-    private void startPath(int idx) {
-        if (idx < 1 || idx > 12) {
-            currentPathIndex = 0;
-            state = AutoState.FINISHED;
-            return;
-        }
-
-        startIntake(INTAKE_ON_POWER);
-
-        if (idx == 5 || idx == 8 || idx == 11) {
-            timedIntakeTimer.resetTimer();
-            timedIntakeActive = true;
-            panelsTelemetry.debug("TimedIntake", "Started timed intake for path " + idx);
-        }
-
-        switch (idx) {
-            case 1: follower.followPath(paths.startToShoot); break;
-            case 2: follower.followPath(paths.collectFirst3); break;
-            case 3: follower.followPath(paths.gateAlign); break;
-            case 4: follower.followPath(paths.gateClear); break;
-            case 5: follower.followPath(paths.backToShootFirst3); break;
-            case 6: follower.followPath(paths.alignToCollectSecond3); break;
-            case 7: follower.followPath(paths.collectSecond3); break;
-            case 8: follower.followPath(paths.backToShootSecond3); break;
-            case 9: follower.followPath(paths.alignToCollectThird3); break;
-            case 10: follower.followPath(paths.collectThird3); break;
-            case 11: follower.followPath(paths.backToShootThird3); break;
-            case 12: follower.followPath(paths.moveForRP); break;
-            default: break;
-        }
-
-        currentPathIndex = idx;
-        state = AutoState.RUNNING_PATH;
     }
 
     private boolean isReadyToShoot(long nowMs) {
@@ -528,21 +375,18 @@ public class RedPedroAuto extends OpMode {
     }
 
     private void runStateMachine(long nowMs) {
-        if (timedIntakeActive) {
-            if (timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
-                startIntake(INTAKE_ON_POWER);
-                timedIntakeActive = false;
-            }
+        if (timedIntakeActive && timedIntakeTimer.getElapsedTimeSeconds() >= TIMED_INTAKE_SECONDS) {
+            startIntake(INTAKE_ON_POWER);
+            timedIntakeActive = false;
         }
 
         switch (state) {
-            case WAIT_FOR_SHOOTER:
+            case WAIT_FOR_SHOOTER: {
                 boolean atTarget = (flywheel != null && flywheel.isAtTarget());
-                long elapsed = (shooterWaitStartMs < 0) ? 0 : (System.currentTimeMillis() - shooterWaitStartMs);
-                if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) {
-                    startPath(1);
-                }
+                long elapsed = (shooterWaitStartMs < 0) ? 0 : (nowMs - shooterWaitStartMs);
+                if (atTarget || elapsed >= SHOOTER_WAIT_TIMEOUT_MS) startPath(1);
                 break;
+            }
 
             case RUNNING_PATH:
                 if (!follower.isBusy()) {
@@ -594,11 +438,12 @@ public class RedPedroAuto extends OpMode {
                 }
                 break;
 
-            case CLOSED_INTAKE_SEQUENCE:
-                double distPre = distanceToShootPose();
-                if (distPre <= CLOSED_INTAKE_TOLERANCE_IN) startIntake(CLOSED_INTAKE_POWER);
-                if (distPre <= START_POSE_TOLERANCE_IN) state = AutoState.PRE_ACTION;
+            case CLOSED_INTAKE_SEQUENCE: {
+                double dist = distanceToShootPose();
+                if (dist <= CLOSED_INTAKE_TOLERANCE_IN) startIntake(CLOSED_INTAKE_POWER);
+                if (dist <= START_POSE_TOLERANCE_IN) state = AutoState.PRE_ACTION;
                 break;
+            }
 
             case PRE_ACTION:
                 if (!preActionEntered) {
@@ -626,13 +471,13 @@ public class RedPedroAuto extends OpMode {
                     startIntake(INTAKE_ON_POWER);
                     if (flywheel != null) flywheel.setTargetRPM(0.95 * AUTO_SHOOTER_RPM);
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_CLOSED);
-                    clawActionStartMs = System.currentTimeMillis();
+                    clawActionStartMs = nowMs;
                     state = AutoState.CLAW_ACTION;
                 }
                 break;
 
             case CLAW_ACTION:
-                if (System.currentTimeMillis() >= clawActionStartMs + ClawController.CLAW_CLOSE_MS) {
+                if (nowMs >= clawActionStartMs + ClawController.CLAW_CLOSE_MS) {
                     if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
                     if (nextPathIndex > 0 && nextPathIndex <= 12) {
                         startPath(nextPathIndex);
@@ -642,19 +487,85 @@ public class RedPedroAuto extends OpMode {
                 break;
 
             case FINISHED:
-                if (turretForceHold) turretHoldTarget = 0;
-                break;
-
             case IDLE:
             default:
                 break;
         }
     }
 
+    private void startPath(int idx) {
+        if (idx < 1 || idx > 12) {
+            currentPathIndex = 0;
+            state = AutoState.FINISHED;
+            return;
+        }
+
+        startIntake(INTAKE_ON_POWER);
+
+        if (idx == 5 || idx == 8 || idx == 11) {
+            timedIntakeTimer.resetTimer();
+            timedIntakeActive = true;
+        }
+
+        switch (idx) {
+            case 1: follower.followPath(paths.startToShoot); break;
+            case 2: follower.followPath(paths.collectFirst3); break;
+            case 3: follower.followPath(paths.gateAlign); break;
+            case 4: follower.followPath(paths.gateClear); break;
+            case 5: follower.followPath(paths.backToShootFirst3); break;
+            case 6: follower.followPath(paths.alignToCollectSecond3); break;
+            case 7: follower.followPath(paths.collectSecond3); break;
+            case 8: follower.followPath(paths.backToShootSecond3); break;
+            case 9: follower.followPath(paths.alignToCollectThird3); break;
+            case 10: follower.followPath(paths.collectThird3); break;
+            case 11: follower.followPath(paths.backToShootThird3); break;
+            case 12: follower.followPath(paths.moveForRP); break;
+            default: break;
+        }
+
+        currentPathIndex = idx;
+        state = AutoState.RUNNING_PATH;
+    }
+
+    private boolean endsAtShoot(int pathIndex) {
+        return pathIndex == 1 || pathIndex == 5 || pathIndex == 8 || pathIndex == 11;
+    }
+
+    private double distanceToShootPose() {
+        try {
+            Pose p = follower.getPose();
+            return Math.hypot(p.getX() - SHOOT_POSE_X, p.getY() - SHOOT_POSE_Y);
+        } catch (Exception e) {
+            return Double.POSITIVE_INFINITY;
+        }
+    }
+
+    private void startIntake(double power) {
+        try {
+            double finalPower = power;
+            if (jamDetector != null) {
+                double measuredVelocity = 0.0;
+                try { if (intakeMotorEx != null) measuredVelocity = intakeMotorEx.getVelocity(); }
+                catch (Exception ignored) {}
+                finalPower = jamDetector.update(System.currentTimeMillis(), power, measuredVelocity);
+            }
+            if (intakeMotor != null) intakeMotor.setPower(finalPower);
+        } catch (Exception e) {
+            panelsTelemetry.debug("Intake", "startIntake error: " + e.getMessage());
+        }
+    }
+
+    private void stopIntake() {
+        try {
+            if (intakeMotor != null) intakeMotor.setPower(0.0);
+        } catch (Exception e) {
+            panelsTelemetry.debug("Intake", "stopIntake error: " + e.getMessage());
+        }
+    }
+
     private void updateGate() {
         try {
             double dist = distanceToShootPose();
-
             if (dist <= GATE_OPEN_TOLERANCE_IN && gateServo != null && gateClosed) {
                 gateServo.setPosition(GATE_OPEN);
                 gateClosed = false;
@@ -664,6 +575,31 @@ public class RedPedroAuto extends OpMode {
             }
         } catch (Exception e) {
             panelsTelemetry.debug("Gate", "updateGate error: " + e.getMessage());
+        }
+    }
+
+    private void resetToInitState() {
+        if (flywheel != null) {
+            flywheel.setShooterOn(false);
+            flywheel.setTargetRPM(0.0);
+            flywheel.update(System.currentTimeMillis(), false);
+        }
+        stopIntake();
+
+        if (gateServo != null) {
+            gateServo.setPosition(GATE_CLOSED);
+            gateClosed = true;
+        }
+        if (clawServo != null) clawServo.setPosition(ClawController.CLAW_OPEN);
+        if (rightHoodServo != null) rightHoodServo.setPosition(0.16);
+
+        if (turretController != null && turretForceHold) {
+            turretHoldTarget = 0;
+            turretController.holdPositionTicks(turretHoldTarget);
+        }
+
+        if (turretMotor != null) {
+            try { turretMotor.setPower(0.0); } catch (Exception ignored) {}
         }
     }
 
