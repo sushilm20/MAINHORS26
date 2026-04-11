@@ -372,7 +372,13 @@ public class OfficialHORS extends LinearOpMode {
          on the robot, always pushing the boundaries of what we could achieve. At the start I initially didn't think much
          of the club than just for building my resume for college but I've come to realize this club is so much more than that.
          If i had to recall a special movement that will stay with me for the rest of my life, it would be the moment of centerstage
-         where we qualified for WORLD. From then, I come to reali
+         where we qualified for WORLD. From then, I come to realize that I had to carry legacy.
+
+
+            I want to thank everyone in the club for making this experience unforgettable, and
+            I hope that the legacy of our team continues to inspire future generations of FTC teams to reach for the stars
+            and achieve greatness.
+
 
          */
     }
