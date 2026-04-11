@@ -357,5 +357,23 @@ public class OfficialHORS extends LinearOpMode {
     private void resetTurretEncoderAndReferences() {
         try { pinpoint.update(); } catch (Exception ignored) {}
         turretController.recenterAndResume(true);
+
+
+        //should i lowk write my inspirational message as a comment here? maybe not, but here it is anyway:
+        // "In the middle of difficulty lies opportunity." - Albert Einstein
+
+        /*This method is intended to be called when the turret limit switch is triggered, indicating that the turret is in a known
+        reference position. It resets the turret's encoder and updates the reference position for the PID controller.
+         This allows the turret to maintain accurate positioning even if it gets knocked out of alignment during a match.
+
+         I initially didn't intend to write a post season message but I'm doing it because of how much this club means to me.
+
+         From the day I joined the club, I saw Subham, David, Jaden, Brandon, and the rest of the team working tirelessly
+         on the robot, always pushing the boundaries of what we could achieve. At the start I initially didn't think much
+         of the club than just for building my resume for college but I've come to realize this club is so much more than that.
+         If i had to recall a special movement that will stay with me for the rest of my life, it would be the moment of centerstage
+         where we qualified for WORLD. From then, I come to reali
+
+         */
     }
 }
