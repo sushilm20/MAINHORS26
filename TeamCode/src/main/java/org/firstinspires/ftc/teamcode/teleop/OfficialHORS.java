@@ -381,7 +381,7 @@ public class OfficialHORS extends LinearOpMode {
 
 
 
-        From the start of the season with the future of the club in my hands, I honestly did not know I was going to pull of creat
+        I want not innitially write this but i do so because i mean it a lot
 
 
          */
