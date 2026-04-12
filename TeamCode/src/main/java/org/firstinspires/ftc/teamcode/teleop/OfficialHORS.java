@@ -375,13 +375,8 @@ public class OfficialHORS extends LinearOpMode {
          where we qualified for WORLD. From then, I come to realize that I had to carry legacy.
 
 
-            I want to thank everyone in the club for making this experience unforgettable, and
-            I hope that the legacy of our team continues to inspire future generations of FTC teams to reach for the stars
-            and achieve greatness.
 
 
-
-        I want not innitially write this but i do so because i mean it a lot
 
 
          */
