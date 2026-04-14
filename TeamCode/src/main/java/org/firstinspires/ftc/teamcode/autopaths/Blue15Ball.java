@@ -35,7 +35,7 @@ public class Blue15Ball extends OpMode {
 
     private enum AutoState {
         IDLE, WAIT_FOR_SHOOTER, RUNNING_PATH, WAIT_FIRST_SHOOT,
-        CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED
+        CLOSED_INTAKE_SEQUENCE, PRE_ACTION, INTAKE_RUN, CLAW_ACTION, FINISHED//extras
     }
 
     private AutoState state = AutoState.IDLE;
