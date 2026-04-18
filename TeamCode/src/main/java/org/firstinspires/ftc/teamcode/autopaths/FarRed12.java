@@ -131,7 +131,7 @@ public class FarRed12 extends OpMode {
 
     // Bezier control: Shoot -> Collect First 3
     @Sorter(sort = 123) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_X = 58.000;
-    @Sorter(sort = 124) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_Y = 34.000;
+    @Sorter(sort = 124) public static double SHOOT_TO_COLLECT_FIRST3_CTRL_Y = 34.000;//ok
 
     // ========================================
     // PATH POSES - EXTEND FIRST 3 COLLECT
