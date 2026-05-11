@@ -362,8 +362,7 @@ public class OfficialHORS extends LinearOpMode {
         //should i lowk write my inspirational message as a comment here? maybe not, but here it is anyway:
         // "In the middle of difficulty lies opportunity." - Albert Einstein
 
-        /*This method is intended to be called when the turret limit switch is triggered, indicating that the turret is in a known
-        reference position. It resets the turret's encoder and updates the reference position for the PID controller.
+        /*
          This allows the turret to maintain accurate positioning even if it gets knocked out of alignment during a match.
 
          I initially didn't intend to write a post season message but I'm doing it because of how much this club means to me.

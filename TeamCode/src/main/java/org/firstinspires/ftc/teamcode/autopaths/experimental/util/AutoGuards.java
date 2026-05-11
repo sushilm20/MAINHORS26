@@ -7,7 +7,7 @@ public final class AutoGuards {
 
     public static boolean hasTimedOut(long startMs, long timeoutMs, long nowMs) {
         if (startMs < 0) return false;
-        return nowMs - startMs >= timeoutMs;
+        return nowMs - startMs >= timeoutMs;//vison false safes
     }
 
     public static boolean shouldForcePark(long autoStartMs, long nowMs, long cutoffMs) {
