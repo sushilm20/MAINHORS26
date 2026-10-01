@@ -2,6 +2,7 @@ repositories {
     mavenCentral()
     google() // Needed for androidx
     maven { url = "https://mymaven.bylazar.com/releases" }
+    maven { url 'https://repo.dairy.foundation/releases/' }
 }
 
 dependencies {
@@ -15,8 +16,8 @@ dependencies {
     implementation 'org.firstinspires.ftc:Vision:11.1.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
 
-    implementation 'com.pedropathing:ftc:2.1.2'
-    implementation 'com.pedropathing:telemetry:1.0.0'
+    implementation 'com.pedropathing:revhub:3.0.1'
+    implementation 'com.pedropathing:tuning:1.0.1'
     implementation "com.bylazar:configurables:1.0.5"
     implementation 'com.bylazar:fullpanels:1.0.12'
     implementation "com.bylazar:gamepad:1.0.4"
@@ -25,7 +26,5 @@ dependencies {
     implementation "com.bylazar:themes:1.0.3"
     implementation "com.bylazar:camerastream:1.0.0"
     implementation "com.bylazar:telemetry:1.0.5"
-
-    implementation 'com.pedropathing:ivy:1.0.0'//pedro ivy API support
 }
 
